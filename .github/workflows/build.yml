@@ -40,9 +40,12 @@ jobs:
             libxcomposite1 libxdamage1 libxrandr2 libasound2t64 \
             libdbus-1-3 libfontconfig1 libfreetype6 libx11-xcb1 \
             libxcb-cursor0 libxcb-icccm4 libxcb-image0 \
-            libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 \
-            libxcb-shape0 libxcb-shm0 libxcb-xfixes0 libxcb-xinerama0 \
-            libxcb-xkb1 libxext6 libxrender1 xvfb
+            libxcb-keysyms1 libxcb-randr0 libxcb-render0 \
+            libxcb-render-util0 libxcb-shape0 libxcb-shm0 \
+            libxcb-sync1 libxcb-util1 libxcb-xfixes0 \
+            libxcb-xinput0 libxcb-xinerama0 libxcb-xkb1 \
+            libxkbcommon-x11-0 libpulse0 \
+            libxext6 libxrender1 xvfb
 
       - name: Install Python dependencies
         run: |
@@ -64,6 +67,9 @@ jobs:
         run: |
           set -e
           export CLOUDAR_DEBUG=1
+          # WebEngine needs the sandbox disabled when running inside CI containers
+          export QTWEBENGINE_DISABLE_SANDBOX=1
+          export QTWEBENGINE_CHROMIUM_FLAGS="--no-sandbox --disable-gpu"
           timeout 30 xvfb-run -a python main.py &
           PID=$!
           sleep 20
