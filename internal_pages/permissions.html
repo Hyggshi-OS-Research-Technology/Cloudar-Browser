@@ -1,0 +1,160 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Permissions</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" />
+  <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --panel: #151923;
+      --panel-2: #1b2230;
+      --text: #e6edf3;
+      --muted: #9aa4b2;
+      --accent: #f59e0b;
+      --border: rgba(255,255,255,0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Space Grotesk', sans-serif;
+      color: var(--text);
+      background: radial-gradient(1200px 500px at 70% -20%, rgba(245,158,11,0.18), transparent), var(--bg);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+    h1 { margin: 0; font-size: 24px; }
+    button {
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .table {
+      padding: 16px 24px 24px;
+      overflow: auto;
+      flex: 1;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--panel);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    th, td {
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+    th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+    select {
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 8px;
+      border-radius: 8px;
+    }
+    .empty { color: var(--muted); text-align: center; padding: 20px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Permissions</h1>
+    <button id="clear">Clear All</button>
+  </header>
+  <div class="table" id="table"></div>
+
+  <script>
+    let bridge = null;
+    const tableEl = document.getElementById('table');
+    const permKeys = ['camera', 'microphone', 'location', 'notifications'];
+
+    const buildSelect = (origin, key, value) => {
+      const select = document.createElement('select');
+      ['ask', 'allow', 'deny'].forEach((opt) => {
+        const o = document.createElement('option');
+        o.value = opt;
+        o.textContent = opt;
+        if (opt === value) o.selected = true;
+        select.appendChild(o);
+      });
+      select.onchange = () => bridge.setPermission(origin, key, select.value);
+      return select;
+    };
+
+    const render = (data) => {
+      const origins = Object.keys(data || {});
+      if (!origins.length) {
+        tableEl.innerHTML = '<div class="empty">No permissions stored yet.</div>';
+        return;
+      }
+
+      const table = document.createElement('table');
+      const thead = document.createElement('thead');
+      thead.innerHTML = `
+        <tr>
+          <th>Site</th>
+          <th>Camera</th>
+          <th>Microphone</th>
+          <th>Location</th>
+          <th>Notifications</th>
+        </tr>
+      `;
+      table.appendChild(thead);
+      const tbody = document.createElement('tbody');
+
+      origins.forEach((origin) => {
+        const row = document.createElement('tr');
+        const perms = data[origin] || {};
+        row.appendChild(Object.assign(document.createElement('td'), { textContent: origin }));
+        permKeys.forEach((key) => {
+          const td = document.createElement('td');
+          td.appendChild(buildSelect(origin, key, perms[key] || 'ask'));
+          row.appendChild(td);
+        });
+        tbody.appendChild(row);
+      });
+      table.appendChild(tbody);
+      tableEl.innerHTML = '';
+      tableEl.appendChild(table);
+    };
+
+    const load = () => {
+      if (!bridge) return;
+      bridge.getPermissions((data) => render(data || {}));
+    };
+
+    document.getElementById('clear').onclick = () => {
+      if (confirm('Clear all saved permissions?')) {
+        bridge.clearPermissions();
+      }
+    };
+
+    const initChannel = () => {
+      if (typeof qt === 'undefined') return;
+      new QWebChannel(qt.webChannelTransport, (channel) => {
+        bridge = channel.objects.internalBridge;
+        if (!bridge) return;
+        if (bridge.permissionsChanged) bridge.permissionsChanged.connect(load);
+        load();
+      });
+    };
+
+    window.addEventListener('DOMContentLoaded', initChannel);
+  </script>
+</body>
+</html>

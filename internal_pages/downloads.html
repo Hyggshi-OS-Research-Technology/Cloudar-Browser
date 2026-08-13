@@ -1,0 +1,170 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Downloads</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" />
+  <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --panel: #151923;
+      --panel-2: #1b2230;
+      --text: #e6edf3;
+      --muted: #9aa4b2;
+      --accent: #22c55e;
+      --border: rgba(255,255,255,0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Space Grotesk', sans-serif;
+      color: var(--text);
+      background: radial-gradient(1200px 500px at 20% -20%, rgba(34,197,94,0.16), transparent), var(--bg);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+    h1 { margin: 0; font-size: 24px; }
+    .list {
+      padding: 16px 24px 24px;
+      overflow: auto;
+      flex: 1;
+    }
+    .row {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+    .row-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .name { font-weight: 600; }
+    .status { color: var(--muted); font-size: 12px; }
+    .progress {
+      height: 6px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 999px;
+      overflow: hidden;
+      margin: 10px 0;
+    }
+    .progress > div {
+      height: 100%;
+      background: var(--accent);
+      width: 0;
+      transition: width 0.2s ease;
+    }
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    button {
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .empty { color: var(--muted); text-align: center; padding: 20px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Downloads</h1>
+  </header>
+  <div class="list" id="list"></div>
+
+  <script>
+    let bridge = null;
+    const listEl = document.getElementById('list');
+
+    const statusText = (item, active) => {
+      if (item.cancelled) return 'Cancelled';
+      if (item.completed) return 'Completed';
+      if (active && item.paused) return 'Paused';
+      if (active) return `Downloading ${item.progress || 0}%`;
+      return 'Interrupted';
+    };
+
+    const render = (items) => {
+      listEl.innerHTML = '';
+      if (!items || !items.length) {
+        listEl.innerHTML = '<div class="empty">No downloads yet.</div>';
+        return;
+      }
+
+      items.forEach((item) => {
+        const active = !item.completed && !item.cancelled && (item.progress < 100);
+        const row = document.createElement('div');
+        row.className = 'row';
+        row.innerHTML = `
+          <div class="row-top">
+            <div>
+              <div class="name">${item.filename}</div>
+              <div class="status">${statusText(item, active)}</div>
+            </div>
+          </div>
+          <div class="progress"><div style="width:${item.progress || 0}%"></div></div>
+          <div class="actions"></div>
+        `;
+
+        const actions = row.querySelector('.actions');
+        const addBtn = (label, onClick) => {
+          const b = document.createElement('button');
+          b.textContent = label;
+          b.onclick = onClick;
+          actions.appendChild(b);
+        };
+
+        if (item.completed) {
+          addBtn('Open', () => bridge.openDownload(item.filename));
+        }
+        addBtn('Show in Folder', () => bridge.showInFolder(item.filename));
+
+        if (active) {
+          addBtn(item.paused ? 'Resume' : 'Pause', () => {
+            if (item.paused) bridge.resumeDownload(item.filename);
+            else bridge.pauseDownload(item.filename);
+          });
+          addBtn('Cancel', () => bridge.cancelDownload(item.filename));
+        }
+
+        listEl.appendChild(row);
+      });
+    };
+
+    const load = () => {
+      if (!bridge) return;
+      bridge.getDownloads((items) => render(items));
+    };
+
+    const initChannel = () => {
+      if (typeof qt === 'undefined') return;
+      new QWebChannel(qt.webChannelTransport, (channel) => {
+        bridge = channel.objects.internalBridge;
+        if (!bridge) return;
+        if (bridge.downloadsChanged) bridge.downloadsChanged.connect(load);
+        load();
+      });
+    };
+
+    window.addEventListener('DOMContentLoaded', initChannel);
+  </script>
+</body>
+</html>

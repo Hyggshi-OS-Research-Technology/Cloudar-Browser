@@ -1,0 +1,372 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Experiments</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" />
+  <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --panel: #151923;
+      --panel-2: #1b2230;
+      --text: #e6edf3;
+      --muted: #9aa4b2;
+      --accent: #7c3aed;
+      --accent-2: #5865f2;
+      --warn: #f59e0b;
+      --border: rgba(255,255,255,0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Space Grotesk', sans-serif;
+      color: var(--text);
+      background: radial-gradient(1200px 500px at 70% -20%, rgba(124,58,237,0.18), transparent), var(--bg);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      padding: 20px 24px 14px;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: var(--bg);
+      z-index: 5;
+    }
+    header .top-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    h1 { margin: 0; font-size: 24px; }
+    h1 span { color: var(--accent); }
+    .warning {
+      background: rgba(245,158,11,0.12);
+      border: 1px solid rgba(245,158,11,0.35);
+      color: #fbbf24;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 12.5px;
+      margin-bottom: 12px;
+    }
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    input[type="text"] {
+      flex: 1;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-family: inherit;
+      font-size: 13px;
+    }
+    input[type="text"]:focus { outline: 2px solid var(--accent-2); }
+    button {
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 600;
+      font-family: inherit;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    button:hover { background: #24304a; }
+    .content {
+      padding: 16px 24px 90px;
+      overflow: auto;
+      flex: 1;
+    }
+    .category-title {
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin: 22px 0 8px;
+    }
+    .category-title:first-child { margin-top: 0; }
+    .flag-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 10px;
+    }
+    .flag-info { flex: 1; min-width: 0; }
+    .flag-title {
+      font-weight: 600;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .badge {
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: rgba(88,101,242,0.18);
+      color: #aab8ff;
+      border: 1px solid rgba(88,101,242,0.35);
+    }
+    .badge.restart {
+      background: rgba(245,158,11,0.14);
+      color: #fbbf24;
+      border-color: rgba(245,158,11,0.3);
+    }
+    .flag-desc {
+      color: var(--muted);
+      font-size: 12.5px;
+      margin-top: 4px;
+      line-height: 1.5;
+    }
+    .flag-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .status-label {
+      font-size: 12px;
+      color: var(--muted);
+      min-width: 64px;
+      text-align: right;
+    }
+    .switch {
+      position: relative;
+      width: 42px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background: #3a3f4b;
+      border-radius: 999px;
+      transition: 0.15s;
+    }
+    .slider::before {
+      content: "";
+      position: absolute;
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      top: 3px;
+      background: #e6edf3;
+      border-radius: 50%;
+      transition: 0.15s;
+    }
+    input:checked + .slider { background: var(--accent-2); }
+    input:checked + .slider::before { transform: translateX(18px); }
+    .empty { color: var(--muted); text-align: center; padding: 40px; }
+
+    .relaunch-bar {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 14px 20px;
+      background: #1b2230;
+      border-top: 1px solid var(--border);
+      box-shadow: 0 -8px 24px rgba(0,0,0,0.35);
+    }
+    .relaunch-bar.show { display: flex; }
+    .relaunch-bar span { font-size: 13px; color: var(--text); }
+    .relaunch-bar button {
+      background: var(--accent-2);
+      border: none;
+      color: #fff;
+    }
+    .relaunch-bar button:hover { background: #6f7bf5; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="top-row">
+      <h1><span>cloudar://</span>flags</h1>
+      <button id="resetAll" data-tr="flags_reset_all">Reset all</button>
+    </div>
+    <div class="warning" data-tr="flags_experimental_warning">
+      These are experimental features that may change, break, or be removed without notice. Use with caution.
+    </div>
+    <div class="toolbar">
+      <input type="text" id="search" data-tr-placeholder="flags_search_placeholder" placeholder="Search flags" />
+    </div>
+  </header>
+
+  <div class="content" id="content"></div>
+
+  <div class="relaunch-bar" id="relaunchBar">
+    <span data-tr="flags_relaunch_banner">Some changes need a relaunch to take effect.</span>
+    <button id="relaunchBtn" data-tr="flags_relaunch_button">Relaunch</button>
+  </div>
+
+  <script>
+    let bridge = null;
+    let flags = [];
+    let strings = {};
+
+    const t = (key, fallback) => strings[key] || fallback || key;
+
+    const applyStaticTranslations = () => {
+      document.querySelectorAll('[data-tr]').forEach((el) => {
+        const key = el.getAttribute('data-tr');
+        el.textContent = t(key, el.textContent);
+      });
+      document.querySelectorAll('[data-tr-placeholder]').forEach((el) => {
+        const key = el.getAttribute('data-tr-placeholder');
+        el.placeholder = t(key, el.placeholder);
+      });
+    };
+
+    const contentEl = document.getElementById('content');
+    const relaunchBar = document.getElementById('relaunchBar');
+
+    const renderFlag = (flag) => {
+      const card = document.createElement('div');
+      card.className = 'flag-card';
+
+      const info = document.createElement('div');
+      info.className = 'flag-info';
+
+      const titleRow = document.createElement('div');
+      titleRow.className = 'flag-title';
+      titleRow.appendChild(Object.assign(document.createElement('span'), { textContent: flag.title }));
+      if (flag.restart_required) {
+        const badge = document.createElement('span');
+        badge.className = 'badge restart';
+        badge.textContent = '\u21bb';
+        badge.title = t('flags_relaunch_banner');
+        titleRow.appendChild(badge);
+      }
+      const catBadge = document.createElement('span');
+      catBadge.className = 'badge';
+      catBadge.textContent = flag.category;
+      titleRow.appendChild(catBadge);
+      info.appendChild(titleRow);
+
+      const desc = document.createElement('div');
+      desc.className = 'flag-desc';
+      desc.textContent = flag.description;
+      info.appendChild(desc);
+
+      const controls = document.createElement('div');
+      controls.className = 'flag-controls';
+
+      const statusLbl = document.createElement('span');
+      statusLbl.className = 'status-label';
+      statusLbl.textContent = flag.is_override
+        ? (flag.enabled ? t('flags_status_enabled') : t('flags_status_disabled'))
+        : t('flags_status_default');
+      controls.appendChild(statusLbl);
+
+      const label = document.createElement('label');
+      label.className = 'switch';
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.checked = !!flag.enabled;
+      input.onchange = () => {
+        bridge.setFlag(flag.id, input.checked, () => {
+          if (flag.restart_required) relaunchBar.classList.add('show');
+          load();
+        });
+      };
+      const slider = document.createElement('span');
+      slider.className = 'slider';
+      label.appendChild(input);
+      label.appendChild(slider);
+      controls.appendChild(label);
+
+      card.appendChild(info);
+      card.appendChild(controls);
+      return card;
+    };
+
+    const render = (query) => {
+      const q = (query || '').trim().toLowerCase();
+      const filtered = flags.filter((f) =>
+        !q || f.title.toLowerCase().includes(q) || f.description.toLowerCase().includes(q) || f.id.includes(q)
+      );
+
+      contentEl.innerHTML = '';
+      if (!filtered.length) {
+        contentEl.innerHTML = `<div class="empty">${t('flags_no_results')}</div>`;
+        return;
+      }
+
+      const byCategory = {};
+      filtered.forEach((f) => {
+        byCategory[f.category] = byCategory[f.category] || [];
+        byCategory[f.category].push(f);
+      });
+
+      Object.keys(byCategory).sort().forEach((cat) => {
+        const title = document.createElement('div');
+        title.className = 'category-title';
+        title.textContent = cat;
+        contentEl.appendChild(title);
+        byCategory[cat].forEach((f) => contentEl.appendChild(renderFlag(f)));
+      });
+    };
+
+    const load = () => {
+      if (!bridge) return;
+      bridge.getFlags((data) => {
+        flags = data || [];
+        render(document.getElementById('search').value);
+        if (flags.some((f) => f.restart_required && f.is_override)) {
+          relaunchBar.classList.add('show');
+        }
+      });
+    };
+
+    document.getElementById('search').addEventListener('input', (e) => render(e.target.value));
+
+    document.getElementById('resetAll').addEventListener('click', () => {
+      if (!bridge) return;
+      bridge.resetAllFlags(() => load());
+      relaunchBar.classList.remove('show');
+    });
+
+    document.getElementById('relaunchBtn').addEventListener('click', () => {
+      if (bridge) bridge.relaunchBrowser();
+    });
+
+    const initChannel = () => {
+      if (typeof qt === 'undefined') return;
+      new QWebChannel(qt.webChannelTransport, (channel) => {
+        bridge = channel.objects.internalBridge;
+        if (!bridge) return;
+        if (bridge.flagsChanged) bridge.flagsChanged.connect(load);
+        load();
+      });
+    };
+
+    window.addEventListener('DOMContentLoaded', () => {
+      if (window.INJECTED_STRINGS) strings = window.INJECTED_STRINGS;
+      applyStaticTranslations();
+      initChannel();
+    });
+  </script>
+</body>
+</html>

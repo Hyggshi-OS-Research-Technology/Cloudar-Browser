@@ -1,0 +1,18 @@
+{
+  "homepage": "cloudar://newtab",
+  "search_engine": "https://www.google.com/search?q={}",
+  "theme": "dark",
+  "accent_color": "#ffa657",
+  "background": "cloudar-asset://bg_f1bdd6c0b00c.png",
+  "startup": "newtab",
+  "downloads_folder": "/home/hyggshi/Downloads/Hyggshi browser Python",
+  "ask_before_download": true,
+  "hardware_accel": true,
+  "incognito": true,
+  "language": "en",
+  "tab_sleep_minutes": 5,
+  "version": "1.0.0",
+  "engine": "Qt WebEngine",
+  "vertical_tabs": false,
+  "vertical_tabs_collapsed": true
+}

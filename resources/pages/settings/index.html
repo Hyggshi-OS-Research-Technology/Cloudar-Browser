@@ -1,0 +1,189 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cloudar Settings</title>
+  <base href="cloudar://settings/">
+  <link rel="stylesheet" href="cloudar://settings/styles.css" />
+  <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+</head>
+<body class="theme-dark">
+  <div class="settings-app">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="app-title">Settings</div>
+        <div class="app-subtitle">Cloudar Browser™</div>
+      </div>
+      <nav class="nav">
+        <button class="nav-item active" data-section="general">General</button>
+        <button class="nav-item" data-section="language">Language</button>
+        <button class="nav-item" data-section="privacy">Privacy</button>
+        <button class="nav-item" data-section="downloads">Downloads</button>
+        <button class="nav-item" data-section="appearance">Appearance</button>
+        <button class="nav-item" data-section="performance">Performance</button>
+        <button class="nav-item" data-section="about">About</button>
+      </nav>
+    </aside>
+
+    <main class="content">
+      <section class="section active" id="general">
+        <h1>General Settings</h1>
+        <div class="card">
+          <label class="field">
+            <span>Home page</span>
+            <input id="homepage" type="text" placeholder="cloudar://newtab" />
+          </label>
+          <label class="field">
+            <span>Search engine</span>
+            <input id="search_engine" type="text" placeholder="https://google.com/search?q={}" />
+          </label>
+          <label class="field">
+            <span>Startup behavior</span>
+            <select id="startup">
+              <option value="newtab">Open New Tab</option>
+              <option value="continue">Continue where you left off</option>
+              <option value="homepage">Open Home Page</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section class="section" id="language">
+        <h1>Language</h1>
+        <div class="card">
+          <label class="field">
+            <span>Browser Language</span>
+            <select id="language-select">
+              <option value="">Loading...</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section class="section" id="privacy">
+        <h1>Privacy</h1>
+        <div class="card">
+          <div class="toggle-row">
+            <div>
+              <div class="label">Incognito mode</div>
+              <div class="hint">Allow opening incognito windows</div>
+            </div>
+            <label class="switch">
+              <input id="incognito" type="checkbox" />
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="divider"></div>
+          <div class="action-row">
+            <div>
+              <div class="label">Clear browsing data</div>
+              <div class="hint">History, cookies, and cache</div>
+            </div>
+            <button id="clear_data" class="secondary">Clear</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="downloads">
+        <h1>Downloads</h1>
+        <div class="card">
+          <label class="field">
+            <span>Download folder</span>
+            <div class="inline">
+              <input id="downloads_folder" type="text" placeholder="Select folder" />
+              <button id="choose_folder" class="secondary">Browse</button>
+            </div>
+          </label>
+          <div class="toggle-row">
+            <div>
+              <div class="label">Ask before download</div>
+              <div class="hint">Choose location for every download</div>
+            </div>
+            <label class="switch">
+              <input id="ask_before_download" type="checkbox" />
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="appearance">
+        <h1>Appearance</h1>
+        <div class="card">
+          <label class="field">
+            <span>Theme</span>
+            <select id="theme">
+              <option value="dark">Dark</option>
+              <option value="light">Light</option>
+              <option value="system">System</option>
+            </select>
+          </label>
+          <div class="toggle-row">
+            <div>
+              <div class="label">Vertical tabs</div>
+              <div class="hint">Show tabs on the side like Chrome</div>
+            </div>
+            <label class="switch">
+              <input id="vertical_tabs" type="checkbox" />
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <div>
+              <div class="label">Collapse vertical tabs</div>
+              <div class="hint">Show icons only, then expand on hover</div>
+            </div>
+            <label class="switch">
+              <input id="vertical_tabs_collapsed" type="checkbox" />
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
+      </section>
+
+      <section class="section" id="performance">
+        <h1>Performance</h1>
+        <div class="card">
+          <div class="toggle-row">
+            <div>
+              <div class="label">Hardware acceleration</div>
+              <div class="hint">Use GPU acceleration when available</div>
+            </div>
+            <label class="switch">
+              <input id="hardware_accel" type="checkbox" />
+              <span class="slider"></span>
+            </label>
+          </div>
+          <label class="field" style="margin-top:16px;">
+            <span>Sleep inactive tabs after (minutes)</span>
+            <input id="tab_sleep_minutes" type="number" min="1" max="120" step="1" />
+          </label>
+        </div>
+      </section>
+
+      <section class="section" id="about">
+        <h1>About</h1>
+        <div class="card">
+          <div class="about-row">
+            <div class="about-title">Cloudar Browser™</div>
+            <div id="version" class="about-value">Version</div>
+          </div>
+          <div class="about-row">
+            <div class="about-title">Engine</div>
+            <div id="engine" class="about-value">Engine</div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" class="toast">Saved</div>
+
+  <script src="cloudar://settings/app.js"></script>
+</body>
+</html>
+
+
+

@@ -1,0 +1,138 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Extensions</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" />
+  <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --panel: #151923;
+      --panel-2: #1b2230;
+      --text: #e6edf3;
+      --muted: #9aa4b2;
+      --accent: #a78bfa;
+      --border: rgba(255,255,255,0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Space Grotesk', sans-serif;
+      color: var(--text);
+      background: radial-gradient(1200px 500px at 30% -20%, rgba(167,139,250,0.18), transparent), var(--bg);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+    h1 { margin: 0; font-size: 24px; }
+    .list {
+      padding: 16px 24px 24px;
+      overflow: auto;
+      flex: 1;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .name { font-weight: 600; }
+    .desc { color: var(--muted); font-size: 12px; }
+    .meta { color: var(--muted); font-size: 12px; }
+    .toggle {
+      width: 44px;
+      height: 24px;
+      border-radius: 999px;
+      background: #30363d;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .toggle::after {
+      content: '';
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #fff;
+      top: 3px;
+      left: 3px;
+      transition: transform 0.2s;
+    }
+    .toggle.on { background: var(--accent); }
+    .toggle.on::after { transform: translateX(20px); }
+    .empty { color: var(--muted); text-align: center; padding: 20px; }
+    .note { color: var(--muted); font-size: 12px; padding: 0 24px 18px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Extensions</h1>
+    <div class="meta">Load unpacked extensions from <code>extensions/</code></div>
+  </header>
+  <div class="list" id="list"></div>
+  <div class="note">Restart tabs to ensure content scripts are applied everywhere.</div>
+
+  <script>
+    let bridge = null;
+    const listEl = document.getElementById('list');
+
+    const render = (items) => {
+      listEl.innerHTML = '';
+      if (!items || !items.length) {
+        listEl.innerHTML = '<div class="empty">No extensions found.</div>';
+        return;
+      }
+      items.forEach((ext) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <div>
+            <div class="name">${ext.name}</div>
+            <div class="desc">${ext.description || 'No description'}</div>
+            <div class="meta">${ext.id} · v${ext.version}</div>
+          </div>
+          <div class="toggle ${ext.enabled ? 'on' : ''}"></div>
+        `;
+        const toggle = card.querySelector('.toggle');
+        toggle.onclick = () => {
+          const next = !toggle.classList.contains('on');
+          bridge.toggleExtension(ext.id, next, () => {});
+        };
+        listEl.appendChild(card);
+      });
+    };
+
+    const load = () => {
+      if (!bridge) return;
+      bridge.getExtensions((items) => render(items || []));
+    };
+
+    const initChannel = () => {
+      if (typeof qt === 'undefined') return;
+      new QWebChannel(qt.webChannelTransport, (channel) => {
+        bridge = channel.objects.internalBridge;
+        if (!bridge) return;
+        if (bridge.extensionsChanged) bridge.extensionsChanged.connect(load);
+        load();
+      });
+    };
+
+    window.addEventListener('DOMContentLoaded', initChannel);
+  </script>
+</body>
+</html>

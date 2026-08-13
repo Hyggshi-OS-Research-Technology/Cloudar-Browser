@@ -1,0 +1,26 @@
+{
+  "home_page": "cloudar://newtab",
+  "search_engine": "https://www.google.com/search?q={}",
+  "download_location": "/home/hyggshi/Downloads/Hyggshi browser Python",
+  "theme": "Dark",
+  "language": "en",
+  "show_bookmark_bar": false,
+  "vertical_tabs": false,
+  "vertical_tabs_collapsed": true,
+  "translation_enabled": true,
+  "third_party_cookies": "block",
+  "safe_browsing": true,
+  "ad_privacy": true,
+  "newtab_frame_color": "#ffa657",
+  "newtab_background_image": "cloudar-asset://bg_f1bdd6c0b00c.png",
+  "performance_memory_saver": true,
+  "performance_energy_saver": true,
+  "performance_hardware_acceleration": true,
+  "tab_sleep_minutes": 5,
+  "startup_behavior": "Open New Tab",
+  "ask_download": true,
+  "incognito_enabled": true,
+  "last_session": [
+    "cloudar://newtab"
+  ]
+}

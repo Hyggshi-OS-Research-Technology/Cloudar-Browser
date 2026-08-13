@@ -1,0 +1,159 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>History</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" />
+  <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --panel: #151923;
+      --panel-2: #1b2230;
+      --text: #e6edf3;
+      --muted: #9aa4b2;
+      --accent: #60a5fa;
+      --border: rgba(255,255,255,0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Space Grotesk', sans-serif;
+      color: var(--text);
+      background: radial-gradient(1200px 500px at 80% -20%, rgba(96,165,250,0.18), transparent), var(--bg);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      padding: 20px 24px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+    h1 { margin: 0; font-size: 24px; }
+    .search {
+      display: flex;
+      gap: 10px;
+      flex: 1;
+      max-width: 520px;
+    }
+    input {
+      flex: 1;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 8px;
+    }
+    button {
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button.primary { background: var(--accent); color: #0b0f12; border: none; }
+    .list {
+      padding: 16px 24px 24px;
+      overflow: auto;
+      flex: 1;
+    }
+    .row {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 10px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      cursor: pointer;
+    }
+    .row:hover { background: var(--panel-2); }
+    .title { font-weight: 600; }
+    .url { color: var(--muted); font-size: 12px; }
+    .time { color: var(--muted); font-size: 12px; }
+    .empty { color: var(--muted); text-align: center; padding: 20px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>History</h1>
+    <div class="search">
+      <input id="query" type="text" placeholder="Search history" />
+      <button id="clear">Clear History</button>
+    </div>
+  </header>
+  <div class="list" id="list"></div>
+
+  <script>
+    let bridge = null;
+    const listEl = document.getElementById('list');
+    const queryEl = document.getElementById('query');
+
+    const render = (items) => {
+      listEl.innerHTML = '';
+      if (!items || !items.length) {
+        listEl.innerHTML = '<div class="empty">No history found.</div>';
+        return;
+      }
+      items.forEach((item) => {
+        const row = document.createElement('div');
+        row.className = 'row';
+        const visited = (item.visited || '').replace('T', ' ').split('.')[0];
+        row.innerHTML = `
+          <div>
+            <div class="title">${item.title || item.url}</div>
+            <div class="url">${item.url}</div>
+          </div>
+          <div class="time">${visited}</div>
+        `;
+        row.onclick = () => { window.location.href = item.url; };
+        listEl.appendChild(row);
+      });
+    };
+
+    const load = () => {
+      if (!bridge) return;
+      bridge.getHistory(200, (items) => render(items));
+    };
+
+    const search = () => {
+      if (!bridge) return;
+      const q = queryEl.value.trim();
+      if (!q) {
+        load();
+      } else {
+        bridge.searchHistory(q, (items) => render(items));
+      }
+    };
+
+    document.getElementById('clear').onclick = () => {
+      if (confirm('Clear all browsing history?')) {
+        bridge.clearHistory();
+      }
+    };
+
+    queryEl.addEventListener('input', () => { search(); });
+
+    const initChannel = () => {
+      if (typeof qt === 'undefined') return;
+      new QWebChannel(qt.webChannelTransport, (channel) => {
+        bridge = channel.objects.internalBridge;
+        if (!bridge) return;
+        if (bridge.historyChanged) bridge.historyChanged.connect(load);
+        load();
+      });
+    };
+
+    window.addEventListener('DOMContentLoaded', initChannel);
+  </script>
+</body>
+</html>

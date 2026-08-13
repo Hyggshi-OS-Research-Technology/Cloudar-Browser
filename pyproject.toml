@@ -1,0 +1,50 @@
+[tool.briefcase]
+project_name = "Cloudar Browser"
+bundle = "com.cloudar"
+version = "1.0.0"
+url = "https://example.com/cloudar"
+license = "MIT"
+author = "Cloudar Team"
+author_email = "contact@example.com"
+
+[tool.briefcase.app.cloudar]
+formal_name = "Cloudar Browser"
+description = "A modern, private web browser."
+long_description = "Cloudar Browser features a customizable New Tab page, privacy tools, and performance optimizations."
+icon = "resources/Icon"
+sources = ["."]
+test_sources = ["tests"]
+
+[tool.briefcase.app.cloudar.macOS]
+universal_build = true
+requires = [
+    "std-nslog",
+    "PyQt6==6.6.1",
+    "PyQt6-WebEngine==6.6.0"
+]
+
+[tool.briefcase.app.cloudar.linux]
+requires = [
+    "PyQt6==6.6.1",
+    "PyQt6-WebEngine==6.6.0"
+]
+
+[tool.briefcase.app.cloudar.windows]
+requires = [
+    "PyQt6==6.6.1",
+    "PyQt6-WebEngine==6.6.0"
+]
+
+# --- Android Specific Configuration ---
+[tool.briefcase.app.cloudar.android]
+requires = [
+    "PyQt6==6.6.1",
+    # Note: PyQt6-WebEngine is NOT supported on mobile.
+    # We use native QtWebView instead.
+    "PyQt6-Qt6>=6.6.0" 
+]
+
+permission = [
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_NETWORK_STATE"
+]

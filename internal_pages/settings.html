@@ -1,0 +1,943 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloudar Settings</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #0d1117;
+            color: #e6edf3;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        /* â”€â”€ Layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        .settings-layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* â”€â”€ Sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        .sidebar {
+            width: 260px;
+            min-width: 260px;
+            background: #161b22;
+            border-right: 1px solid #30363d;
+            padding: 24px 0;
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            overflow-y: auto;
+        }
+
+        .sidebar-header {
+            padding: 0 20px 20px;
+            border-bottom: 1px solid #30363d;
+            margin-bottom: 8px;
+        }
+
+        .sidebar-header h1 {
+            font-size: 20px;
+            font-weight: 600;
+            background: linear-gradient(135deg, #60cdff, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .sidebar-header p {
+            font-size: 12px;
+            color: #8b949e;
+            margin-top: 4px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 20px;
+            color: #8b949e;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            border-left: 3px solid transparent;
+            text-decoration: none;
+        }
+
+        .nav-item:hover {
+            background: rgba(96, 205, 255, 0.06);
+            color: #e6edf3;
+        }
+
+        .nav-item.active {
+            background: rgba(96, 205, 255, 0.1);
+            color: #60cdff;
+            border-left-color: #60cdff;
+        }
+
+        .nav-item .icon {
+            width: 20px;
+            text-align: center;
+            font-size: 16px;
+        }
+
+        .nav-item .label {
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        /* â”€â”€ Content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        .content {
+            flex: 1;
+            margin-left: 260px;
+            padding: 32px 48px;
+            max-width: 800px;
+        }
+
+        .section {
+            margin-bottom: 40px;
+            scroll-margin-top: 24px;
+        }
+
+        .section-title {
+            font-size: 22px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #e6edf3;
+        }
+
+        .section-desc {
+            font-size: 13px;
+            color: #8b949e;
+            margin-bottom: 24px;
+        }
+
+        /* â”€â”€ Cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        .card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            padding: 20px 24px;
+            margin-bottom: 16px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+
+        .card-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: #e6edf3;
+        }
+
+        .card-desc {
+            font-size: 12px;
+            color: #8b949e;
+            margin-top: 2px;
+        }
+
+        /* â”€â”€ Form Controls â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        select, input[type="text"], input[type="url"] {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            color: #e6edf3;
+            padding: 8px 12px;
+            font-size: 13px;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.15s;
+            min-width: 200px;
+        }
+
+        select:focus, input[type="text"]:focus, input[type="url"]:focus {
+            border-color: #60cdff;
+        }
+
+        select {
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%238b949e' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 32px;
+        }
+
+        /* â”€â”€ Toggle Switch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        .toggle {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+
+        .toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background: #30363d;
+            border-radius: 24px;
+            transition: 0.2s;
+        }
+
+        .toggle-slider::before {
+            content: '';
+            position: absolute;
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background: #8b949e;
+            border-radius: 50%;
+            transition: 0.2s;
+        }
+
+        .toggle input:checked + .toggle-slider {
+            background: #60cdff;
+        }
+
+        .toggle input:checked + .toggle-slider::before {
+            background: #fff;
+            transform: translateX(20px);
+        }
+
+        /* â”€â”€ Buttons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        .btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.15s;
+            border: 1px solid transparent;
+        }
+
+        .btn-primary {
+            background: #60cdff;
+            color: #0d1117;
+        }
+
+        .btn-primary:hover {
+            background: #7ad8ff;
+        }
+
+        .btn-danger {
+            background: transparent;
+            border-color: #f85149;
+            color: #f85149;
+        }
+
+        .btn-danger:hover {
+            background: rgba(248, 81, 73, 0.1);
+        }
+
+        /* â”€â”€ Version badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        .version-badge {
+            display: inline-block;
+            background: rgba(96, 205, 255, 0.15);
+            color: #60cdff;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        /* â”€â”€ Language preview â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        .lang-preview {
+            margin-top: 12px;
+            padding: 12px 16px;
+            background: rgba(96, 205, 255, 0.06);
+            border-radius: 8px;
+            border: 1px solid rgba(96, 205, 255, 0.15);
+            font-size: 12px;
+            color: #8b949e;
+        }
+
+        .lang-preview strong {
+            color: #60cdff;
+        }
+
+        /* â”€â”€ Responsive â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 56px;
+                min-width: 56px;
+            }
+            .sidebar-header, .nav-item .label {
+                display: none;
+            }
+            .nav-item {
+                justify-content: center;
+                padding: 12px;
+            }
+            .content {
+                margin-left: 56px;
+                padding: 24px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="settings-layout">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>Settings</h1>
+                <p>Cloudar Browser™</p>
+            </div>
+            <a class="nav-item" href="#general" data-section="general">
+                <span class="icon">âš™ï¸</span>
+                <span class="label">General</span>
+            </a>
+            <a class="nav-item" href="#language" data-section="language">
+                <span class="icon">ðŸŒ</span>
+                <span class="label">Language</span>
+            </a>
+            <a class="nav-item" href="#appearance" data-section="appearance">
+                <span class="icon">ðŸŽ¨</span>
+                <span class="label">Appearance</span>
+            </a>
+            <a class="nav-item" href="#privacy" data-section="privacy">
+                <span class="icon">ðŸ”’</span>
+                <span class="label">Privacy & Security</span>
+            </a>
+            <a class="nav-item" href="#downloads" data-section="downloads">
+                <span class="icon">ðŸ“¥</span>
+                <span class="label">Downloads</span>
+            </a>
+            <a class="nav-item" href="#performance" data-section="performance">
+                <span class="icon">âš¡</span>
+                <span class="label">Performance</span>
+            </a>
+            <a class="nav-item" href="#about" data-section="about">
+                <span class="icon">â„¹ï¸</span>
+                <span class="label">About</span>
+            </a>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="content">
+
+            <!-- â”€â”€ General Section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+            <section class="section" id="general">
+                <h2 class="section-title">General</h2>
+                <p class="section-desc">Basic browser settings including search engine and homepage.</p>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Default Search Engine</div>
+                            <div class="card-desc">Used when you type a search query in the address bar.</div>
+                        </div>
+                        <select id="search-engine">
+                            <option value="https://www.google.com/search?q={}">Google</option>
+                            <option value="https://www.bing.com/search?q={}">Bing</option>
+                            <option value="https://duckduckgo.com/?q={}">DuckDuckGo</option>
+                            <option value="https://search.yahoo.com/search?p={}">Yahoo</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Homepage</div>
+                            <div class="card-desc">The page shown when you click Home or open a new window.</div>
+                        </div>
+                        <input type="text" id="homepage" placeholder="cloudar://newtab" style="width:280px;">
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Startup Behavior</div>
+                            <div class="card-desc">What to show when the browser starts.</div>
+                        </div>
+                        <select id="startup-behavior">
+                            <option value="newtab">Open New Tab</option>
+                            <option value="homepage">Open Home Page</option>
+                            <option value="continue">Continue Where You Left Off</option>
+                        </select>
+                    </div>
+                </div>
+            </section>
+
+            <!-- â”€â”€ Language Section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+            <section class="section" id="language">
+                <h2 class="section-title">Language</h2>
+                <p class="section-desc">Choose the display language for Cloudar Browser™. Changes take effect immediately.</p>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Browser Language</div>
+                            <div class="card-desc">Select the language used for menus, buttons, and browser interface.</div>
+                        </div>
+                        <select id="language-select">
+                            <option value="">Loading...</option>
+                        </select>
+                    </div>
+                    <div class="lang-preview" id="lang-preview">
+                        <strong>Tip:</strong> Changing the language will instantly update all browser menus and interface text. No restart required.
+                    </div>
+                </div>
+            </section>
+
+            <!-- â”€â”€ Appearance Section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+            <section class="section" id="appearance">
+                <h2 class="section-title">Appearance</h2>
+                <p class="section-desc">Customize how Cloudar Browser™ looks.</p>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Theme</div>
+                            <div class="card-desc">Choose between dark and light mode.</div>
+                        </div>
+                        <select id="theme-select">
+                            <option value="dark">Dark</option>
+                            <option value="light">Light</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Accent Color</div>
+                            <div class="card-desc">The highlight color used across the browser.</div>
+                        </div>
+                        <input type="color" id="accent-color" value="#60cdff" style="width:40px;height:32px;padding:2px;cursor:pointer;">
+                    </div>
+                </div>
+            </section>
+
+            <!-- â”€â”€ Privacy Section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+            <section class="section" id="privacy">
+                <h2 class="section-title">Privacy & Security</h2>
+                <p class="section-desc">Control your browsing privacy and security settings.</p>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Block Third-Party Cookies</div>
+                            <div class="card-desc">Prevent cross-site tracking cookies.</div>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" id="third-party-cookies">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Safe Browsing</div>
+                            <div class="card-desc">Warn about dangerous sites and downloads.</div>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" id="safe-browsing" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">⛔ Block Fingerprinting</div>
+                            <div class="card-desc">Protect against canvas, WebGL, and browser fingerprinting.</div>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" id="block-fingerprinting" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">🔒 Block Tracking Scripts</div>
+                            <div class="card-desc">Block known tracking and analytics scripts from loading.</div>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" id="block-tracking-scripts" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">🛡️ Block Third-Party Ads</div>
+                            <div class="card-desc">Block third-party ad and tracking networks.</div>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" id="block-third-party-ads" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">🦠 User-Agent Spoofing</div>
+                            <div class="card-desc">Mask your browser identity to prevent UA-based fingerprinting.</div>
+                        </div>
+                        <select id="user-agent-mode" style="min-width:130px;">
+                            <option value="default">Default</option>
+                            <option value="chrome">Chrome</option>
+                            <option value="firefox">Firefox</option>
+                            <option value="edge">Edge</option>
+                            <option value="random">Random</option>
+                            <option value="custom">Custom...</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="card" id="custom-ua-card" style="display:none;">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Custom User-Agent</div>
+                            <div class="card-desc">Enter a custom user-agent string.</div>
+                        </div>
+                        <input type="text" id="custom-user-agent" placeholder="Mozilla/5.0 ..." style="width:300px;">
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">🗑️ Auto-Delete Cookies on Exit</div>
+                            <div class="card-desc">Clear all cookies and site data when the browser closes (non-incognito).</div>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" id="auto-delete-cookies">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">🔘 Show Anonymity Button</div>
+                            <div class="card-desc">Add a quick-toggle button in the toolbar for one-click anonymity mode.</div>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" id="privacy-quick-action">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Clear Browsing Data</div>
+                            <div class="card-desc">Remove history, cookies, and cached files.</div>
+                        </div>
+                        <button class="btn btn-danger" id="clear-data-btn">Clear Data</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- â”€â”€ Performance Section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+            <section class="section" id="performance">
+                <h2 class="section-title">Performance</h2>
+                <p class="section-desc">Optimize browser performance and resource usage.</p>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Hardware Acceleration</div>
+                            <div class="card-desc">Use GPU for rendering when available.</div>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" id="hardware-accel" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </section>
+
+            <!-- â”€â”€ Downloads Section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+            <section class="section" id="downloads">
+                <h2 class="section-title">Downloads</h2>
+                <p class="section-desc">Manage download preferences.</p>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Download Location</div>
+                            <div class="card-desc" id="download-path">~/Downloads</div>
+                        </div>
+                        <button class="btn btn-primary" id="change-download-btn">Change</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- â”€â”€ About Section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+            <section class="section" id="about">
+                <h2 class="section-title">About</h2>
+                <p class="section-desc">Information about Cloudar Browser™.</p>
+
+                <div class="card">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div>
+                            <div class="card-title">Cloudar Browser™</div>
+                            <div class="card-desc">Powered by Qt WebEngine (Chromium)</div>
+                        </div>
+                        <span class="version-badge" id="version-badge">v1.0.0</span>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <script>
+        // â”€â”€ Fragment â†’ Section Mapping â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // Maps URL fragments to sidebar sections.
+        // Allows aliases like #general â†’ #search, #privacy â†’ #privacy etc.
+        const SECTION_MAP = {
+            // Direct mappings (fragment matches section id)
+            'general':    'general',
+            'language':   'language',
+            'appearance': 'appearance',
+            'privacy':    'privacy',
+            'security':   'privacy',
+            'downloads':  'downloads',
+            'download':   'downloads',
+            'performance':'performance',
+            'about':      'about',
+
+            // Aliases
+            'search':     'general',
+            'searchengine':'general',
+            'homepage':   'general',
+            'startup':    'general',
+            'theme':      'appearance',
+            'color':      'appearance',
+            'cookies':    'privacy',
+            'data':       'privacy',
+            'speed':      'performance',
+            'hardware':   'performance',
+            'info':       'about',
+            'version':    'about',
+        };
+
+        // Ordered list of sections (must match sidebar order)
+        const SECTIONS = ['general', 'language', 'appearance', 'privacy', 'downloads', 'performance', 'about'];
+
+        // Default section when no hash is present
+        const DEFAULT_SECTION = 'general';
+
+        // â”€â”€ State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        let bridge = null;
+        let currentSection = null;
+
+        // â”€â”€ Section Navigation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        /**
+         * Navigate to a settings section by name.
+         * Updates sidebar highlight, scrolls content, updates URL hash.
+         *
+         * @param {string} sectionName - The section to navigate to (e.g., 'language')
+         * @param {boolean} scroll - Whether to scroll smoothly (default: true)
+         */
+        function navigateToSection(sectionName, scroll = true) {
+            // Resolve aliases via the map
+            const resolved = SECTION_MAP[sectionName] || sectionName;
+
+            // Validate the section exists
+            const sectionEl = document.getElementById(resolved);
+            const navEl = document.querySelector(`.nav-item[data-section="${resolved}"]`);
+
+            if (!sectionEl || !navEl) {
+                console.warn(`Settings: unknown section "${sectionName}", falling back to "${DEFAULT_SECTION}"`);
+                navigateToSection(DEFAULT_SECTION, scroll);
+                return;
+            }
+
+            // Skip if already on this section (prevent redundant navigation)
+            if (currentSection === resolved) {
+                return;
+            }
+
+            currentSection = resolved;
+
+            // Update sidebar active state
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.toggle('active', item.dataset.section === resolved);
+            });
+
+            // Scroll to section
+            if (scroll) {
+                sectionEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else {
+                sectionEl.scrollIntoView({ block: 'start' });
+            }
+
+            // Update URL hash without triggering hashchange event
+            history.replaceState(null, '', '#' + resolved);
+        }
+
+        /**
+         * Get the fragment to navigate to on page load.
+         *
+         * QtWebEngine sometimes strips the fragment (#section) from custom
+         * URL schemes. The Python handler injects it as window.INJECTED_FRAGMENT
+         * as a fallback. This function checks both sources.
+         *
+         * @returns {string} The fragment name (without #) or empty string
+         */
+        function getInitialFragment() {
+            // First check if the URL hash is present (standard behavior)
+            const hash = window.location.hash.replace('#', '').toLowerCase().trim();
+            if (hash) return hash;
+
+            // Fallback: check the value injected by the Python handler
+            if (typeof window.INJECTED_FRAGMENT === 'string' && window.INJECTED_FRAGMENT) {
+                return window.INJECTED_FRAGMENT.replace('#', '').toLowerCase().trim();
+            }
+
+            return '';
+        }
+
+        /**
+         * Parse the current URL fragment and navigate to that section.
+         * Called on page load and when hash changes.
+         */
+        function handleHashNavigation() {
+            const fragment = getInitialFragment();
+
+            if (fragment && SECTION_MAP[fragment]) {
+                navigateToSection(fragment, false);
+            } else if (!fragment) {
+                // No fragment â†’ go to default section
+                navigateToSection(DEFAULT_SECTION, false);
+            }
+        }
+
+        // â”€â”€ Sidebar Click Handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        function setupSidebarNavigation() {
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const section = this.dataset.section;
+                    navigateToSection(section, true);
+                });
+            });
+
+            // Listen for hash changes (e.g., browser back/forward)
+            window.addEventListener('hashchange', handleHashNavigation);
+        }
+
+        // â”€â”€ QWebChannel Bridge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        function initBridge() {
+            if (typeof QWebChannel === 'undefined') {
+                // Bridge not available yet, retry
+                setTimeout(initBridge, 100);
+                return;
+            }
+
+            new QWebChannel(qt.webChannelTransport, function(channel) {
+                bridge = channel.objects.cloudar;
+                if (bridge) {
+                    loadSettings();
+                }
+            });
+        }
+
+        // â”€â”€ Load Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        function loadSettings() {
+            if (!bridge) return;
+
+            bridge.getSettings(function(settings) {
+                populateForm(settings);
+            });
+
+            bridge.getLanguageInfo(function(info) {
+                populateLanguages(info);
+            });
+        }
+
+        function populateForm(s) {
+            if (s.theme) document.getElementById('theme-select').value = s.theme;
+            if (s.accent_color) document.getElementById('accent-color').value = s.accent_color;
+            if (s.search_engine) document.getElementById('search-engine').value = s.search_engine;
+            if (s.homepage !== undefined) document.getElementById('homepage').value = s.homepage;
+            if (s.startup) document.getElementById('startup-behavior').value = s.startup;
+            if (s.downloads_folder) document.getElementById('download-path').textContent = s.downloads_folder;
+            if (s.hardware_accel !== undefined) document.getElementById('hardware-accel').checked = s.hardware_accel;
+
+            // â”€â”€ Anonymity settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            if (s.block_fingerprinting !== undefined) document.getElementById('block-fingerprinting').checked = s.block_fingerprinting;
+            if (s.block_tracking_scripts !== undefined) document.getElementById('block-tracking-scripts').checked = s.block_tracking_scripts;
+            if (s.block_third_party_ads !== undefined) document.getElementById('block-third-party-ads').checked = s.block_third_party_ads;
+            if (s.auto_delete_cookies_on_exit !== undefined) document.getElementById('auto-delete-cookies').checked = s.auto_delete_cookies_on_exit;
+            if (s.privacy_quick_action !== undefined) document.getElementById('privacy-quick-action').checked = s.privacy_quick_action;
+            if (s.user_agent_mode) {
+                document.getElementById('user-agent-mode').value = s.user_agent_mode;
+                // Show/hide custom UA input
+                document.getElementById('custom-ua-card').style.display = s.user_agent_mode === 'custom' ? 'flex' : 'none';
+            }
+            if (s.custom_user_agent) document.getElementById('custom-user-agent').value = s.custom_user_agent;
+
+            if (s.version) document.getElementById('version-badge').textContent = 'v' + s.version;
+        }
+
+        function populateLanguages(info) {
+            const select = document.getElementById('language-select');
+            select.innerHTML = '';
+
+            const available = info.available || {};
+            const current = info.current || 'en';
+
+            for (const [code, name] of Object.entries(available)) {
+                const opt = document.createElement('option');
+                opt.value = code;
+                opt.textContent = name;
+                if (code === current) opt.selected = true;
+                select.appendChild(opt);
+            }
+        }
+
+        // â”€â”€ Save Handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        function save(key, value) {
+            if (!bridge) return;
+            const data = {};
+            data[key] = value;
+            bridge.updateSettings(data);
+        }
+
+        document.getElementById('language-select').addEventListener('change', function() {
+            if (bridge) bridge.setLanguage(this.value);
+        });
+
+        document.getElementById('theme-select').addEventListener('change', function() {
+            save('theme', this.value);
+        });
+
+        document.getElementById('accent-color').addEventListener('change', function() {
+            save('accent_color', this.value);
+        });
+
+        document.getElementById('search-engine').addEventListener('change', function() {
+            save('search_engine', this.value);
+        });
+
+        document.getElementById('homepage').addEventListener('change', function() {
+            save('homepage', this.value);
+        });
+
+        document.getElementById('startup-behavior').addEventListener('change', function() {
+            save('startup', this.value);
+        });
+
+        document.getElementById('hardware-accel').addEventListener('change', function() {
+            save('hardware_accel', this.checked);
+        });
+
+        document.getElementById('clear-data-btn').addEventListener('click', function() {
+            if (confirm('Are you sure you want to clear all browsing data?')) {
+                if (bridge) bridge.clearBrowsingData();
+            }
+        });
+
+        document.getElementById('change-download-btn').addEventListener('click', function() {
+            if (bridge) {
+                bridge.selectDownloadFolder(function(path) {
+                    if (path) document.getElementById('download-path').textContent = path;
+                });
+            }
+        });
+
+        // â”€â”€ Anonymity event handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        document.getElementById('block-fingerprinting').addEventListener('change', function() {
+            save('block_fingerprinting', this.checked);
+        });
+
+        document.getElementById('block-tracking-scripts').addEventListener('change', function() {
+            save('block_tracking_scripts', this.checked);
+        });
+
+        document.getElementById('block-third-party-ads').addEventListener('change', function() {
+            save('block_third_party_ads', this.checked);
+        });
+
+        document.getElementById('auto-delete-cookies').addEventListener('change', function() {
+            save('auto_delete_cookies_on_exit', this.checked);
+        });
+
+        document.getElementById('privacy-quick-action').addEventListener('change', function() {
+            save('privacy_quick_action', this.checked);
+        });
+
+        document.getElementById('user-agent-mode').addEventListener('change', function() {
+            save('user_agent_mode', this.value);
+            // Show/hide custom UA input
+            document.getElementById('custom-ua-card').style.display = this.value === 'custom' ? 'flex' : 'none';
+        });
+
+        document.getElementById('custom-user-agent').addEventListener('change', function() {
+            save('custom_user_agent', this.value);
+        });
+
+        // â”€â”€ Initialize â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        function init() {
+            setupSidebarNavigation();
+            initBridge();
+            handleHashNavigation();
+        }
+
+        // Run init when DOM is ready (or immediately if already ready)
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+
+        // Add an extra execution after a delay to ensure scrolling works
+        // after QtWebEngine completes the initial paint
+        setTimeout(() => {
+            const hash = getInitialFragment();
+            if (hash && SECTION_MAP[hash]) {
+                const sectionEl = document.getElementById(SECTION_MAP[hash]);
+                if (sectionEl) {
+                    sectionEl.scrollIntoView({ block: 'start' });
+                }
+            }
+        }, 150);
+    </script>
+</body>
+
+</html>
+

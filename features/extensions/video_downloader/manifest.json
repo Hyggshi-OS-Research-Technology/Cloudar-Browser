@@ -1,0 +1,12 @@
+{
+    "name": "Video Downloader",
+    "description": "Detects videos on pages and asks if you want to download them",
+    "version": "1.0.0",
+    "background": "background.js",
+    "matches": [
+        "*://*.youtube.com/*",
+        "*://youtube.com/*",
+        "*://youtu.be/*"
+    ],
+    "bridge": "youtubeDownloader"
+}

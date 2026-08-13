@@ -1,0 +1,10 @@
+{
+    "name": "Torrent Downloader",
+    "description": "Detects torrent files and magnet links on pages and downloads them with real-time progress",
+    "version": "1.0.0",
+    "background": "background.js",
+    "matches": [
+        "*://*/*"
+    ],
+    "bridge": "torrentDownloader"
+}

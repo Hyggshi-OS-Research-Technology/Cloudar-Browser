@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir dist\\\\CloudarBrowser)",
+      "Bash(python -m py_compile browser_resources.py && echo \"browser_resources.py OK\")",
+      "Bash(python -m py_compile browser_window.py && python -m py_compile settings_backend.py && echo \"All files syntax OK\")",
+      "Bash(python -c \"import json; [json.load\\(open\\(f'lang/{l}.json', encoding='utf-8'\\)\\) for l in ['en','vi','ja','zh']]; print\\('JSON OK'\\)\" && python -c \"import html.parser; p=html.parser.HTMLParser\\(\\); p.feed\\(open\\('internal_pages/settings.html', encoding='utf-8'\\).read\\(\\)\\); print\\('HTML OK'\\)\")",
+      "Bash(python -m py_compile internal_handler.py && echo \"internal_handler.py OK\")"
+    ]
+  }
+}

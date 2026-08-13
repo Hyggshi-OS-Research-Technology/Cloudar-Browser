@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Tab</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --text-color: #e6edf3;
+            --accent-color: #60cdff;
+            --secondary-bg: rgba(255, 255, 255, 0.05);
+            --border-color: rgba(255, 255, 255, 0.1);
+            --hover-bg: rgba(255, 255, 255, 0.1);
+            --input-bg: rgba(13, 17, 23, 0.8);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            color: var(--text-color);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            transition: background-image 0.5s ease-in-out;
+        }
+
+        /* Overlay for better text readability on custom backgrounds */
+        .bg-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: -1;
+            /* Only show overlay if background image is set */
+            display: none;
+        }
+
+        body.has-custom-bg .bg-overlay {
+            display: block;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            padding: 20px;
+            text-align: center;
+            z-index: 1;
+        }
+
+        /* Logo / Branding */
+        .logo {
+            font-size: 4rem;
+            font-weight: 700;
+            margin-bottom: 40px;
+            background: linear-gradient(135deg, var(--accent-color), #0078d4);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-shadow: 0 10px 30px rgba(96, 205, 255, 0.2);
+            /* Fallback for text-shadow with background-clip adjustment if needed */
+        }
+
+        /* Search Bar */
+        .search-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto 50px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 16px 24px;
+            padding-left: 50px;
+            font-size: 18px;
+            border-radius: 30px;
+            border: 1px solid var(--border-color);
+            background: var(--input-bg);
+            color: var(--text-color);
+            outline: none;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+        }
+
+        .search-input:focus {
+            background: rgba(22, 27, 34, 0.95);
+            border-color: var(--accent-color);
+            transform: translateY(-2px);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #8b949e;
+            font-size: 20px;
+            pointer-events: none;
+        }
+
+        /* Shortcuts Grid */
+        .shortcuts {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 20px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .shortcut {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-decoration: none;
+            color: var(--text-color);
+            padding: 15px;
+            border-radius: 16px;
+            transition: background 0.2s, transform 0.2s;
+            cursor: pointer;
+        }
+
+        .shortcut:hover {
+            background: var(--hover-bg);
+            transform: translateY(-4px);
+        }
+
+        .shortcut-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--secondary-bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin-bottom: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .shortcut-title {
+            font-size: 13px;
+            opacity: 0.9;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+        }
+
+        /* Customize Button */
+        .customize-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.2s, border-color 0.2s;
+            z-index: 10;
+        }
+
+        .customize-btn:hover {
+            background: var(--hover-bg);
+            border-color: var(--accent-color);
+        }
+
+        /* Settings Panel */
+        .settings-panel {
+            position: fixed;
+            bottom: 70px;
+            right: 20px;
+            width: 300px;
+            background: #161b22;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            transform: translateY(20px);
+            opacity: 0;
+            visibility: hidden;
+            transition: transform 0.25s ease-out, opacity 0.2s ease-out, visibility 0.25s;
+            z-index: 100;
+        }
+
+        .settings-panel.open {
+            transform: translateY(0);
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        .panel-title {
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        .close-panel {
+            background: none;
+            border: none;
+            color: #8b949e;
+            cursor: pointer;
+            font-size: 20px;
+        }
+
+        .setting-group {
+            margin-bottom: 20px;
+        }
+
+        .setting-label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #8b949e;
+        }
+
+        .color-options {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .color-option {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: transform 0.2s;
+        }
+
+        .color-option.active {
+            border-color: white;
+            transform: scale(1.1);
+        }
+
+        .bg-url-input {
+            width: 100%;
+            background: #0d1117;
+            border: 1px solid var(--border-color);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-family: inherit;
+            box-sizing: border-box;
+            /* Important for padding */
+        }
+
+        .restore-defaults {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: #8b949e;
+            width: 100%;
+            padding: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .restore-defaults:hover {
+            color: white;
+            border-color: #8b949e;
+        }
+
+        .upload-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            width: 100%;
+            margin-top: 8px;
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px dashed var(--accent-color);
+            background: rgba(96, 205, 255, 0.05);
+            color: var(--accent-color);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .upload-btn:hover {
+            background: rgba(96, 205, 255, 0.12);
+            border-style: solid;
+        }
+
+        .upload-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="bg-overlay"></div>
+
+    <div class="container">
+        <div class="logo">Cloudar™</div>
+
+        <div class="search-container">
+            <span class="search-icon">🔍</span>
+            <input type="text" class="search-input" placeholder="Search the web..." id="searchInput" autofocus>
+        </div>
+
+        <div class="shortcuts">
+            <a href="https://www.google.com" class="shortcut">
+                <div class="shortcut-icon" style="color: #4285F4">G</div>
+                <div class="shortcut-title">Google</div>
+            </a>
+            <a href="https://www.youtube.com" class="shortcut">
+                <div class="shortcut-icon" style="color: #FF0000">Y</div>
+                <div class="shortcut-title">YouTube</div>
+            </a>
+            <a href="https://github.com" class="shortcut">
+                <div class="shortcut-icon" style="color: #ffffff; background: #333;">g</div>
+                <div class="shortcut-title">GitHub</div>
+            </a>
+            <a href="https://www.reddit.com" class="shortcut">
+                <div class="shortcut-icon" style="color: #FF4500">R</div>
+                <div class="shortcut-title">Reddit</div>
+            </a>
+        </div>
+    </div>
+
+    <!-- Customize Button -->
+    <button class="customize-btn" id="customizeBtn">
+        <span>✏️</span> Customize
+    </button>
+
+    <!-- Settings Panel -->
+    <div class="settings-panel" id="settingsPanel">
+        <div class="panel-header">
+            <span class="panel-title">Customize Interface</span>
+            <button class="close-panel" id="closePanel">×</button>
+        </div>
+
+        <div class="setting-group">
+            <label class="setting-label">Accent Color</label>
+            <div class="color-options">
+                <div class="color-option" style="background: #60cdff" data-color="#60cdff"></div>
+                <div class="color-option" style="background: #ff7b72" data-color="#ff7b72"></div>
+                <div class="color-option" style="background: #79c0ff" data-color="#79c0ff"></div>
+                <div class="color-option" style="background: #d2a8ff" data-color="#d2a8ff"></div>
+                <div class="color-option" style="background: #ffa657" data-color="#ffa657"></div>
+                <div class="color-option" style="background: #7ee787" data-color="#7ee787"></div>
+            </div>
+            <div style="margin-top: 10px;">
+                <input type="color" id="customColorPicker" value="#60cdff"
+                    style="width: 100%; height: 32px; border: none; border-radius: 4px; cursor: pointer;">
+            </div>
+        </div>
+
+        <div class="setting-group">
+            <label class="setting-label">Background Image</label>
+            <input type="text" class="bg-url-input" id="bgUrlInput" placeholder="https://example.com/image.jpg">
+            <button class="upload-btn" id="uploadBgBtn">
+                <span>📁</span> Upload from Device
+            </button>
+            <p style="font-size: 11px; color: #8b949e; margin-top: 5px;">Paste a URL or pick a file from your device</p>
+        </div>
+
+        <button class="restore-defaults" id="restoreDefaults">Restore Defaults</button>
+    </div>
+
+    <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+    <script>
+        // --- Logic ---
+
+        // Elements
+        const searchInput = document.getElementById('searchInput');
+        const customizeBtn = document.getElementById('customizeBtn');
+        const settingsPanel = document.getElementById('settingsPanel');
+        const closePanel = document.getElementById('closePanel');
+        const colorOptions = document.querySelectorAll('.color-option');
+        const bgUrlInput = document.getElementById('bgUrlInput');
+        const restoreBtn = document.getElementById('restoreDefaults');
+        const customColorPicker = document.getElementById('customColorPicker');
+        const uploadBgBtn = document.getElementById('uploadBgBtn');
+
+        // State
+        let settings = {
+            accentColor: '#60cdff',
+            bgImage: ''
+        };
+
+        // Image cache to avoid re-decoding on re-renders
+        let cachedBgImage = null;
+        let cachedBgUrl = null;
+
+        // WebChannel initialization
+        let cloudar = null;
+
+        function initWebChannel() {
+            if (typeof qt !== 'undefined') {
+                new QWebChannel(qt.webChannelTransport, function (channel) {
+                    cloudar = channel.objects.cloudar;
+                });
+            }
+        }
+
+        // Load Settings
+        function loadSettings() {
+            // Check for injected settings from Python backend
+            if (window.INJECTED_SETTINGS) {
+                settings = window.INJECTED_SETTINGS;
+            }
+
+            applySettings();
+        }
+
+        // Apply Settings
+        function applySettings() {
+            // Apply Accent Color
+            if (settings.accentColor) {
+                document.documentElement.style.setProperty('--accent-color', settings.accentColor);
+                document.querySelector('.logo').style.background = `linear-gradient(135deg, ${settings.accentColor}, #0078d4)`;
+                document.querySelector('.logo').style.webkitBackgroundClip = 'text';
+                customColorPicker.value = settings.accentColor;
+
+                // Mark active color option
+                colorOptions.forEach(opt => {
+                    opt.classList.toggle('active', opt.dataset.color === settings.accentColor);
+                });
+            }
+
+            // Update UI inputs
+            if (bgUrlInput.value !== settings.bgImage) {
+                bgUrlInput.value = settings.bgImage || '';
+            }
+
+            // Apply Background with caching
+            if (settings.bgImage && settings.bgImage.trim() !== '') {
+                // Only reload image if URL changed
+                if (cachedBgUrl !== settings.bgImage) {
+                    cachedBgUrl = settings.bgImage;
+                    cachedBgImage = new Image();
+                    
+                    // For file:// URLs, preload and cache the image
+                    cachedBgImage.onload = function() {
+                        document.body.style.backgroundImage = `url('${settings.bgImage}')`;
+                        document.body.classList.add('has-custom-bg');
+                    };
+                    
+                    cachedBgImage.onerror = function() {
+                        console.warn('Failed to load background image:', settings.bgImage);
+                        document.body.style.backgroundImage = 'none';
+                        document.body.classList.remove('has-custom-bg');
+                    };
+                    
+                    cachedBgImage.src = settings.bgImage;
+                }
+            } else {
+                cachedBgImage = null;
+                cachedBgUrl = null;
+                document.body.style.backgroundImage = 'none';
+                document.body.classList.remove('has-custom-bg');
+            }
+        }
+
+        // Save Settings
+        function saveSettings() {
+            // Call internal bridge to save to Python backend
+            if (cloudar) {
+                cloudar.saveNewTabSettings(JSON.stringify(settings));
+            } else {
+                console.warn("Cloudar bridge not available");
+            }
+
+            // Force apply settings immediately
+            applySettings();
+        }
+        
+        // Listen for settings changes from other tabs/windows
+        if (cloudar) {
+            // Settings are applied on load and when saveSettings is called
+            console.log("New tab page initialized with settings bridge");
+        }
+
+        // Event Listeners
+
+        // Search
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const query = searchInput.value;
+                if (query) {
+                    if (query.includes('://') || (query.includes('.') && !query.includes(' '))) {
+                        window.location.href = query.startsWith('http') ? query : 'http://' + query;
+                    } else {
+                        window.location.href = 'https://www.google.com/search?q=' + encodeURIComponent(query);
+                    }
+                }
+            }
+        });
+
+        // Panel Toggle
+        customizeBtn.addEventListener('click', () => {
+            settingsPanel.classList.add('open');
+        });
+
+        closePanel.addEventListener('click', () => {
+            settingsPanel.classList.remove('open');
+        });
+
+        // Click outside to close
+        document.addEventListener('click', (e) => {
+            if (!settingsPanel.contains(e.target) && !customizeBtn.contains(e.target) && settingsPanel.classList.contains('open')) {
+                settingsPanel.classList.remove('open');
+            }
+        });
+
+        // Color Selection
+        colorOptions.forEach(opt => {
+            opt.addEventListener('click', () => {
+                settings.accentColor = opt.dataset.color;
+                saveSettings();
+            });
+        });
+
+        customColorPicker.addEventListener('input', (e) => {
+            // Live preview
+            document.documentElement.style.setProperty('--accent-color', e.target.value);
+            document.querySelector('.logo').style.background = `linear-gradient(135deg, ${e.target.value}, #0078d4)`;
+            document.querySelector('.logo').style.webkitBackgroundClip = 'text';
+            colorOptions.forEach(opt => opt.classList.remove('active'));
+        });
+
+        customColorPicker.addEventListener('change', (e) => {
+            settings.accentColor = e.target.value;
+            saveSettings();
+        });
+
+        // Background Image
+        let bgTimeout;
+        bgUrlInput.addEventListener('input', (e) => {
+            clearTimeout(bgTimeout);
+            bgTimeout = setTimeout(() => {
+                settings.bgImage = e.target.value;
+                saveSettings();
+            }, 500);
+        });
+
+        // Upload image from device
+        uploadBgBtn.addEventListener('click', () => {
+            if (!cloudar) {
+                console.warn('Cloudar bridge not available');
+                return;
+            }
+            uploadBgBtn.disabled = true;
+            uploadBgBtn.textContent = '⏳ Opening…';
+            
+            // Call selectBgImage which returns the file URL directly
+            const fileUrl = String(cloudar.selectBgImage());
+            
+            uploadBgBtn.disabled = false;
+            uploadBgBtn.innerHTML = '<span>📁</span> Upload from Device';
+            
+            if (fileUrl && fileUrl !== 'undefined' && fileUrl !== 'null' && (fileUrl.startsWith('cloudar-asset://') || fileUrl.startsWith('file://') || fileUrl.startsWith('data:'))) {
+                // Force reload by clearing cache
+                cachedBgImage = null;
+                cachedBgUrl = null;
+                settings.bgImage = fileUrl;
+                bgUrlInput.value = '';
+                saveSettings();
+            }
+        });
+
+        // Restore Defaults
+        restoreBtn.addEventListener('click', () => {
+            settings = {
+                accentColor: '#60cdff',
+                bgImage: ''
+            };
+            saveSettings();
+        });
+
+        // Init
+        initWebChannel();
+        loadSettings();
+
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,93 @@
+83 INFO: PyInstaller: 6.21.0, contrib hooks: 2026.6
+83 INFO: Python: 3.14.4
+86 INFO: Platform: Linux-7.0.0-22-generic-x86_64-with-glibc2.43
+86 INFO: Python environment: /usr
+86 INFO: wrote /home/hyggshi/Downloads/Hyggshi browser Python/CloudarBrowser.spec
+89 INFO: Removing temporary files and cleaning cache in /home/hyggshi/.cache/pyinstaller
+92 INFO: Module search paths (PYTHONPATH):
+['/home/hyggshi/Downloads/Hyggshi browser Python',
+ '/usr/lib/python314.zip',
+ '/usr/lib/python3.14',
+ '/usr/lib/python3.14/lib-dynload',
+ '/home/hyggshi/.local/lib/python3.14/site-packages',
+ '/usr/lib/python3/dist-packages',
+ '/home/hyggshi/Downloads/Hyggshi browser Python']
+692 INFO: Appending 'datas' from .spec
+693 INFO: checking Analysis
+693 INFO: Building Analysis because Analysis-00.toc is non existent
+693 INFO: Looking for Python shared library...
+707 WARNING: Unrecognised line of output 'Bộ nhớ tạm được tạo bởi: ldconfig (Ubuntu GLIBC 2.43-2ubuntu2) stable release version 2.43' from ldconfig
+708 INFO: Using Python shared library: /usr/lib/x86_64-linux-gnu/libpython3.14.so.1.0
+708 INFO: Running Analysis Analysis-00.toc
+708 INFO: Target bytecode optimization level: 0
+708 INFO: Initializing module dependency graph...
+709 INFO: Initializing module graph hook caches...
+719 INFO: Analyzing modules for base_library.zip ...
+1317 INFO: Processing standard module hook 'hook-heapq.py' from '/home/hyggshi/.local/lib/python3.14/site-packages/PyInstaller/hooks'
+1953 INFO: Processing standard module hook 'hook-encodings.py' from '/home/hyggshi/.local/lib/python3.14/site-packages/PyInstaller/hooks'
+2247 INFO: Processing standard module hook 'hook-pickle.py' from '/home/hyggshi/.local/lib/python3.14/site-packages/PyInstaller/hooks'
+2484 INFO: Processing standard module hook 'hook-math.py' from '/home/hyggshi/.local/lib/python3.14/site-packages/PyInstaller/hooks'
+2619 INFO: Processing standard module hook 'hook-difflib.py' from '/home/hyggshi/.local/lib/python3.14/site-packages/PyInstaller/hooks'
+5125 INFO: Caching module dependency graph...
+5168 INFO: Analyzing /home/hyggshi/Downloads/Hyggshi browser Python/main.py
+5211 INFO: Processing standard module hook 'hook-sysconfig.py' from '/home/hyggshi/.local/lib/python3.14/site-packages/PyInstaller/hooks'
+5216 INFO: Processing standard module hook 'hook-_ctypes.py' from '/home/hyggshi/.local/lib/python3.14/site-packages/PyInstaller/hooks'
+6218 INFO: Processing standard module hook 'hook-PyQt6.QtWidgets.py' from '/home/hyggshi/.local/lib/python3.14/site-packages/PyInstaller/hooks'
+6492 INFO: Processing standard module hook 'hook-PyQt6.py' from '/home/hyggshi/.local/lib/python3.14/site-packages/PyInstaller/hooks'
+7339 INFO: Processing standard module hook 'hook-PyQt6.QtCore.py' from '/home/hyggshi/.local/lib/python3.14/site-packages/PyInstaller/hooks'
+8230 INFO: Processing standard module hook 'hook-PyQt6.QtGui.py' from '/home/hyggshi/.local/lib/python3.14/site-packages/PyInstaller/hooks'
+8877 INFO: Processing standard module hook 'hook-PyQt6.QtWebEngineCore.py' from '/home/hyggshi/.local/lib/python3.14/site-packages/PyInstaller/hooks'
+8976 INFO: QtLibraryInfo(PyQt6): overriding relative destination path of QtWebEngineProcess helper from 'lib/qt6/libexec' to 'libexec'!
+9283 INFO: Processing standard module hook 'hook-PyQt6.QtNetwork.py' from '/home/hyggshi/.local/lib/python3.14/site-packages/PyInstaller/hooks'
+9620 INFO: Processing standard module hook 'hook-PyQt6.QtWebChannel.py' from '/home/hyggshi/.local/lib/python3.14/site-packages/PyInstaller/hooks'
+9774 INFO: Processing standard module hook 'hook-PyQt6.QtWebEngineWidgets.py' from '/home/hyggshi/.local/lib/python3.14/site-packages/PyInstaller/hooks'
+9919 INFO: Processing standard module hook 'hook-PyQt6.QtPrintSupport.py' from '/home/hyggshi/.local/lib/python3.14/site-packages/PyInstaller/hooks'
+10160 INFO: Processing standard module hook 'hook-platform.py' from '/home/hyggshi/.local/lib/python3.14/site-packages/PyInstaller/hooks'
+10244 INFO: Processing standard module hook 'hook-PIL.py' from '/home/hyggshi/.local/lib/python3.14/site-packages/PyInstaller/hooks'
+10349 INFO: Processing standard module hook 'hook-PIL.Image.py' from '/home/hyggshi/.local/lib/python3.14/site-packages/PyInstaller/hooks'
+10755 INFO: Processing standard module hook 'hook-xml.py' from '/home/hyggshi/.local/lib/python3.14/site-packages/PyInstaller/hooks'
+10776 INFO: Processing standard module hook 'hook-xml.etree.cElementTree.py' from '/home/hyggshi/.local/lib/python3.14/site-packages/PyInstaller/hooks'
+11077 INFO: Processing standard module hook 'hook-PIL.ImageFilter.py' from '/home/hyggshi/.local/lib/python3.14/site-packages/PyInstaller/hooks'
+11601 INFO: Processing module hooks (post-graph stage)...
+12224 INFO: Processing standard module hook 'hook-PIL.SpiderImagePlugin.py' from '/home/hyggshi/.local/lib/python3.14/site-packages/PyInstaller/hooks'
+12265 WARNING: Hidden import "PyQt6.QtQuick" not found!
+12265 WARNING: Hidden import "PyQt6.QtPositioning" not found!
+12679 INFO: Processing standard module hook 'hook-PyQt6.QtOpenGL.py' from '/home/hyggshi/.local/lib/python3.14/site-packages/PyInstaller/hooks'
+12801 INFO: Processing standard module hook 'hook-PyQt6.QtDBus.py' from '/home/hyggshi/.local/lib/python3.14/site-packages/PyInstaller/hooks'
+12906 WARNING: Hidden import "PyQt6.QtQuick" not found!
+12906 WARNING: Hidden import "PyQt6.QtQuickWidgets" not found!
+12907 WARNING: Hidden import "PyQt6.QtPositioning" not found!
+12988 INFO: Performing binary vs. data reclassification (250 entries)
+13200 INFO: Looking for ctypes DLLs
+13262 WARNING: Ignoring /usr/lib/libSystem.B.dylib imported from /home/hyggshi/Downloads/Hyggshi browser Python/features/performance_manager.py - only basenames are supported with ctypes imports!
+13267 INFO: Analyzing run-time hooks ...
+13268 INFO: Including run-time hook 'pyi_rth_inspect.py' from '/home/hyggshi/.local/lib/python3.14/site-packages/PyInstaller/hooks/rthooks'
+13271 INFO: Including run-time hook 'pyi_rth_pyqt6.py' from '/home/hyggshi/.local/lib/python3.14/site-packages/PyInstaller/hooks/rthooks'
+13276 INFO: Processing pre-find-module-path hook 'hook-_pyi_rth_utils.py' from '/home/hyggshi/.local/lib/python3.14/site-packages/PyInstaller/hooks/pre_find_module_path'
+13278 INFO: Processing standard module hook 'hook-_pyi_rth_utils.py' from '/home/hyggshi/.local/lib/python3.14/site-packages/PyInstaller/hooks'
+13281 INFO: Including run-time hook 'pyi_rth_pkgutil.py' from '/home/hyggshi/.local/lib/python3.14/site-packages/PyInstaller/hooks/rthooks'
+13292 INFO: Creating base_library.zip...
+13311 INFO: Looking for dynamic libraries
+15672 INFO: Warnings written to /home/hyggshi/Downloads/Hyggshi browser Python/build/CloudarBrowser/warn-CloudarBrowser.txt
+15684 INFO: Graph cross-reference written to /home/hyggshi/Downloads/Hyggshi browser Python/build/CloudarBrowser/xref-CloudarBrowser.html
+15697 INFO: checking PYZ
+15697 INFO: Building PYZ because PYZ-00.toc is non existent
+15697 INFO: Building PYZ (ZlibArchive) /home/hyggshi/Downloads/Hyggshi browser Python/build/CloudarBrowser/PYZ-00.pyz
+15917 INFO: Building PYZ (ZlibArchive) /home/hyggshi/Downloads/Hyggshi browser Python/build/CloudarBrowser/PYZ-00.pyz completed successfully.
+15919 WARNING: Ignoring icon; supported only on Windows and macOS!
+15925 INFO: checking PKG
+15925 INFO: Building PKG because PKG-00.toc is non existent
+15925 INFO: Building PKG (CArchive) CloudarBrowser.pkg
+15945 INFO: Building PKG (CArchive) CloudarBrowser.pkg completed successfully.
+15945 INFO: Bootloader /home/hyggshi/.local/lib/python3.14/site-packages/PyInstaller/bootloader/Linux-64bit-intel/run
+15945 INFO: checking EXE
+15945 INFO: Building EXE because EXE-00.toc is non existent
+15945 INFO: Building EXE from EXE-00.toc
+15946 INFO: Copying bootloader EXE to /home/hyggshi/Downloads/Hyggshi browser Python/build/CloudarBrowser/CloudarBrowser
+15946 INFO: Appending PKG archive to custom ELF section in EXE
+15955 INFO: Building EXE from EXE-00.toc completed successfully.
+15958 INFO: checking COLLECT
+15958 INFO: Building COLLECT because COLLECT-00.toc is non existent
+15958 INFO: Building COLLECT COLLECT-00.toc
+16939 INFO: Building COLLECT COLLECT-00.toc completed successfully.
+16944 INFO: Build complete! The results are available in: /home/hyggshi/Downloads/Hyggshi browser Python/dist
