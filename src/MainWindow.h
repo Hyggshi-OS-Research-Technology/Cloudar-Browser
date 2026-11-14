@@ -6,6 +6,7 @@
 #include <QMenuBar>
 #include <QProgressBar>
 #include <QWebEngineProfile>
+#include <QWebEnginePage>
 #include <QWebChannel>
 #include <QPropertyAnimation>
 #include <QGraphicsDropShadowEffect>
@@ -58,7 +59,11 @@ private slots:
     void toggleBookmarkForCurrentPage();
     void updateBookmarkStar(const QUrl &url);
     void updateNavigationState();
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
     void requestPermission(const QWebEnginePermission &permission);
+#else
+    void handleFeaturePermission(const QUrl &origin, QWebEnginePage::Feature feature, QWebEnginePage *page);
+#endif
     void saveSession();
 
 private:
@@ -123,7 +128,11 @@ private:
     void showFindBar();
     void setZoom(qreal zoom);
     void setSidebarExpanded(bool expanded, bool animated = true);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
     QString permissionName(QWebEnginePermission::PermissionType type) const;
+#else
+    QString featureName(QWebEnginePage::Feature feature) const;
+#endif
     Qt::Edges resizeEdgesAt(const QPoint &globalPos) const;
     void updateResizeCursor(const QPoint &globalPos);
     void resizeFromGlobalPos(const QPoint &globalPos);

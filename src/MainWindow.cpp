@@ -185,8 +185,13 @@ MainWindow::MainWindow(bool isIncognito, QWidget *parent)
     });
     connect(m_tabs, &BrowserTabWidget::currentTabChanged, this, &MainWindow::updateNavigationState);
     connect(m_tabs, &BrowserTabWidget::tabsChanged, this, &MainWindow::saveSession);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
     connect(m_tabs, &BrowserTabWidget::permissionRequested, this,
             &MainWindow::requestPermission);
+#else
+    connect(m_tabs, &BrowserTabWidget::featurePermissionRequested, this,
+            &MainWindow::handleFeaturePermission);
+#endif
 
     buildTitleBar();
     buildToolbar();
@@ -695,6 +700,7 @@ void MainWindow::setZoom(qreal zoom)
     }
 }
 
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
 QString MainWindow::permissionName(QWebEnginePermission::PermissionType type) const
 {
     using Type = QWebEnginePermission::PermissionType;
@@ -742,6 +748,52 @@ void MainWindow::requestPermission(const QWebEnginePermission &permission)
         if (granted) permission.grant(); else permission.deny();
     }
 }
+#else
+QString MainWindow::featureName(QWebEnginePage::Feature feature) const
+{
+    switch (feature) {
+    case QWebEnginePage::Notifications: return "notifications";
+    case QWebEnginePage::Geolocation: return "location";
+    case QWebEnginePage::MediaAudioCapture: return "microphone";
+    case QWebEnginePage::MediaVideoCapture: return "camera";
+    case QWebEnginePage::MediaAudioVideoCapture: return "camera and microphone";
+    case QWebEnginePage::MouseLock: return "pointer lock";
+    case QWebEnginePage::DesktopVideoCapture: return "screen sharing";
+    case QWebEnginePage::DesktopAudioVideoCapture: return "screen and audio sharing";
+    default: return "this capability";
+    }
+}
+
+void MainWindow::handleFeaturePermission(const QUrl &origin, QWebEnginePage::Feature feature, QWebEnginePage *page)
+{
+    if (!page) return;
+    QSettings settings;
+    const QString key = QString("permissions/%1/%2").arg(origin.host(), QString::number(int(feature)));
+    const QString saved = settings.value(key).toString();
+    if (saved == "allow") {
+        page->setFeaturePermission(origin, feature, QWebEnginePage::PermissionGrantedByUser);
+        return;
+    }
+    if (saved == "deny") {
+        page->setFeaturePermission(origin, feature, QWebEnginePage::PermissionDeniedByUser);
+        return;
+    }
+    {
+        QMessageBox question(this);
+        question.setWindowTitle("Permission request");
+        question.setText(QString("%1 wants to use your %2.").arg(origin.host(), featureName(feature)));
+        question.setInformativeText("Choose Allow only for sites you trust.");
+        auto *deny = question.addButton("Deny", QMessageBox::RejectRole);
+        auto *allow = question.addButton("Allow", QMessageBox::AcceptRole);
+        question.exec();
+        const bool granted = question.clickedButton() == allow;
+        Q_UNUSED(deny);
+        settings.setValue(key, granted ? "allow" : "deny");
+        page->setFeaturePermission(origin, feature,
+            granted ? QWebEnginePage::PermissionGrantedByUser : QWebEnginePage::PermissionDeniedByUser);
+    }
+}
+#endif
 
 void MainWindow::saveSession()
 {

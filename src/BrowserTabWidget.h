@@ -3,11 +3,16 @@
 #include <QTabWidget>
 #include <QWebEngineView>
 #include <QWebEngineProfile>
+#include <QWebEnginePage>
 #include <QWebChannel>
-#include <QWebEnginePermission>
 #include <QHash>
 #include <QPixmap>
 #include <functional>
+#include <QtGlobal>
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+#include <QWebEnginePermission>
+#endif
 
 class QTimer;
 class QToolButton;
@@ -78,7 +83,11 @@ signals:
     void loadFinishedForCurrentTab(bool ok);
     void currentTabChanged(int index);
     void tabsChanged();
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
     void permissionRequested(const QWebEnginePermission &permission);
+#else
+    void featurePermissionRequested(const QUrl &origin, QWebEnginePage::Feature feature, QWebEnginePage *page);
+#endif
 
 public slots:
     void repositionNewTabButton();

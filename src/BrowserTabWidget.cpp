@@ -289,10 +289,17 @@ void BrowserTabWidget::wireView(QWebEngineView *view)
         }
     });
 
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
     connect(view->page(), &QWebEnginePage::permissionRequested, this,
             [this](const QWebEnginePermission &permission) {
                 emit permissionRequested(permission);
             });
+#else
+    connect(view->page(), &QWebEnginePage::featurePermissionRequested, this,
+            [this, page = view->page()](const QUrl &origin, QWebEnginePage::Feature feature) {
+                emit featurePermissionRequested(origin, feature, page);
+            });
+#endif
 
     // Fullscreen video request support.
     connect(view->page(), &QWebEnginePage::fullScreenRequested, this,
