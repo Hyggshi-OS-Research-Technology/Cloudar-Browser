@@ -1,0 +1,18 @@
+<RCC>
+    <qresource prefix="/">
+        <file>icon.png</file>
+        <file>close.svg</file>
+        <file>close-hover.svg</file>
+        <file>newtab.html</file>
+        <file>settings.html</file>
+        <file>version.html</file>
+        <file>flags.html</file>
+        <file>about.html</file>
+        <file>bookmarks.html</file>
+        <file>history.html</file>
+        <file>downloads.html</file>
+        <file>extensions.html</file>
+        <file>permissions.html</file>
+        <file>chrome-api-shim.js</file>
+    </qresource>
+</RCC>

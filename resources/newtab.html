@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>New Tab</title>
+<style>
+  :root {
+    --bg-a: #10131a;
+    --bg-b: #1a2233;
+    --accent: #2d7ff9;
+    --accent-2: #7a5cff;
+    --text: #e8ecf5;
+    --muted: #8b93a7;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%;
+    font-family: -apple-system, "Segoe UI", Roboto, Ubuntu, sans-serif;
+    color: var(--text);
+    overflow: hidden;
+  }
+  body {
+    background: linear-gradient(135deg, var(--bg-a), var(--bg-b), var(--bg-a));
+    background-size: 400% 400%;
+    animation: drift 18s ease infinite;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+  }
+  /* Custom background (color / uploaded image / web image) overrides the
+     default gradient. Applied by toggling this class on <body>. */
+  body.custom-bg {
+    animation: none;
+    background-size: cover;
+  }
+  @keyframes drift {
+    0%   { background-position: 0% 50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  .blob {
+    position: fixed;
+    width: 420px; height: 420px;
+    border-radius: 50%;
+    filter: blur(90px);
+    opacity: 0.25;
+    z-index: 0;
+    animation: float 12s ease-in-out infinite;
+    pointer-events: none;
+  }
+  .blob.one   { background: var(--accent);   top: -120px; left: -100px; }
+  .blob.two   { background: var(--accent-2); bottom: -140px; right: -120px; animation-delay: 3s; }
+  @keyframes float {
+    0%, 100% { transform: translateY(0) translateX(0); }
+    50%      { transform: translateY(30px) translateX(20px); }
+  }
+  /* Custom backgrounds look busy with the blobs still floating on top. */
+  body.custom-bg .blob { display: none; }
+  /* A soft scrim keeps the search box/tiles readable on top of any photo. */
+  .scrim {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 12, 18, 0.35);
+    z-index: 0;
+    display: none;
+    pointer-events: none;
+  }
+  body.custom-bg .scrim { display: block; }
+
+  .content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    opacity: 0;
+    transform: translateY(14px);
+    animation: riseIn 0.6s ease-out 0.1s forwards;
+  }
+  @keyframes riseIn {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  h1 {
+    font-weight: 600;
+    font-size: 28px;
+    letter-spacing: 0.5px;
+    margin: 0 0 28px 0;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  form.search {
+    width: 560px;
+    max-width: 80vw;
+    position: relative;
+    margin-bottom: 40px;
+  }
+  form.search input {
+    width: 100%;
+    padding: 14px 20px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.06);
+    color: var(--text);
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+  }
+  form.search input:focus {
+    border-color: var(--accent);
+    background: rgba(255,255,255,0.09);
+    box-shadow: 0 0 0 4px rgba(45,127,249,0.15);
+  }
+
+  .tiles {
+    display: flex;
+    gap: 16px;
+  }
+  .tile {
+    width: 108px;
+    padding: 16px 8px;
+    border-radius: 14px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.06);
+    text-align: center;
+    cursor: pointer;
+    user-select: none;
+    opacity: 0;
+    transform: translateY(10px);
+    animation: riseIn 0.5s ease-out forwards;
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+  .tile:hover { background: rgba(255,255,255,0.09); transform: translateY(-2px); }
+  .tile:active { transform: translateY(0); }
+  .tile .icon { font-size: 22px; margin-bottom: 6px; }
+  .tile .label { font-size: 12px; color: var(--muted); }
+
+  .tile:nth-child(1) { animation-delay: 0.20s; }
+  .tile:nth-child(2) { animation-delay: 0.28s; }
+  .tile:nth-child(3) { animation-delay: 0.36s; }
+  .tile:nth-child(4) { animation-delay: 0.44s; }
+
+  /* --- Speed dial (user-customizable shortcuts) --- */
+  .speed-dial {
+    margin-top: 26px;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+  }
+  .speed-tiles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    max-width: 560px;
+    justify-content: center;
+  }
+  .speed-tile {
+    position: relative;
+    width: 92px;
+    padding: 14px 6px 10px;
+    border-radius: 14px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.06);
+    text-align: center;
+    cursor: pointer;
+    user-select: none;
+    transition: transform 0.15s ease, background 0.15s ease, opacity 0.15s ease;
+  }
+  .speed-tile:hover { background: rgba(255,255,255,0.09); transform: translateY(-2px); }
+  .speed-tile:active { transform: translateY(0); }
+  .speed-tile.dragging { opacity: 0.35; }
+  .speed-tile.drag-over { border-color: var(--accent); }
+  .speed-tile .favicon {
+    width: 34px;
+    height: 34px;
+    margin: 0 auto 6px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    text-transform: uppercase;
+  }
+  .speed-tile .label {
+    font-size: 11px;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .speed-tile .remove-btn {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: rgba(20, 22, 30, 0.95);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: var(--muted);
+    font-size: 10px;
+    line-height: 16px;
+    text-align: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s ease, color 0.15s ease;
+  }
+  .speed-tile:hover .remove-btn { opacity: 1; }
+  .speed-tile .remove-btn:hover { color: #ff6b6b; }
+  .speed-tile.add-tile {
+    background: transparent;
+    border: 1px dashed rgba(255,255,255,0.18);
+  }
+  .speed-tile.add-tile:hover { background: rgba(255,255,255,0.05); }
+  .speed-tile.add-tile .favicon {
+    background: transparent;
+    border: 1px dashed rgba(255,255,255,0.25);
+    color: var(--muted);
+    font-size: 18px;
+  }
+
+  .mini-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(6, 7, 11, 0.55);
+    z-index: 4;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+  .mini-overlay.open { display: flex; }
+  .mini-dialog {
+    width: 300px;
+    max-width: 86vw;
+    background: rgba(20, 23, 31, 0.98);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px;
+    padding: 20px;
+  }
+  .mini-dialog h3 {
+    margin: 0 0 14px 0;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .mini-dialog input[type="text"] {
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.05);
+    color: var(--text);
+    font-size: 13px;
+    margin-bottom: 10px;
+  }
+  .mini-dialog .row {
+    display: flex;
+    gap: 8px;
+  }
+  .mini-dialog .row button {
+    flex: 1;
+    padding: 9px;
+    border-radius: 8px;
+    border: none;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .mini-dialog .row button.action { background: var(--accent); color: #fff; }
+  .mini-dialog .row button.action:hover { filter: brightness(1.08); }
+  .mini-dialog .row button.secondary { background: rgba(255,255,255,0.08); color: var(--text); }
+
+  .footer {
+    position: fixed;
+    bottom: 18px;
+    font-size: 11px;
+    color: var(--muted);
+    opacity: 0;
+    animation: riseIn 0.5s ease-out 0.6s forwards;
+    z-index: 1;
+  }
+
+  /* --- Customize button + panel --- */
+  .customize-btn {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 2;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: var(--text);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease, transform 0.15s ease;
+  }
+  .customize-btn:hover { background: rgba(255,255,255,0.14); transform: rotate(20deg); }
+
+  .panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: 300px;
+    max-width: 86vw;
+    background: rgba(16, 19, 26, 0.92);
+    backdrop-filter: blur(14px);
+    border-left: 1px solid rgba(255,255,255,0.08);
+    z-index: 3;
+    padding: 22px 20px;
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+    overflow-y: auto;
+  }
+  .panel.open { transform: translateX(0); }
+  .panel h2 {
+    font-size: 15px;
+    margin: 0 0 18px 0;
+    font-weight: 600;
+  }
+  .panel .close-btn {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 18px;
+    cursor: pointer;
+  }
+  .panel section {
+    margin-bottom: 22px;
+  }
+  .panel label {
+    display: block;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .swatches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .swatch {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+  }
+  .swatch:hover, .swatch.active { border-color: #fff; }
+  .panel input[type="color"] {
+    width: 100%;
+    height: 34px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    cursor: pointer;
+  }
+  .panel input[type="text"], .panel input[type="file"] {
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.05);
+    color: var(--text);
+    font-size: 13px;
+    margin-bottom: 8px;
+  }
+  .panel button.action {
+    width: 100%;
+    padding: 9px;
+    border-radius: 8px;
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: 6px;
+  }
+  .panel button.action:hover { filter: brightness(1.08); }
+  .panel button.secondary {
+    background: rgba(255,255,255,0.08);
+    color: var(--text);
+  }
+  .panel .hint {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  .panel .preview {
+    width: 100%;
+    height: 70px;
+    border-radius: 8px;
+    background-size: cover;
+    background-position: center;
+    margin-top: 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+    display: none;
+  }
+  .panel .preview.show { display: block; }
+
+  /* Background Video & Live Wallpaper */
+  .bg-video {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    min-width: 100%;
+    min-height: 100%;
+    width: auto;
+    height: auto;
+    z-index: 0;
+    transform: translate(-50%, -50%);
+    object-fit: cover;
+    display: none;
+    pointer-events: none;
+  }
+  body.video-bg {
+    animation: none;
+    background: #000;
+  }
+  body.video-bg .bg-video {
+    display: block;
+  }
+  body.video-bg .blob {
+    display: none;
+  }
+  body.video-bg .scrim {
+    display: block;
+  }
+
+  .media-controls {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 10;
+    display: flex;
+    gap: 8px;
+  }
+  .media-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(16, 19, 26, 0.75);
+    color: var(--text);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(8px);
+    transition: transform 0.2s, background 0.2s;
+  }
+  .media-btn:hover {
+    transform: scale(1.08);
+    background: rgba(255,255,255,0.2);
+  }
+  .video-preview-wrapper {
+    margin-top: 8px;
+    display: none;
+  }
+  .video-preview-wrapper.show {
+    display: block;
+  }
+  .video-preview-wrapper video {
+    width: 100%;
+    height: 80px;
+    border-radius: 8px;
+    object-fit: cover;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+</style>
+</head>
+<body>
+  <video id="bgVideo" class="bg-video" autoplay loop muted playsinline></video>
+  <div class="scrim"></div>
+  <div class="blob one"></div>
+  <div class="blob two"></div>
+
+  <div class="media-controls" id="mediaControls" style="display:none;">
+    <button class="media-btn" id="soundBtn" title="Toggle audio">&#128263;</button>
+    <button class="media-btn" id="playPauseBtn" title="Pause / Play">&#9208;</button>
+  </div>
+
+  <button class="customize-btn" id="customizeBtn" title="Customize this page">&#127912;</button>
+
+  <div class="content">
+    <h1 style="display:flex; align-items:center; gap:12px;"><img src="qrc:/icon.png" style="width:36px; height:36px; border-radius:10px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">Cloudar Browser</h1>
+
+    <form class="search" action="https://duckduckgo.com/" method="get">
+      <input type="text" name="q" placeholder="Search the web" autofocus>
+    </form>
+
+    <div class="tiles">
+      <div class="tile" data-action="history">
+        <div class="icon">&#128337;</div>
+        <div class="label">History</div>
+      </div>
+      <div class="tile" data-action="downloads">
+        <div class="icon">&#8681;</div>
+        <div class="label">Downloads</div>
+      </div>
+      <div class="tile" data-action="extensions">
+        <div class="icon">&#129513;</div>
+        <div class="label">Extensions</div>
+      </div>
+      <div class="tile" data-action="settings">
+        <div class="icon">&#9881;</div>
+        <div class="label">Settings</div>
+      </div>
+    </div>
+
+    <div class="speed-dial">
+      <div class="speed-tiles" id="speedTiles"></div>
+    </div>
+  </div>
+
+  <div class="footer">cloudar://newtab</div>
+
+  <div class="mini-overlay" id="addOverlay">
+    <div class="mini-dialog">
+      <h3 id="addDialogTitle">Add shortcut</h3>
+      <input type="text" id="addName" placeholder="Name">
+      <input type="text" id="addUrl" placeholder="https://example.com">
+      <div class="row">
+        <button class="secondary" id="addCancel">Cancel</button>
+        <button class="action" id="addConfirm">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="panel">
+    <button class="close-btn" id="closePanel">&#10005;</button>
+    <h2>Customize this page</h2>
+
+    <section>
+      <label>Background color</label>
+      <div class="swatches" id="swatches"></div>
+      <input type="color" id="colorPicker" value="#10131a">
+    </section>
+
+    <section>
+      <label>Background image or video (from this device)</label>
+      <input type="file" id="imageFile" accept="image/*,video/mp4,video/webm,video/ogg,video/*">
+      <div class="hint">Images (PNG, JPG, WebP) or Videos (MP4, WebM Live2D wallpaper).</div>
+      <div class="preview" id="imagePreview"></div>
+      <div class="video-preview-wrapper" id="videoPreviewWrapper">
+        <video id="videoPreview" muted loop autoplay></video>
+        <div style="margin-top:6px; display:flex; align-items:center; gap:8px;">
+          <label style="font-size:12px; display:flex; align-items:center; gap:6px; margin:0; cursor:pointer;">
+            <input type="checkbox" id="videoAudioToggle"> Enable sound
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <label>Background media from the web (Image or Video URL)</label>
+      <input type="text" id="webImageUrl" placeholder="https://example.com/photo.jpg or video.mp4">
+      <button class="action" id="applyWebImage">Use this media</button>
+    </section>
+
+    <section>
+      <button class="action secondary" id="resetBg">Reset to default</button>
+    </section>
+  </div>
+
+  <script src="qrc:/qtwebchannel/qwebchannel.js"></script>
+  <script>
+    var native = null;
+    if (window.qt && window.qt.webChannelTransport) {
+      new QWebChannel(qt.webChannelTransport, function(channel) {
+        native = channel.objects.native;
+      });
+    }
+    document.querySelectorAll('.tile').forEach(function (tile) {
+      tile.addEventListener('click', function () {
+        if (!native) return;
+        var action = tile.getAttribute('data-action');
+        if (action === 'history') native.openHistory();
+        else if (action === 'downloads') native.openDownloads();
+        else if (action === 'extensions') native.openExtensions();
+        else if (action === 'settings') native.openSettings();
+      });
+    });
+
+    // ---------- New Tab background customization (Color, Image, Video) ----------
+    var STORAGE_KEY = 'cloudar.newtab.background';
+    var PRESET_COLORS = ['#10131a', '#1a2233', '#0f2027', '#2c1e3d', '#1b2a1d', '#3a1f1f', '#1f2937', '#0b132b'];
+
+    var body = document.body;
+    var panel = document.getElementById('panel');
+    var swatchesEl = document.getElementById('swatches');
+    var colorPicker = document.getElementById('colorPicker');
+    var imageFileInput = document.getElementById('imageFile');
+    var imagePreview = document.getElementById('imagePreview');
+    var videoPreviewWrapper = document.getElementById('videoPreviewWrapper');
+    var videoPreview = document.getElementById('videoPreview');
+    var videoAudioToggle = document.getElementById('videoAudioToggle');
+    var webImageUrlInput = document.getElementById('webImageUrl');
+    var bgVideo = document.getElementById('bgVideo');
+    var mediaControls = document.getElementById('mediaControls');
+    var soundBtn = document.getElementById('soundBtn');
+    var playPauseBtn = document.getElementById('playPauseBtn');
+
+    // IndexedDB for storing local video background
+    var DB_NAME = 'cloudar_wallpaper_db';
+    var DB_VERSION = 1;
+    var STORE_NAME = 'videos';
+    var currentVideoObjectUrl = null;
+
+    function openVideoDB(callback) {
+      var req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = function (e) {
+        var db = e.target.result;
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          db.createObjectStore(STORE_NAME);
+        }
+      };
+      req.onsuccess = function (e) { callback(null, e.target.result); };
+      req.onerror = function (e) { callback(e.target.error, null); };
+    }
+
+    function saveVideoBlob(blob, callback) {
+      openVideoDB(function (err, db) {
+        if (err) return callback && callback(err);
+        var tx = db.transaction([STORE_NAME], 'readwrite');
+        var store = tx.objectStore(STORE_NAME);
+        var req = store.put(blob, 'bg_video');
+        req.onsuccess = function () { callback && callback(null); };
+        req.onerror = function (e) { callback && callback(e.target.error); };
+      });
+    }
+
+    function loadVideoBlob(callback) {
+      openVideoDB(function (err, db) {
+        if (err) return callback(err, null);
+        var tx = db.transaction([STORE_NAME], 'readonly');
+        var store = tx.objectStore(STORE_NAME);
+        var req = store.get('bg_video');
+        req.onsuccess = function (e) { callback(null, e.target.result); };
+        req.onerror = function (e) { callback(e.target.error, null); };
+      });
+    }
+
+    function clearVideoBlob(callback) {
+      openVideoDB(function (err, db) {
+        if (err) return callback && callback(err);
+        var tx = db.transaction([STORE_NAME], 'readwrite');
+        var store = tx.objectStore(STORE_NAME);
+        var req = store.delete('bg_video');
+        req.onsuccess = function () { callback && callback(null); };
+        req.onerror = function (e) { callback && callback(e.target.error); };
+      });
+    }
+
+    function buildSwatches() {
+      swatchesEl.innerHTML = '';
+      PRESET_COLORS.forEach(function (hex) {
+        var el = document.createElement('div');
+        el.className = 'swatch';
+        el.style.background = hex;
+        el.title = hex;
+        el.addEventListener('click', function () { setColorBackground(hex); });
+        swatchesEl.appendChild(el);
+      });
+    }
+
+    function markActiveSwatch(hex) {
+      var kids = swatchesEl.querySelectorAll('.swatch');
+      for (var i = 0; i < kids.length; i++) {
+        kids[i].classList.toggle('active', kids[i].title === hex);
+      }
+    }
+
+    function saveBackground(setting) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(setting));
+      } catch (e) {
+        console.warn('Could not save background preference:', e);
+      }
+    }
+
+    function applyVideoBackground(sourceUrlOrBlob, audioEnabled) {
+      body.classList.remove('custom-bg');
+      body.classList.add('video-bg');
+      body.style.backgroundImage = '';
+      body.style.backgroundColor = '#000';
+
+      if (sourceUrlOrBlob instanceof Blob) {
+        if (currentVideoObjectUrl) {
+          URL.revokeObjectURL(currentVideoObjectUrl);
+        }
+        currentVideoObjectUrl = URL.createObjectURL(sourceUrlOrBlob);
+        bgVideo.src = currentVideoObjectUrl;
+      } else {
+        bgVideo.src = sourceUrlOrBlob;
+      }
+
+      bgVideo.muted = !audioEnabled;
+      bgVideo.play().catch(function(e) { console.log('Autoplay:', e); });
+
+      mediaControls.style.display = 'flex';
+      soundBtn.innerHTML = audioEnabled ? '&#128266;' : '&#128263;';
+      soundBtn.title = audioEnabled ? 'Mute audio' : 'Enable audio';
+      playPauseBtn.innerHTML = '&#9208;';
+      videoAudioToggle.checked = !!audioEnabled;
+    }
+
+    function stopVideoBackground() {
+      bgVideo.pause();
+      bgVideo.removeAttribute('src');
+      bgVideo.load();
+      body.classList.remove('video-bg');
+      mediaControls.style.display = 'none';
+      if (currentVideoObjectUrl) {
+        URL.revokeObjectURL(currentVideoObjectUrl);
+        currentVideoObjectUrl = null;
+      }
+    }
+
+    function applyBackground(setting) {
+      if (!setting || setting.type === 'default') {
+        stopVideoBackground();
+        body.classList.remove('custom-bg');
+        body.style.backgroundImage = '';
+        body.style.backgroundColor = '';
+        return;
+      }
+
+      if (setting.type === 'video') {
+        if (setting.source === 'local') {
+          loadVideoBlob(function (err, blob) {
+            if (!err && blob) {
+              applyVideoBackground(blob, setting.sound);
+              videoPreview.src = URL.createObjectURL(blob);
+              videoPreviewWrapper.classList.add('show');
+            } else {
+              console.warn('Video blob not found in IndexedDB');
+            }
+          });
+        } else if (setting.source === 'web') {
+          applyVideoBackground(setting.value, setting.sound);
+          videoPreview.src = setting.value;
+          videoPreviewWrapper.classList.add('show');
+        }
+        return;
+      }
+
+      stopVideoBackground();
+      body.classList.add('custom-bg');
+      if (setting.type === 'color') {
+        body.style.backgroundImage = '';
+        body.style.backgroundColor = setting.value;
+        colorPicker.value = setting.value;
+        markActiveSwatch(setting.value);
+      } else if (setting.type === 'image' || setting.type === 'web') {
+        body.style.backgroundColor = '';
+        body.style.backgroundImage = 'url("' + setting.value + '")';
+      }
+    }
+
+    function setColorBackground(hex) {
+      clearVideoBlob();
+      var setting = { type: 'color', value: hex };
+      applyBackground(setting);
+      saveBackground(setting);
+      imagePreview.classList.remove('show');
+      videoPreviewWrapper.classList.remove('show');
+    }
+
+    function setImageBackground(dataUrl) {
+      clearVideoBlob();
+      var setting = { type: 'image', value: dataUrl };
+      applyBackground(setting);
+      saveBackground(setting);
+      imagePreview.style.backgroundImage = 'url("' + dataUrl + '")';
+      imagePreview.classList.add('show');
+      videoPreviewWrapper.classList.remove('show');
+    }
+
+    function setWebImageBackground(url) {
+      clearVideoBlob();
+      var setting = { type: 'web', value: url };
+      applyBackground(setting);
+      saveBackground(setting);
+      imagePreview.style.backgroundImage = 'url("' + url + '")';
+      imagePreview.classList.add('show');
+      videoPreviewWrapper.classList.remove('show');
+    }
+
+    function resetBackground() {
+      clearVideoBlob();
+      stopVideoBackground();
+      var setting = { type: 'default' };
+      applyBackground(setting);
+      saveBackground(setting);
+      imagePreview.classList.remove('show');
+      videoPreviewWrapper.classList.remove('show');
+      webImageUrlInput.value = '';
+      markActiveSwatch(null);
+    }
+
+    function readImageFileAsDataUrl(file, callback) {
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        var img = new Image();
+        img.onload = function () {
+          var maxDim = 1920;
+          var scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+          var canvas = document.createElement('canvas');
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          var ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          callback(canvas.toDataURL('image/jpeg', 0.85));
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    document.getElementById('customizeBtn').addEventListener('click', function () {
+      panel.classList.add('open');
+    });
+    document.getElementById('closePanel').addEventListener('click', function () {
+      panel.classList.remove('open');
+    });
+
+    buildSwatches();
+
+    colorPicker.addEventListener('input', function () {
+      setColorBackground(colorPicker.value);
+    });
+
+    imageFileInput.addEventListener('change', function () {
+      var file = imageFileInput.files && imageFileInput.files[0];
+      if (!file) return;
+
+      var isVideo = file.type.startsWith('video/') || /\.(mp4|webm|ogg|mkv|mov)$/i.test(file.name);
+      if (isVideo) {
+        saveVideoBlob(file, function (err) {
+          if (err) {
+            console.error('Failed to save video:', err);
+            return;
+          }
+          var setting = { type: 'video', source: 'local', sound: videoAudioToggle.checked };
+          applyVideoBackground(file, videoAudioToggle.checked);
+          saveBackground(setting);
+          videoPreview.src = URL.createObjectURL(file);
+          videoPreviewWrapper.classList.add('show');
+          imagePreview.classList.remove('show');
+        });
+      } else {
+        clearVideoBlob();
+        videoPreviewWrapper.classList.remove('show');
+        readImageFileAsDataUrl(file, setImageBackground);
+      }
+    });
+
+    videoAudioToggle.addEventListener('change', function () {
+      bgVideo.muted = !videoAudioToggle.checked;
+      soundBtn.innerHTML = bgVideo.muted ? '&#128263;' : '&#128266;';
+      soundBtn.title = bgVideo.muted ? 'Enable audio' : 'Mute audio';
+      try {
+        var raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          var s = JSON.parse(raw);
+          if (s.type === 'video') {
+            s.sound = !bgVideo.muted;
+            saveBackground(s);
+          }
+        }
+      } catch (e) {}
+    });
+
+    soundBtn.addEventListener('click', function () {
+      bgVideo.muted = !bgVideo.muted;
+      soundBtn.innerHTML = bgVideo.muted ? '&#128263;' : '&#128266;';
+      soundBtn.title = bgVideo.muted ? 'Enable audio' : 'Mute audio';
+      videoAudioToggle.checked = !bgVideo.muted;
+      try {
+        var raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          var s = JSON.parse(raw);
+          if (s.type === 'video') {
+            s.sound = !bgVideo.muted;
+            saveBackground(s);
+          }
+        }
+      } catch (e) {}
+    });
+
+    playPauseBtn.addEventListener('click', function () {
+      if (bgVideo.paused) {
+        bgVideo.play();
+        playPauseBtn.innerHTML = '&#9208;';
+        playPauseBtn.title = 'Pause';
+      } else {
+        bgVideo.pause();
+        playPauseBtn.innerHTML = '&#9658;';
+        playPauseBtn.title = 'Play';
+      }
+    });
+
+    document.getElementById('applyWebImage').addEventListener('click', function () {
+      var url = webImageUrlInput.value.trim();
+      if (!url) return;
+      var isVideo = /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(url);
+      if (isVideo) {
+        clearVideoBlob();
+        var setting = { type: 'video', source: 'web', value: url, sound: videoAudioToggle.checked };
+        applyVideoBackground(url, videoAudioToggle.checked);
+        saveBackground(setting);
+        videoPreview.src = url;
+        videoPreviewWrapper.classList.add('show');
+        imagePreview.classList.remove('show');
+      } else {
+        setWebImageBackground(url);
+        videoPreviewWrapper.classList.remove('show');
+      }
+    });
+
+    webImageUrlInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        document.getElementById('applyWebImage').click();
+      }
+    });
+
+    document.getElementById('resetBg').addEventListener('click', resetBackground);
+
+    // ---------- Speed dial (user-customizable shortcuts) ----------
+    // Persisted client-side in localStorage, same pattern as the background
+    // preference above — no native round trip needed since navigation is
+    // just a normal page load in this same QWebEngineView.
+    var SPEEDDIAL_KEY = 'lightbrowser.newtab.speeddial';
+    var DEFAULT_SPEED_DIAL = [
+      { id: 'sd-1', label: 'GitHub', url: 'https://github.com' },
+      { id: 'sd-2', label: 'YouTube', url: 'https://youtube.com' },
+      { id: 'sd-3', label: 'DuckDuckGo', url: 'https://duckduckgo.com' }
+    ];
+    var AVATAR_COLORS = ['#2d7ff9', '#7a5cff', '#00b894', '#e17055', '#d63384', '#0984e3', '#e67e22', '#20c997'];
+
+    var speedTilesEl = document.getElementById('speedTiles');
+    var addOverlay = document.getElementById('addOverlay');
+    var addName = document.getElementById('addName');
+    var addUrl = document.getElementById('addUrl');
+    var dragSourceId = null;
+
+    function loadSpeedDial() {
+      try {
+        var raw = localStorage.getItem(SPEEDDIAL_KEY);
+        if (raw) return JSON.parse(raw);
+      } catch (e) {
+        console.warn('Could not load speed dial:', e);
+      }
+      return DEFAULT_SPEED_DIAL.slice();
+    }
+
+    function saveSpeedDial(list) {
+      try {
+        localStorage.setItem(SPEEDDIAL_KEY, JSON.stringify(list));
+      } catch (e) {
+        console.warn('Could not save speed dial:', e);
+      }
+    }
+
+    function hashColor(str) {
+      var hash = 0;
+      for (var i = 0; i < str.length; i++) hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
+      return AVATAR_COLORS[hash % AVATAR_COLORS.length];
+    }
+
+    function faviconLetter(entry) {
+      var source = entry.label || entry.url || '?';
+      return source.trim().charAt(0) || '?';
+    }
+
+    function normalizeUrl(raw) {
+      raw = raw.trim();
+      if (!raw) return '';
+      if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(raw)) raw = 'https://' + raw;
+      return raw;
+    }
+
+    function navigateTo(url) {
+      window.location.href = url;
+    }
+
+    var speedDial = loadSpeedDial();
+
+    function renderSpeedDial() {
+      speedTilesEl.innerHTML = '';
+      speedDial.forEach(function (entry) {
+        var tile = document.createElement('div');
+        tile.className = 'speed-tile';
+        tile.draggable = true;
+        tile.dataset.id = entry.id;
+
+        var favicon = document.createElement('div');
+        favicon.className = 'favicon';
+        favicon.style.background = hashColor(entry.url);
+        favicon.textContent = faviconLetter(entry);
+
+        var label = document.createElement('div');
+        label.className = 'label';
+        label.textContent = entry.label;
+
+        var removeBtn = document.createElement('div');
+        removeBtn.className = 'remove-btn';
+        removeBtn.textContent = '\u2715';
+        removeBtn.title = 'Remove';
+        removeBtn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          speedDial = speedDial.filter(function (x) { return x.id !== entry.id; });
+          saveSpeedDial(speedDial);
+          renderSpeedDial();
+        });
+
+        tile.appendChild(favicon);
+        tile.appendChild(label);
+        tile.appendChild(removeBtn);
+
+        tile.addEventListener('click', function () { navigateTo(entry.url); });
+
+        tile.addEventListener('dragstart', function (e) {
+          dragSourceId = entry.id;
+          tile.classList.add('dragging');
+          e.dataTransfer.effectAllowed = 'move';
+        });
+        tile.addEventListener('dragend', function () {
+          tile.classList.remove('dragging');
+        });
+        tile.addEventListener('dragover', function (e) {
+          e.preventDefault();
+          tile.classList.add('drag-over');
+        });
+        tile.addEventListener('dragleave', function () {
+          tile.classList.remove('drag-over');
+        });
+        tile.addEventListener('drop', function (e) {
+          e.preventDefault();
+          tile.classList.remove('drag-over');
+          if (!dragSourceId || dragSourceId === entry.id) return;
+          var fromIdx = speedDial.findIndex(function (x) { return x.id === dragSourceId; });
+          var toIdx = speedDial.findIndex(function (x) { return x.id === entry.id; });
+          if (fromIdx === -1 || toIdx === -1) return;
+          var moved = speedDial.splice(fromIdx, 1)[0];
+          speedDial.splice(toIdx, 0, moved);
+          saveSpeedDial(speedDial);
+          renderSpeedDial();
+        });
+
+        speedTilesEl.appendChild(tile);
+      });
+
+      var addTile = document.createElement('div');
+      addTile.className = 'speed-tile add-tile';
+      addTile.innerHTML = '<div class="favicon">+</div><div class="label">Add</div>';
+      addTile.addEventListener('click', function () {
+        addName.value = '';
+        addUrl.value = '';
+        addOverlay.classList.add('open');
+        addName.focus();
+      });
+      speedTilesEl.appendChild(addTile);
+    }
+
+    document.getElementById('addCancel').addEventListener('click', function () {
+      addOverlay.classList.remove('open');
+    });
+    addOverlay.addEventListener('click', function (e) {
+      if (e.target === addOverlay) addOverlay.classList.remove('open');
+    });
+    document.getElementById('addConfirm').addEventListener('click', function () {
+      var url = normalizeUrl(addUrl.value);
+      if (!url) { addUrl.focus(); return; }
+      var label = addName.value.trim() || url.replace(/^https?:\/\//, '').split('/')[0];
+      speedDial.push({ id: 'sd-' + Date.now(), label: label, url: url });
+      saveSpeedDial(speedDial);
+      renderSpeedDial();
+      addOverlay.classList.remove('open');
+    });
+    addUrl.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') document.getElementById('addConfirm').click();
+    });
+
+    renderSpeedDial();
+
+    // Restore whatever was saved last time.
+    (function restore() {
+      try {
+        var raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          var setting = JSON.parse(raw);
+          applyBackground(setting);
+          if (setting.type === 'image') {
+            imagePreview.style.backgroundImage = 'url("' + setting.value + '")';
+            imagePreview.classList.add('show');
+          } else if (setting.type === 'web') {
+            webImageUrlInput.value = setting.value;
+          } else if (setting.type === 'video') {
+            if (setting.source === 'web') {
+              webImageUrlInput.value = setting.value;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Could not restore background preference:', e);
+      }
+    })();
+  </script>
+</body>
+</html>

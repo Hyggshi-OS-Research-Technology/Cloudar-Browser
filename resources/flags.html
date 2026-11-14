@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>LightBrowser Flags</title>
+<style>
+  :root {
+    --bg: #10131a;
+    --panel: #171b24;
+    --panel-2: #1d212b;
+    --panel-3: #22273a;
+    --border: rgba(255,255,255,0.08);
+    --accent: #2d7ff9;
+    --accent-2: #7a5cff;
+    --text: #e8ecf5;
+    --muted: #8b93a7;
+    --danger: #e05252;
+    --good: #34c77b;
+    --warn: #f5a623;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    font-family: -apple-system, "Segoe UI", Roboto, Ubuntu, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+  }
+
+  /* ── Top bar ── */
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 24px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .topbar-icon {
+    width: 32px; height: 32px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px;
+    flex: none;
+  }
+  .topbar h1 {
+    font-size: 18px;
+    font-weight: 700;
+    flex: 1;
+  }
+  .topbar h1 span { color: var(--muted); font-weight: 400; font-size: 14px; margin-left: 8px; }
+
+  .search-wrap {
+    position: relative;
+    flex: 0 0 340px;
+  }
+  .search-wrap svg {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    pointer-events: none;
+  }
+  #search {
+    width: 100%;
+    padding: 9px 12px 9px 36px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--panel-2);
+    color: var(--text);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  #search:focus { border-color: var(--accent); }
+
+  .reset-btn {
+    padding: 8px 18px;
+    border-radius: 10px;
+    background: rgba(229,57,53,0.15);
+    color: var(--danger);
+    border: 1px solid rgba(229,57,53,0.25);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.15s;
+  }
+  .reset-btn:hover { background: rgba(229,57,53,0.28); transform: translateY(-1px); }
+  .reset-btn:active { transform: translateY(0); }
+
+  /* ── Warning banner ── */
+  .banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    margin: 20px 24px 0;
+    padding: 14px 18px;
+    background: rgba(245, 166, 35, 0.10);
+    border: 1px solid rgba(245, 166, 35, 0.28);
+    border-radius: 12px;
+    font-size: 13px;
+    color: #f5d78a;
+    line-height: 1.55;
+  }
+  .banner-icon { font-size: 20px; flex: none; margin-top: 1px; }
+
+  /* ── Flags list ── */
+  .content { padding: 20px 24px 60px; max-width: 900px; }
+
+  #no-results {
+    text-align: center;
+    padding: 60px 0;
+    color: var(--muted);
+    display: none;
+  }
+  #no-results svg { opacity: 0.3; margin-bottom: 16px; }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 20px 0 10px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 4px;
+  }
+
+  .flag-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 18px;
+    padding: 16px 18px;
+    border-radius: 12px;
+    border: 1px solid transparent;
+    transition: background 0.18s, border-color 0.18s;
+    margin-bottom: 4px;
+    position: relative;
+  }
+  .flag-item:hover {
+    background: var(--panel);
+    border-color: var(--border);
+  }
+  .flag-item.modified {
+    background: rgba(45, 127, 249, 0.07);
+    border-color: rgba(45, 127, 249, 0.2);
+  }
+  .flag-body { flex: 1; min-width: 0; }
+  .flag-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 3px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .flag-name code {
+    font-size: 11px;
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    background: var(--panel-3);
+    color: var(--accent);
+    padding: 2px 7px;
+    border-radius: 5px;
+    font-weight: 500;
+  }
+  .badge-modified {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: rgba(45, 127, 249, 0.2);
+    color: var(--accent);
+    padding: 2px 7px;
+    border-radius: 5px;
+  }
+  .badge-restart {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: rgba(245, 166, 35, 0.2);
+    color: var(--warn);
+    padding: 2px 7px;
+    border-radius: 5px;
+  }
+  .flag-desc {
+    font-size: 12.5px;
+    color: var(--muted);
+    line-height: 1.55;
+    margin-top: 2px;
+  }
+  .flag-control {
+    flex: none;
+    display: flex;
+    align-items: center;
+    padding-top: 2px;
+  }
+
+  /* Toggle */
+  .toggle { position: relative; display: inline-block; width: 44px; height: 24px; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider {
+    position: absolute; cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(255,255,255,0.12);
+    border-radius: 24px;
+    transition: background 0.22s;
+  }
+  .toggle-slider::before {
+    content: "";
+    position: absolute;
+    width: 18px; height: 18px;
+    left: 3px; bottom: 3px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.22s;
+  }
+  .toggle input:checked + .toggle-slider { background: var(--accent); }
+  .toggle input:checked + .toggle-slider::before { transform: translateX(20px); }
+
+  /* Select */
+  .flag-select {
+    appearance: none;
+    background: var(--panel-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b93a7' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 10px center;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 7px 32px 7px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    outline: none;
+    min-width: 140px;
+    transition: border-color 0.2s;
+  }
+  .flag-select:focus { border-color: var(--accent); }
+  .flag-select.modified { border-color: rgba(45,127,249,0.5); color: var(--accent); }
+
+  /* Restart toast */
+  #restart-toast {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--panel-3);
+    border: 1px solid rgba(245,166,35,0.4);
+    border-radius: 12px;
+    padding: 14px 22px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 13px;
+    font-weight: 500;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s;
+    opacity: 0;
+    z-index: 100;
+    white-space: nowrap;
+  }
+  #restart-toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+  .toast-icon { color: var(--warn); font-size: 18px; }
+  .relaunch-btn {
+    padding: 7px 16px;
+    border-radius: 8px;
+    background: var(--warn);
+    color: #1a1000;
+    font-size: 12px;
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .relaunch-btn:hover { opacity: 0.85; }
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+  <div class="topbar-icon">🚩</div>
+  <h1>Experiments <span>cloudar://flags</span></h1>
+  <div class="search-wrap">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+    <input id="search" type="search" placeholder="Search flags..." autocomplete="off" autofocus>
+  </div>
+  <button class="reset-btn" onclick="resetAll()">Reset all</button>
+</div>
+
+<!-- Warning -->
+<div class="banner">
+  <span class="banner-icon">⚠️</span>
+  <div>
+    <strong>These are experimental features.</strong> They may change, break, or disappear at any time. Use at your own risk. Enabling them may impact browser stability and security.
+  </div>
+</div>
+
+<!-- Main content -->
+<div class="content" id="content">
+  <div id="no-results">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+    <p>No flags match your search.</p>
+  </div>
+</div>
+
+<!-- Restart toast -->
+<div id="restart-toast">
+  <span class="toast-icon">🔄</span>
+  <span>Your changes will take effect after relaunch.</span>
+  <button class="relaunch-btn" onclick="relaunch()">Relaunch</button>
+</div>
+
+<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+<script>
+let bridge = null;
+let nativeFlags = {};
+
+const FLAGS = [
+  {
+    id: 'enable-sidebar',
+    section: 'User Interface',
+    name: 'Vertical Tab Sidebar',
+    code: '#enable-sidebar',
+    desc: 'Enables the vertical tab sidebar panel on the left side of the browser window. Supports expand/collapse and hover card previews.',
+    type: 'toggle',
+    default: true,
+    restart: false,
+  },
+  {
+    id: 'sidebar-hover-card',
+    section: 'User Interface',
+    name: 'Sidebar Tab Hover Cards',
+    code: '#sidebar-hover-card',
+    desc: 'Show a popup card with page title, domain, thumbnail preview, and memory usage when hovering tabs in the collapsed sidebar.',
+    type: 'toggle',
+    default: true,
+    restart: false,
+  },
+  {
+    id: 'tab-preview-popup',
+    section: 'User Interface',
+    name: 'Horizontal Tab Preview Popup',
+    code: '#tab-preview-popup',
+    desc: 'Show a floating thumbnail preview card when hovering over tabs in the horizontal tab bar.',
+    type: 'toggle',
+    default: true,
+    restart: false,
+  },
+  {
+    id: 'smooth-scrolling',
+    section: 'User Interface',
+    name: 'Smooth Scrolling',
+    code: '#smooth-scrolling',
+    desc: 'Animate scrolling using smooth physics-based easing instead of instant jumps.',
+    type: 'select',
+    options: ['Default', 'Enabled', 'Disabled'],
+    default: 'Default',
+    restart: true,
+  },
+  {
+    id: 'dark-mode-detection',
+    section: 'User Interface',
+    name: 'Automatic Dark Mode for Web Contents',
+    code: '#darken-websites-checkbox-in-themes-setting',
+    desc: 'Apply an automatic dark mode filter to web pages when the system dark mode is enabled.',
+    type: 'select',
+    options: ['Default', 'Enabled', 'Disabled'],
+    default: 'Default',
+    restart: true,
+  },
+  {
+    id: 'reader-mode',
+    section: 'User Interface',
+    name: 'Reader Mode',
+    code: '#enable-reader-mode',
+    desc: 'Enables distraction-free reader mode to render articles in a clean, typographic layout.',
+    type: 'toggle',
+    default: true,
+    restart: false,
+  },
+  {
+    id: 'gpu-rasterization',
+    section: 'Performance',
+    name: 'GPU Rasterization',
+    code: '#enable-gpu-rasterization',
+    desc: 'Use the GPU to rasterize web content. May improve rendering performance on supported hardware.',
+    type: 'select',
+    options: ['Default', 'Enabled', 'Disabled'],
+    default: 'Default',
+    restart: true,
+  },
+  {
+    id: 'zero-copy',
+    section: 'Performance',
+    name: 'Zero-Copy Rasterizer',
+    code: '#enable-zero-copy',
+    desc: 'Rasterize tiles on the GPU directly into the display compositor\'s memory. Reduces memory bandwidth and may improve performance.',
+    type: 'select',
+    options: ['Default', 'Enabled', 'Disabled'],
+    default: 'Default',
+    restart: true,
+  },
+  {
+    id: 'lazy-image-loading',
+    section: 'Performance',
+    name: 'Lazy Image Loading',
+    code: '#enable-lazy-image-loading',
+    desc: 'Defer loading of images that are off-screen until the user scrolls near them, reducing initial page load time.',
+    type: 'select',
+    options: ['Default', 'Enabled', 'Disabled'],
+    default: 'Default',
+    restart: false,
+  },
+  {
+    id: 'quic-protocol',
+    section: 'Network',
+    name: 'Experimental QUIC Protocol',
+    code: '#enable-quic',
+    desc: 'Enable the QUIC protocol (HTTP/3 transport layer) for faster, more reliable connections to supported servers.',
+    type: 'select',
+    options: ['Default', 'Enabled', 'Disabled'],
+    default: 'Default',
+    restart: true,
+  },
+  {
+    id: 'dns-over-https',
+    section: 'Network',
+    name: 'DNS over HTTPS',
+    code: '#dns-over-https',
+    desc: 'Encrypt DNS queries using HTTPS for improved privacy. When enabled, a secure DNS provider is used if available.',
+    type: 'select',
+    options: ['Default', 'Automatic (use current DNS)', 'Enabled (strict)', 'Disabled'],
+    default: 'Default',
+    restart: true,
+  },
+  {
+    id: 'extensions',
+    section: 'Extensions',
+    name: 'Chrome Extension Support',
+    code: '#enable-extensions',
+    desc: 'Enable loading and running Chrome-compatible extensions (.crx) via the Extensions manager.',
+    type: 'toggle',
+    default: true,
+    restart: true,
+  },
+  {
+    id: 'extension-mv3',
+    section: 'Extensions',
+    name: 'Manifest V3 Extensions',
+    code: '#extensions-mv3',
+    desc: 'Enable support for Manifest V3 extensions. MV3 uses a service worker model and stricter Content Security Policy.',
+    type: 'select',
+    options: ['Default', 'Enabled', 'Disabled'],
+    default: 'Default',
+    restart: true,
+  },
+  {
+    id: 'memory-saver',
+    section: 'Performance',
+    name: 'Memory Saver',
+    code: '#memory-saver-discard-freezing',
+    desc: 'Discard inactive background tabs from memory to reduce RAM usage. Tabs are reloaded when reopened.',
+    type: 'select',
+    options: ['Default', 'Enabled', 'Disabled'],
+    default: 'Default',
+    restart: false,
+  },
+  {
+    id: 'webgpu',
+    section: 'Graphics',
+    name: 'WebGPU',
+    code: '#enable-webgpu-developer-features',
+    desc: 'Expose experimental WebGPU developer features for hardware-accelerated graphics and compute workloads.',
+    type: 'select',
+    options: ['Default', 'Enabled', 'Disabled'],
+    default: 'Default',
+    restart: true,
+  },
+  {
+    id: 'webrtc-hide-ips',
+    section: 'Privacy',
+    name: 'WebRTC IP Handling Policy',
+    code: '#webrtc-ip-handling-policy',
+    desc: 'Control how WebRTC handles IP address discovery. Selecting "Disable non-proxied UDP" prevents IP leaks through WebRTC.',
+    type: 'select',
+    options: ['Default', 'Default public and private interfaces', 'Default public interface only', 'Disable non-proxied UDP'],
+    default: 'Default',
+    restart: false,
+  },
+  {
+    id: 'safe-browsing',
+    section: 'Privacy',
+    name: 'Safe Browsing',
+    code: '#safe-browsing-enabled',
+    desc: 'Check sites against a list of known dangerous pages. Warns before navigating to phishing, malware, or deceptive sites.',
+    type: 'toggle',
+    default: true,
+    restart: false,
+  },
+];
+
+// Storage
+function getState(id, def) {
+  if (nativeFlags.hasOwnProperty(id)) {
+    const v = nativeFlags[id];
+    if (v === 'true' || v === true) return true;
+    if (v === 'false' || v === false) return false;
+    return v;
+  }
+  const v = localStorage.getItem('flag:' + id);
+  if (v === null) return def;
+  if (v === 'true') return true;
+  if (v === 'false') return false;
+  return v;
+}
+
+function setState(id, val) {
+  nativeFlags[id] = String(val);
+  localStorage.setItem('flag:' + id, val);
+  if (bridge) {
+    bridge.setFlag(id, String(val));
+  }
+}
+
+function isModified(flag) {
+  const cur = getState(flag.id, flag.default);
+  return String(cur) !== String(flag.default);
+}
+
+// Build UI
+const sections = {};
+FLAGS.forEach(f => { if (!sections[f.section]) sections[f.section] = []; sections[f.section].push(f); });
+
+const content = document.getElementById('content');
+const noResults = document.getElementById('no-results');
+
+function renderAll(filter) {
+  content.querySelectorAll('.flag-item, .section-label').forEach(e => e.remove());
+  let totalVisible = 0;
+  for (const [section, flags] of Object.entries(sections)) {
+    const filtered = filter ? flags.filter(f =>
+      f.name.toLowerCase().includes(filter) ||
+      f.code.toLowerCase().includes(filter) ||
+      f.desc.toLowerCase().includes(filter) ||
+      f.section.toLowerCase().includes(filter)
+    ) : flags;
+    if (!filtered.length) continue;
+    totalVisible += filtered.length;
+    const label = document.createElement('div');
+    label.className = 'section-label';
+    label.textContent = section;
+    content.appendChild(label);
+    filtered.forEach(flag => content.appendChild(buildFlagItem(flag)));
+  }
+  noResults.style.display = totalVisible ? 'none' : 'block';
+}
+
+function buildFlagItem(flag) {
+  const div = document.createElement('div');
+  div.className = 'flag-item' + (isModified(flag) ? ' modified' : '');
+  div.id = 'flag-' + flag.id;
+
+  const body = document.createElement('div');
+  body.className = 'flag-body';
+
+  const nameRow = document.createElement('div');
+  nameRow.className = 'flag-name';
+  nameRow.textContent = flag.name + ' ';
+  const code = document.createElement('code');
+  code.textContent = flag.code;
+  nameRow.appendChild(code);
+  if (isModified(flag)) {
+    const b = document.createElement('span');
+    b.className = 'badge-modified';
+    b.textContent = 'Modified';
+    nameRow.appendChild(b);
+  }
+  if (flag.restart) {
+    const r = document.createElement('span');
+    r.className = 'badge-restart';
+    r.textContent = 'Restart required';
+    nameRow.appendChild(r);
+  }
+
+  const desc = document.createElement('div');
+  desc.className = 'flag-desc';
+  desc.textContent = flag.desc;
+
+  body.appendChild(nameRow);
+  body.appendChild(desc);
+  div.appendChild(body);
+
+  const ctrl = document.createElement('div');
+  ctrl.className = 'flag-control';
+
+  if (flag.type === 'toggle') {
+    const label = document.createElement('label');
+    label.className = 'toggle';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.checked = getState(flag.id, flag.default);
+    input.addEventListener('change', () => {
+      setState(flag.id, input.checked);
+      updateFlagUI(flag);
+      if (flag.restart) showToast();
+    });
+    const slider = document.createElement('span');
+    slider.className = 'toggle-slider';
+    label.appendChild(input);
+    label.appendChild(slider);
+    ctrl.appendChild(label);
+  } else {
+    const sel = document.createElement('select');
+    sel.className = 'flag-select' + (isModified(flag) ? ' modified' : '');
+    flag.options.forEach(opt => {
+      const o = document.createElement('option');
+      o.value = opt;
+      o.textContent = opt;
+      sel.appendChild(o);
+    });
+    sel.value = getState(flag.id, flag.default);
+    sel.addEventListener('change', () => {
+      setState(flag.id, sel.value);
+      sel.className = 'flag-select' + (sel.value !== flag.default ? ' modified' : '');
+      updateFlagUI(flag);
+      if (flag.restart) showToast();
+    });
+    ctrl.appendChild(sel);
+  }
+
+  div.appendChild(ctrl);
+  return div;
+}
+
+function updateFlagUI(flag) {
+  const el = document.getElementById('flag-' + flag.id);
+  if (!el) return;
+  const fresh = buildFlagItem(flag);
+  el.replaceWith(fresh);
+}
+
+// Toast
+let toastTimer;
+function showToast() {
+  const t = document.getElementById('restart-toast');
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 6000);
+}
+function relaunch() {
+  if (bridge) {
+    bridge.relaunch();
+  }
+  document.getElementById('restart-toast').classList.remove('show');
+}
+
+// Search
+document.getElementById('search').addEventListener('input', e => {
+  const q = e.target.value.trim().toLowerCase();
+  renderAll(q || null);
+});
+
+// Reset all
+function resetAll() {
+  FLAGS.forEach(f => {
+    delete nativeFlags[f.id];
+    localStorage.removeItem('flag:' + f.id);
+  });
+  if (bridge) {
+    bridge.resetAllFlags();
+  }
+  renderAll(document.getElementById('search').value.trim().toLowerCase() || null);
+}
+
+// QWebChannel initialization
+if (window.qt && window.qt.webChannelTransport) {
+  new QWebChannel(qt.webChannelTransport, function (channel) {
+    bridge = channel.objects.settingsBridge;
+    if (!bridge) return;
+    bridge.getAllFlags(function (json) {
+      try {
+        nativeFlags = JSON.parse(json);
+        renderAll(document.getElementById('search').value.trim().toLowerCase() || null);
+      } catch (e) {
+        console.warn('Could not parse flags payload:', e);
+      }
+    });
+  });
+} else {
+  renderAll(null);
+}
+</script>
+</body>
+</html>

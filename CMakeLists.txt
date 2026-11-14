@@ -1,0 +1,123 @@
+cmake_minimum_required(VERSION 3.16)
+project(cloudar-browser VERSION 0.1.0 LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+set(CMAKE_AUTOUIC ON)
+
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
+endif()
+
+find_package(Qt6 REQUIRED COMPONENTS
+    Core
+    Gui
+    Widgets
+    WebEngineWidgets
+    WebEngineCore
+    Network
+    WebChannel
+)
+
+find_package(ZLIB REQUIRED)
+
+set(SOURCES
+    src/main.cpp
+    src/AdBlock.cpp
+    src/AISidebar.cpp
+    src/BookmarkBar.cpp
+    src/BookmarkManager.cpp
+    src/BrowserResources.cpp
+    src/BrowserSidebar.cpp
+    src/BrowserTabWidget.cpp
+    src/ChromeExtensionAPI.cpp
+    src/CrxInstaller.cpp
+    src/DownloadManager.cpp
+    src/ExtensionManager.cpp
+    src/ExtensionsDialog.cpp
+    src/HistoryManager.cpp
+    src/IdleEasterEgg.cpp
+    src/Language.cpp
+    src/LightSchemeHandler.cpp
+    src/MainWindow.cpp
+    src/ReaderMode.cpp
+    src/SessionManager.cpp
+    src/SettingsBridge.cpp
+    src/SettingsDialog.cpp
+    src/SpinnerWidget.cpp
+    src/SplitView.cpp
+    src/TabPreviewPopup.cpp
+    src/ThemeManager.cpp
+    src/TitleBar.cpp
+    src/TorrentDownloader.cpp
+    src/WebExtensionAPIBridge.cpp
+    src/WebExtensionManager.cpp
+    src/WebExtensionManifest.cpp
+    src/YouTubeDownloader.cpp
+)
+
+set(HEADERS
+    src/AdBlock.h
+    src/AISidebar.h
+    src/BookmarkBar.h
+    src/BookmarkManager.h
+    src/BrowserResources.h
+    src/BrowserSidebar.h
+    src/BrowserTabWidget.h
+    src/ChromeExtensionAPI.h
+    src/CrxInstaller.h
+    src/DownloadManager.h
+    src/ExtensionManager.h
+    src/ExtensionsDialog.h
+    src/HistoryManager.h
+    src/IdleEasterEgg.h
+    src/Language.h
+    src/LightSchemeHandler.h
+    src/MainWindow.h
+    src/NativeBridge.h
+    src/ReaderMode.h
+    src/SessionManager.h
+    src/SettingsBridge.h
+    src/SettingsDialog.h
+    src/SpinnerWidget.h
+    src/SplitView.h
+    src/TabPreviewPopup.h
+    src/ThemeManager.h
+    src/TitleBar.h
+    src/TorrentDownloader.h
+    src/WebExtensionAPIBridge.h
+    src/WebExtensionManager.h
+    src/WebExtensionManifest.h
+    src/YouTubeDownloader.h
+)
+
+add_executable(cloudar-browser
+    ${SOURCES}
+    ${HEADERS}
+    resources/resources.qrc
+)
+
+target_compile_definitions(cloudar-browser PRIVATE
+    CLOUDAR_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+
+target_include_directories(cloudar-browser PRIVATE
+    src
+)
+
+target_link_libraries(cloudar-browser PRIVATE
+    Qt6::Core
+    Qt6::Gui
+    Qt6::Widgets
+    Qt6::WebEngineWidgets
+    Qt6::WebEngineCore
+    Qt6::Network
+    Qt6::WebChannel
+    ZLIB::ZLIB
+)
+
+install(TARGETS cloudar-browser RUNTIME DESTINATION bin)
+install(FILES resources/cloudar-browser.desktop DESTINATION share/applications)
+install(FILES resources/icon.png DESTINATION share/icons/hicolor/256x256/apps RENAME cloudar-browser.png)

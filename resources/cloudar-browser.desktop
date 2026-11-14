@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Cloudar Browser
+GenericName=Web Browser
+Comment=A modern, lightweight Qt6/WebEngine browser
+Exec=cloudar-browser %U
+Icon=cloudar-browser
+Terminal=false
+Categories=Network;WebBrowser;
+MimeType=text/html;text/xml;application/xhtml+xml;x-scheme-handler/http;x-scheme-handler/https;x-scheme-handler/cloudar;
+StartupWMClass=cloudar-browser

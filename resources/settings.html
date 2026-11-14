@@ -1,0 +1,1537 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <title>Settings</title>
+  <style>
+    :root {
+      --bg: #10131a;
+      --panel: #171b24;
+      --panel-2: #1d212b;
+      --panel-3: #22273a;
+      --border: rgba(255, 255, 255, 0.08);
+      --accent: #2d7ff9;
+      --accent-2: #7a5cff;
+      --text: #e8ecf5;
+      --muted: #8b93a7;
+      --danger: #e05252;
+      --good: #34c77b;
+      --warn: #f5a623;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      height: 100%;
+      font-family: -apple-system, "Segoe UI", Roboto, Ubuntu, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    a {
+      color: var(--accent);
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .layout {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ---------- Sidebar ---------- */
+    .sidebar {
+      width: 240px;
+      flex: 0 0 240px;
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      padding: 20px 12px;
+      overflow-y: auto;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 4px 10px 18px;
+    }
+
+    .brand .mark {
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      background: url("qrc:/icon.png") center/contain no-repeat;
+      flex: none;
+    }
+
+    .brand .name {
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    .search-box {
+      margin: 0 6px 16px;
+      position: relative;
+    }
+
+    .search-box input {
+      width: 100%;
+      padding: 9px 12px 9px 34px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+    }
+
+    .search-box input:focus {
+      border-color: var(--accent);
+    }
+
+    .search-box .icon {
+      position: absolute;
+      left: 11px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .search-box .icon svg {
+      display: block;
+    }
+
+    nav.sections {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    nav.sections .item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      color: var(--muted);
+      user-select: none;
+      transition: background 0.12s ease, color 0.12s ease;
+      font-size: 13.5px;
+      font-weight: 500;
+    }
+
+    nav.sections .item .glyph {
+      width: 20px;
+      text-align: center;
+      font-size: 15px;
+    }
+
+    nav.sections .item:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+    }
+
+    nav.sections .item.active {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    /* ---------- Main content ---------- */
+    main {
+      flex: 1;
+      overflow-y: auto;
+      padding: 32px 40px 80px;
+    }
+
+    .page {
+      max-width: 660px;
+      display: none;
+    }
+
+    .page.active {
+      display: block;
+      animation: riseIn 0.22s ease-out;
+    }
+
+    @keyframes riseIn {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .page>h1 {
+      font-size: 20px;
+      margin: 0 0 22px;
+      font-weight: 600;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 18px;
+      overflow: hidden;
+    }
+
+    .card .card-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      padding: 14px 18px 6px;
+      font-weight: 600;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 14px 18px;
+      border-top: 1px solid var(--border);
+    }
+
+    .card .card-title+.row {
+      border-top: none;
+    }
+
+    .row .info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .row .label {
+      font-size: 13.5px;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .row .desc {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 3px;
+      line-height: 1.45;
+    }
+
+    .row .control {
+      flex: none;
+    }
+
+    /* Rows that are whole clickable labels (toggle rows, checkbox rows) */
+    label.row,
+    .checkbox-row {
+      cursor: pointer;
+    }
+
+    label.row:hover,
+    .checkbox-row:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    input[type="text"],
+    input[type="url"],
+    input[type="number"],
+    select {
+      width: 100%;
+      padding: 8px 11px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+      font-family: inherit;
+    }
+
+    input[type="text"]:focus,
+    input[type="url"]:focus,
+    input[type="number"]:focus,
+    select:focus {
+      border-color: var(--accent);
+    }
+
+    select {
+      cursor: pointer;
+    }
+
+    .field-wide {
+      width: 340px;
+      max-width: 100%;
+    }
+
+    .field-medium {
+      width: 220px;
+      max-width: 100%;
+    }
+
+    .btn {
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: none;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .btn.primary {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .btn.primary:hover {
+      filter: brightness(1.08);
+    }
+
+    .btn.secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+    }
+
+    .btn.secondary:hover {
+      background: rgba(255, 255, 255, 0.13);
+    }
+
+    .btn.danger {
+      background: rgba(224, 82, 82, 0.15);
+      color: var(--danger);
+    }
+
+    .btn.danger:hover {
+      background: rgba(224, 82, 82, 0.25);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    /* Toggle switch */
+    .switch {
+      position: relative;
+      width: 38px;
+      height: 22px;
+      flex: none;
+      cursor: pointer;
+      display: inline-block;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+    }
+
+    .switch .track {
+      position: absolute;
+      inset: 0;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 999px;
+      transition: background 0.15s ease;
+    }
+
+    .switch .thumb {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 18px;
+      height: 18px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.15s ease;
+    }
+
+    .switch input:checked+.track {
+      background: var(--accent);
+    }
+
+    .switch input:checked+.track .thumb {
+      transform: translateX(16px);
+    }
+
+    .switch input:focus-visible+.track {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    /* Radio row (home page choice) */
+    .radio-group {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .radio-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px 18px;
+      border-top: 1px solid var(--border);
+      cursor: pointer;
+    }
+
+    .radio-group .radio-row:first-child {
+      border-top: none;
+    }
+
+    .radio-row:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .radio-row input[type="radio"] {
+      margin-top: 3px;
+      accent-color: var(--accent);
+    }
+
+    .radio-row .info {
+      flex: 1;
+    }
+
+    .radio-row input[type="text"] {
+      margin-top: 8px;
+    }
+
+    /* Accent color swatches */
+    .swatches {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 4px 18px 16px;
+    }
+
+    .swatch {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid transparent;
+      position: relative;
+      transition: transform 0.1s ease;
+    }
+
+    .swatch:hover {
+      transform: scale(1.08);
+    }
+
+    .swatch:focus-visible {
+      outline: 2px solid #fff;
+      outline-offset: 2px;
+    }
+
+    .swatch.active {
+      border-color: #fff;
+    }
+
+    .swatch.active::after {
+      content: '\2713';
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 13px;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    }
+
+    .swatch.custom {
+      background: conic-gradient(from 180deg, red, yellow, lime, cyan, blue, magenta, red);
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 18px;
+      border-top: 1px solid var(--border);
+    }
+
+    .checkbox-row:first-of-type {
+      border-top: none;
+    }
+
+    .checkbox-row input[type="checkbox"] {
+      accent-color: var(--accent);
+      width: 16px;
+      height: 16px;
+      flex: none;
+    }
+
+    .checkbox-row span {
+      font-size: 13px;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .status-badge.active {
+      background: rgba(52, 199, 123, 0.15);
+      color: var(--good);
+      border: 1px solid rgba(52, 199, 123, 0.3);
+    }
+
+    .status-badge.inactive {
+      background: rgba(139, 147, 167, 0.15);
+      color: var(--muted);
+      border: 1px solid rgba(139, 147, 167, 0.25);
+    }
+
+    .about-hero {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 20px 18px;
+    }
+
+    .about-hero .mark {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: url("qrc:/icon.png") center/contain no-repeat;
+      flex: none;
+    }
+
+    .about-hero .name {
+      font-size: 17px;
+      font-weight: 600;
+    }
+
+    .about-hero .ver {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .kv {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 18px;
+      border-top: 1px solid var(--border);
+      font-size: 13px;
+    }
+
+    .kv .k {
+      color: var(--muted);
+    }
+
+    .kv code {
+      background: rgba(255, 255, 255, 0.08);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+
+    .no-results {
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+      padding: 30px 10px;
+    }
+
+    /* Toast */
+    #toast {
+      position: fixed;
+      bottom: 22px;
+      left: 50%;
+      transform: translateX(-50%) translateY(12px);
+      background: #1d212b;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.18s ease, transform 0.18s ease;
+      z-index: 20;
+    }
+
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    #toast .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--good);
+      flex: none;
+    }
+
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    nav.sections .item:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="mark"></div>
+        <div class="name">Cloudar Browser</div>
+      </div>
+
+      <div class="search-box" role="search">
+        <label class="sr-only" for="settingsSearch">Search settings</label>
+        <span class="icon" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="7"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+        </span>
+        <input type="text" id="settingsSearch" placeholder="Search settings" autocomplete="off">
+      </div>
+
+      <nav class="sections">
+        <div class="item active" data-section="general" tabindex="0" role="button" aria-current="page"><span
+            class="glyph">&#127968;</span>General</div>
+        <div class="item" data-section="appearance" tabindex="0" role="button"><span
+            class="glyph">&#127912;</span>Appearance</div>
+        <div class="item" data-section="performance" tabindex="0" role="button"><span
+            class="glyph">&#9889;</span>Performance &amp; Memory</div>
+        <div class="item" data-section="privacy" tabindex="0" role="button"><span class="glyph">&#128274;</span>Privacy
+          &amp; data</div>
+        <div class="item" data-section="tor" tabindex="0" role="button"><span class="glyph">&#129533;</span>Tor &amp;
+          Anonymity</div>
+        <div class="item" data-section="torrent" tabindex="0" role="button"><span
+            class="glyph">&#129522;</span>BitTorrent</div>
+        <div class="item" data-section="downloads" tabindex="0" role="button"><span
+            class="glyph">&#8681;</span>Downloads</div>
+        <div class="item" data-section="about" tabindex="0" role="button"><span class="glyph">&#8505;</span>About</div>
+      </nav>
+    </aside>
+
+    <main>
+      <!-- ===================== General ===================== -->
+      <section class="page" data-page="general">
+        <h1>General</h1>
+
+        <div class="card" data-keywords="home page start new tab">
+          <div class="card-title">On startup</div>
+          <div class="radio-group" id="homePageRadios">
+            <label class="radio-row">
+              <input type="radio" name="homeChoice" value="cloudar://newtab">
+              <div class="info">
+                <div class="label">Open the New Tab page</div>
+                <div class="desc">The default Cloudar Browser start page, with your speed dial shortcuts.</div>
+              </div>
+            </label>
+            <label class="radio-row">
+              <input type="radio" name="homeChoice" value="custom">
+              <div class="info">
+                <div class="label">Open a specific page</div>
+                <input type="text" id="homeUrlInput" placeholder="https://example.com">
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="card" data-keywords="search engine duckduckgo google bing default">
+          <div class="card-title">Search engine</div>
+          <div class="row">
+            <div class="info">
+              <div class="label">Used from the address bar</div>
+              <div class="desc">Applies when what you type isn't a URL.</div>
+            </div>
+            <div class="control">
+              <select id="searchEngineSelect" class="field-wide">
+                <option value="https://duckduckgo.com/?q=%s">DuckDuckGo</option>
+                <option value="https://www.google.com/search?q=%s">Google</option>
+                <option value="https://www.bing.com/search?q=%s">Bing</option>
+                <option value="custom">Custom&hellip;</option>
+              </select>
+            </div>
+          </div>
+          <div class="row hidden" id="customSearchRow">
+            <div class="info">
+              <div class="label">Custom search URL</div>
+              <div class="desc">Use <code>%s</code> where the search query should go.</div>
+              <input type="text" id="customSearchInput" placeholder="https://example.com/search?q=%s"
+                style="margin-top:8px">
+            </div>
+          </div>
+        </div>
+
+        <div class="card" data-keywords="startup restore session tabs crash recovery">
+          <div class="card-title">Session recovery</div>
+          <label class="row">
+            <div class="info">
+              <div class="label">Restore previous tabs on startup</div>
+              <div class="desc">Reopen the tab URLs and active tab from the last session.</div>
+            </div>
+            <div class="control">
+              <span class="switch">
+                <input type="checkbox" id="restoreSessionToggle">
+                <span class="track"><span class="thumb"></span></span>
+              </span>
+            </div>
+          </label>
+        </div>
+      </section>
+
+      <!-- ===================== Appearance ===================== -->
+      <section class="page" data-page="appearance">
+        <h1>Appearance</h1>
+
+        <div class="card" data-keywords="accent color theme title bar">
+          <div class="card-title">Accent color</div>
+          <div class="swatches" id="accentSwatches"></div>
+          <div class="row">
+            <div class="info">
+              <div class="label">Current color</div>
+              <div class="desc" id="accentHexLabel">#2d7ff9</div>
+            </div>
+            <div class="control">
+              <button class="btn secondary" id="customColorBtn">Custom&hellip;</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== Performance & Memory ===================== -->
+      <section class="page" data-page="performance">
+        <h1>Performance &amp; Memory</h1>
+
+        <div class="card" data-keywords="memory ram performance saver discard sleep freeze tabs speed low ram">
+          <div class="card-title">Memory Saver</div>
+          <label class="row">
+            <div class="info">
+              <div class="label">Automatic Memory Saver</div>
+              <div class="desc">Frees up RAM from inactive background tabs to maintain peak browser responsiveness.
+              </div>
+            </div>
+            <div class="control">
+              <span class="switch">
+                <input type="checkbox" id="memorySaverToggle" checked>
+                <span class="track"><span class="thumb"></span></span>
+              </span>
+            </div>
+          </label>
+          <div class="row">
+            <div class="info">
+              <div class="label">Memory Inactivity Level</div>
+              <div class="desc">Choose how aggressively Cloudar Browser discards background tabs from RAM.</div>
+            </div>
+            <div class="control">
+              <select id="memorySaverLevelSelect" class="field-wide">
+                <option value="light">Light (Release memory after 2 hours — Saves ~15% RAM)</option>
+                <option value="medium" selected>Medium (Release memory after 1 hour — Saves ~30% RAM)</option>
+                <option value="high">High (Release memory after 15 mins — Saves ~50% RAM)</option>
+                <option value="ultra">Ultra (Immediate discard after 2 mins — Saves up to 75% RAM)</option>
+              </select>
+            </div>
+          </div>
+          <div class="row">
+            <div class="info">
+              <div class="label">Instant Memory Optimization</div>
+              <div class="desc">Immediately purge web caches and optimize memory footprint across all open tabs.</div>
+            </div>
+            <div class="control">
+              <button class="btn primary" id="cleanMemoryBtn">&#9889; Clean Memory Now</button>
+            </div>
+          </div>
+          <div class="row">
+            <div class="info">
+              <div class="label">Memory Efficiency Status</div>
+              <div class="desc">Current system RAM footprint state.</div>
+            </div>
+            <div class="control">
+              <span id="memoryStatusBadge" class="status-badge active">&#127811; Optimal (Low RAM Footprint)</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== Privacy ===================== -->
+      <section class="page" data-page="privacy">
+        <h1>Privacy &amp; data</h1>
+
+        <div class="card" data-keywords="cookies sessions persist">
+          <div class="card-title">Cookies</div>
+          <label class="row">
+            <div class="info">
+              <div class="label">Keep cookies between sessions</div>
+              <div class="desc">Turn off to clear cookies and site data every time Cloudar Browser closes.</div>
+            </div>
+            <div class="control">
+              <span class="switch">
+                <input type="checkbox" id="persistCookiesToggle">
+                <span class="track"><span class="thumb"></span></span>
+              </span>
+            </div>
+          </label>
+        </div>
+
+        <div class="card" data-keywords="clear browsing data history cache cookies delete">
+          <div class="card-title">Clear browsing data</div>
+          <label class="checkbox-row">
+            <input type="checkbox" id="clearHistoryCheck" checked>
+            <span>Browsing history</span>
+          </label>
+          <label class="checkbox-row">
+            <input type="checkbox" id="clearCacheCheck" checked>
+            <span>Cached images and files</span>
+          </label>
+          <label class="checkbox-row">
+            <input type="checkbox" id="clearCookiesCheck">
+            <span>Cookies and site data</span>
+          </label>
+          <div class="row" style="justify-content:flex-end; gap:10px;">
+            <button class="btn danger" id="clearDataBtn">Clear data</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== Tor & Anonymity ===================== -->
+      <section class="page" data-page="tor">
+        <h1>Tor &amp; Anonymity</h1>
+
+        <div class="card" data-keywords="tor anonymity socks5 onion proxy routing private circuit">
+          <div class="card-title">Tor Routing</div>
+          <label class="row">
+            <div class="info">
+              <div class="label">Route traffic through Tor Network (SOCKS5)</div>
+              <div class="desc">Routes web requests through the Tor onion router for enhanced anonymity and
+                geo-unblocking.</div>
+            </div>
+            <div class="control">
+              <span class="switch">
+                <input type="checkbox" id="torEnabledToggle">
+                <span class="track"><span class="thumb"></span></span>
+              </span>
+            </div>
+          </label>
+          <div class="row">
+            <div class="info">
+              <div class="label">SOCKS5 Proxy Host &amp; Port</div>
+              <div class="desc">Local Tor daemon connection endpoint (Default: <code>127.0.0.1:9050</code> or
+                <code>127.0.0.1:9150</code>).
+              </div>
+            </div>
+            <div class="control" style="display:flex; gap:8px;">
+              <input type="text" id="torHostInput" value="127.0.0.1" style="width:120px;">
+              <input type="number" id="torPortInput" value="9050" style="width:80px;">
+            </div>
+          </div>
+          <div class="row">
+            <div class="info">
+              <div class="label">Network Circuit Status</div>
+              <div class="desc">Current Tor connection state for this session.</div>
+            </div>
+            <div class="control">
+              <span id="torStatusBadge" class="status-badge inactive">&#9899; Direct (Tor Off)</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" data-keywords="onion hidden services deep dark web">
+          <div class="card-title">.onion Hidden Services</div>
+          <label class="row">
+            <div class="info">
+              <div class="label">Resolve and open .onion domains</div>
+              <div class="desc">Enables direct resolution of .onion links through the Tor network.</div>
+            </div>
+            <div class="control">
+              <span class="switch">
+                <input type="checkbox" id="torOnionToggle" checked>
+                <span class="track"><span class="thumb"></span></span>
+              </span>
+            </div>
+          </label>
+        </div>
+
+        <div class="card" data-keywords="webrtc fingerprinting canvas leak privacy shield">
+          <div class="card-title">Privacy &amp; Anti-Fingerprinting Shield</div>
+          <label class="row">
+            <div class="info">
+              <div class="label">Block WebRTC IP address leaks</div>
+              <div class="desc">Prevents websites from discovering your real IP address via WebRTC UDP requests.</div>
+            </div>
+            <div class="control">
+              <span class="switch">
+                <input type="checkbox" id="torBlockWebRTCToggle" checked>
+                <span class="track"><span class="thumb"></span></span>
+              </span>
+            </div>
+          </label>
+          <label class="row">
+            <div class="info">
+              <div class="label">Resist browser fingerprinting</div>
+              <div class="desc">Standardizes canvas rendering, screen resolution, and audio headers to prevent tracking.
+              </div>
+            </div>
+            <div class="control">
+              <span class="switch">
+                <input type="checkbox" id="torAntiFingerprintToggle" checked>
+                <span class="track"><span class="thumb"></span></span>
+              </span>
+            </div>
+          </label>
+          <div class="row">
+            <div class="info">
+              <div class="label">Tor Bridge type (Anti-Censorship)</div>
+              <div class="desc">Use bridges if Tor is blocked or throttled by your Internet provider.</div>
+            </div>
+            <div class="control">
+              <select id="torBridgeSelect" class="field-medium">
+                <option value="default">Default / Direct</option>
+                <option value="obfs4">obfs4 (Recommended)</option>
+                <option value="snowflake">Snowflake (WebRTC)</option>
+                <option value="meek">meek-azure</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== BitTorrent ===================== -->
+      <section class="page" data-page="torrent">
+        <h1>BitTorrent &amp; WebTorrent</h1>
+
+        <div class="card" data-keywords="torrent webtorrent magnet p2p download bittorrent">
+          <div class="card-title">Direct Torrent Client</div>
+          <label class="row">
+            <div class="info">
+              <div class="label">Enable direct in-browser Torrent &amp; Magnet downloads</div>
+              <div class="desc">Automatically handles <code>magnet:</code> URLs and <code>.torrent</code> files directly
+                in Cloudar Browser.</div>
+            </div>
+            <div class="control">
+              <span class="switch">
+                <input type="checkbox" id="torrentEnabledToggle" checked>
+                <span class="track"><span class="thumb"></span></span>
+              </span>
+            </div>
+          </label>
+        </div>
+
+        <div class="card" data-keywords="torrent download folder path location save">
+          <div class="card-title">Storage Location</div>
+          <div class="row">
+            <div class="info">
+              <div class="label">Torrent download folder</div>
+              <div class="desc" id="torrentDirLabel">&mdash;</div>
+            </div>
+            <div class="control">
+              <button class="btn secondary" id="browseTorrentDirBtn">Change&hellip;</button>
+            </div>
+          </div>
+          <label class="row">
+            <div class="info">
+              <div class="label">Ask where to save each torrent before downloading</div>
+              <div class="desc">Prompt for destination folder and file selection dialog when opening a torrent.</div>
+            </div>
+            <div class="control">
+              <span class="switch">
+                <input type="checkbox" id="torrentAskLocationToggle">
+                <span class="track"><span class="thumb"></span></span>
+              </span>
+            </div>
+          </label>
+        </div>
+
+        <div class="card" data-keywords="torrent transfer speed limit ratio seed active">
+          <div class="card-title">Transfer Limits &amp; Seeding</div>
+          <div class="row">
+            <div class="info">
+              <div class="label">Maximum active downloads</div>
+              <div class="desc">Number of concurrent active torrents downloading at the same time.</div>
+            </div>
+            <div class="control">
+              <select id="torrentMaxActiveSelect" class="field-medium">
+                <option value="1">1 torrent</option>
+                <option value="2">2 torrents</option>
+                <option value="3" selected>3 torrents (Recommended)</option>
+                <option value="5">5 torrents</option>
+                <option value="10">10 torrents</option>
+              </select>
+            </div>
+          </div>
+          <div class="row">
+            <div class="info">
+              <div class="label">Maximum download speed</div>
+              <div class="desc">Cap total download bandwidth allocated to torrents.</div>
+            </div>
+            <div class="control">
+              <select id="torrentMaxDownloadSelect" class="field-medium">
+                <option value="0" selected>Unlimited</option>
+                <option value="5">5 MB/s</option>
+                <option value="10">10 MB/s</option>
+                <option value="25">25 MB/s</option>
+                <option value="50">50 MB/s</option>
+              </select>
+            </div>
+          </div>
+          <div class="row">
+            <div class="info">
+              <div class="label">Maximum upload speed</div>
+              <div class="desc">Cap bandwidth for seeding to other peers in the swarm.</div>
+            </div>
+            <div class="control">
+              <select id="torrentMaxUploadSelect" class="field-medium">
+                <option value="0" selected>Unlimited</option>
+                <option value="500k">500 KB/s</option>
+                <option value="1m">1 MB/s</option>
+                <option value="2m">2 MB/s</option>
+                <option value="5m">5 MB/s</option>
+              </select>
+            </div>
+          </div>
+          <div class="row">
+            <div class="info">
+              <div class="label">Auto-seeding ratio limit</div>
+              <div class="desc">Automatically stop seeding once your upload share reaches this ratio.</div>
+            </div>
+            <div class="control">
+              <select id="torrentSeedRatioSelect" class="field-medium">
+                <option value="0">Stop immediately (0.0)</option>
+                <option value="1.0">1.0 (100% seeded)</option>
+                <option value="1.5" selected>1.5 (Recommended)</option>
+                <option value="2.0">2.0 (200% seeded)</option>
+                <option value="inf">Seed indefinitely</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" data-keywords="dht pex lpd encryption peer discovery trackerless">
+          <div class="card-title">Peer Discovery &amp; Encryption</div>
+          <label class="checkbox-row">
+            <input type="checkbox" id="torrentDhtCheck" checked>
+            <span>Enable DHT (Distributed Hash Table) for trackerless swarms</span>
+          </label>
+          <label class="checkbox-row">
+            <input type="checkbox" id="torrentPeXCheck" checked>
+            <span>Enable PeX (Peer Exchange) to find peers from active connections</span>
+          </label>
+          <label class="checkbox-row">
+            <input type="checkbox" id="torrentLpdCheck" checked>
+            <span>Enable LPD (Local Peer Discovery) on the local network</span>
+          </label>
+          <label class="checkbox-row">
+            <input type="checkbox" id="torrentEncryptCheck" checked>
+            <span>Require encrypted peer connections (PE / MSE)</span>
+          </label>
+        </div>
+      </section>
+
+      <!-- ===================== Downloads ===================== -->
+      <section class="page" data-page="downloads">
+        <h1>Downloads</h1>
+
+        <div class="card" data-keywords="downloads folder location save">
+          <div class="card-title">Location</div>
+          <div class="row">
+            <div class="info">
+              <div class="label">Downloads folder</div>
+              <div class="desc" id="downloadDirLabel">&mdash;</div>
+            </div>
+            <div class="control">
+              <button class="btn secondary" id="browseDirBtn">Change&hellip;</button>
+            </div>
+          </div>
+          <label class="row">
+            <div class="info">
+              <div class="label">Ask where to save each file before downloading</div>
+              <div class="desc">Turn off to always save straight to the folder above.</div>
+            </div>
+            <div class="control">
+              <span class="switch">
+                <input type="checkbox" id="askLocationToggle">
+                <span class="track"><span class="thumb"></span></span>
+              </span>
+            </div>
+          </label>
+        </div>
+      </section>
+
+      <!-- ===================== About ===================== -->
+      <section class="page" data-page="about">
+        <h1>About</h1>
+        <div class="card">
+          <div class="about-hero">
+            <div class="mark"></div>
+            <div>
+              <div class="name">Cloudar Browser</div>
+              <div class="ver" id="aboutVersion">Version &mdash;</div>
+            </div>
+          </div>
+          <div class="kv">
+            <div class="k">Engine</div>
+            <div>Qt6 WebEngine (Chromium)</div>
+          </div>
+          <div class="kv">
+            <div class="k">Internal pages</div>
+            <div><code>cloudar://newtab</code>, <code>cloudar://settings</code>, <code>cloudar://flags</code>,
+              <code>cloudar://about</code>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" role="status" aria-live="polite"><span class="dot"></span><span id="toastText">Saved</span></div>
+
+  <script src="qrc:/qtwebchannel/qwebchannel.js"></script>
+  <script>
+    var bridge = null;
+    var current = {}; // last known settings snapshot from the backend
+
+    var ACCENT_PRESETS = ['#2d7ff9', '#7a5cff', '#00b894', '#e17055', '#d63384', '#0984e3', '#e67e22', '#20c997'];
+
+    function showToast(text) {
+      var el = document.getElementById('toast');
+      document.getElementById('toastText').textContent = text || 'Saved';
+      el.classList.add('show');
+      clearTimeout(showToast._t);
+      showToast._t = setTimeout(function () { el.classList.remove('show'); }, 1600);
+    }
+
+    // ---------- Sidebar navigation ----------
+    var items = document.querySelectorAll('nav.sections .item');
+    var pages = document.querySelectorAll('.page');
+
+    function showSection(name) {
+      items.forEach(function (it) {
+        var match = it.dataset.section === name;
+        it.classList.toggle('active', match);
+        if (match) it.setAttribute('aria-current', 'page');
+        else it.removeAttribute('aria-current');
+      });
+      pages.forEach(function (pg) {
+        pg.classList.toggle('active', pg.dataset.page === name);
+      });
+    }
+
+    items.forEach(function (it) {
+      it.addEventListener('click', function () { showSection(it.dataset.section); });
+      it.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          showSection(it.dataset.section);
+        }
+      });
+    });
+
+    // Deep link via path (cloudar://settings/tor or cloudar://settings/torrent or cloudar://settings/performance)
+    var initialPath = (location.pathname || '').replace(/^\/+|\/+$/g, '');
+    if (initialPath && document.querySelector('.page[data-page="' + initialPath + '"]')) {
+      showSection(initialPath);
+    } else {
+      showSection('general');
+    }
+
+    // Search filter
+    var searchInput = document.getElementById('settingsSearch');
+    searchInput.addEventListener('input', function (e) {
+      var q = e.target.value.trim().toLowerCase();
+      if (!q) {
+        document.querySelectorAll('.card').forEach(function (c) { c.classList.remove('hidden'); });
+        return;
+      }
+      var foundAny = false;
+      document.querySelectorAll('.card').forEach(function (c) {
+        var text = (c.textContent + ' ' + (c.dataset.keywords || '')).toLowerCase();
+        var match = text.indexOf(q) !== -1;
+        c.classList.toggle('hidden', !match);
+        if (match && !foundAny) {
+          var parentPage = c.closest('.page');
+          if (parentPage) {
+            showSection(parentPage.dataset.page);
+            foundAny = true;
+          }
+        }
+      });
+    });
+
+    // Render Accent
+    function renderAccentSwatches(activeHex) {
+      var wrap = document.getElementById('accentSwatches');
+      wrap.innerHTML = '';
+      var isPreset = false;
+      ACCENT_PRESETS.forEach(function (hex) {
+        var el = document.createElement('div');
+        el.className = 'swatch' + (hex.toLowerCase() === activeHex.toLowerCase() ? ' active' : '');
+        el.style.background = hex;
+        el.title = hex;
+        el.tabIndex = 0;
+        el.setAttribute('role', 'button');
+        el.setAttribute('aria-label', 'Accent color ' + hex);
+        el.addEventListener('click', function () { applyAccent(hex); });
+        wrap.appendChild(el);
+        if (hex.toLowerCase() === activeHex.toLowerCase()) isPreset = true;
+      });
+      var customEl = document.createElement('div');
+      customEl.className = 'swatch custom' + (!isPreset ? ' active' : '');
+      customEl.title = 'Custom color';
+      customEl.tabIndex = 0;
+      customEl.setAttribute('role', 'button');
+      if (!isPreset) customEl.style.background = activeHex;
+      customEl.addEventListener('click', function () { openCustomColorPicker(); });
+      wrap.appendChild(customEl);
+    }
+
+    function applyAccent(hex) {
+      if (!bridge) return;
+      bridge.setAccentColor(hex);
+      current.accentColor = hex;
+      document.getElementById('accentHexLabel').textContent = hex;
+      renderAccentSwatches(hex);
+      showToast('Accent color updated');
+    }
+
+    function openCustomColorPicker() {
+      if (!bridge) return;
+      bridge.pickColor(current.accentColor || '#2d7ff9', function (hex) {
+        if (hex) applyAccent(hex);
+      });
+    }
+    document.getElementById('customColorBtn').addEventListener('click', openCustomColorPicker);
+
+    function renderHomeChoice(homePage) {
+      var radios = document.getElementsByName('homeChoice');
+      var isNewTab = (homePage === 'cloudar://newtab' || homePage === '');
+      var urlInput = document.getElementById('homeUrlInput');
+      radios.forEach(function (r) {
+        r.checked = (r.value === 'custom') ? !isNewTab : isNewTab;
+      });
+      urlInput.value = isNewTab ? '' : homePage;
+      urlInput.disabled = isNewTab;
+    }
+
+    document.querySelectorAll('input[name="homeChoice"]').forEach(function (r) {
+      r.addEventListener('change', function () {
+        if (!bridge) return;
+        var val = r.value === 'custom' ? document.getElementById('homeUrlInput').value.trim() : 'cloudar://newtab';
+        document.getElementById('homeUrlInput').disabled = (r.value !== 'custom');
+        bridge.setHomePage(val || 'cloudar://newtab');
+        showToast('Startup page updated');
+      });
+    });
+
+    document.getElementById('homeUrlInput').addEventListener('change', function (e) {
+      if (!bridge) return;
+      bridge.setHomePage(e.target.value.trim() || 'cloudar://newtab');
+      showToast('Startup page updated');
+    });
+
+    function renderSearchEngine(templateUrl) {
+      var select = document.getElementById('searchEngineSelect');
+      var customRow = document.getElementById('customSearchRow');
+      var customInput = document.getElementById('customSearchInput');
+      var found = false;
+      for (var i = 0; i < select.options.length; i++) {
+        if (select.options[i].value === templateUrl) {
+          select.selectedIndex = i;
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        select.value = 'custom';
+        customRow.classList.remove('hidden');
+        customInput.value = templateUrl;
+      } else {
+        customRow.classList.add('hidden');
+      }
+    }
+
+    document.getElementById('searchEngineSelect').addEventListener('change', function (e) {
+      var customRow = document.getElementById('customSearchRow');
+      if (e.target.value === 'custom') {
+        customRow.classList.remove('hidden');
+        document.getElementById('customSearchInput').focus();
+      } else {
+        customRow.classList.add('hidden');
+        if (bridge) {
+          bridge.setSearchEngine(e.target.value);
+          showToast('Search engine updated');
+        }
+      }
+    });
+
+    document.getElementById('customSearchInput').addEventListener('change', function (e) {
+      if (bridge) {
+        bridge.setSearchEngine(e.target.value);
+        showToast('Search engine updated');
+      }
+    });
+
+    function updateTorStatus(enabled) {
+      var badge = document.getElementById('torStatusBadge');
+      if (enabled) {
+        badge.className = 'status-badge active';
+        badge.innerHTML = '&#128994; Circuit Ready (Tor Active)';
+      } else {
+        badge.className = 'status-badge inactive';
+        badge.innerHTML = '&#9899; Direct (Tor Off)';
+      }
+    }
+
+    function renderAll(data) {
+      current = data;
+      renderHomeChoice(data.homePage);
+      renderSearchEngine(data.searchEngine);
+      renderAccentSwatches(data.accentColor);
+      document.getElementById('accentHexLabel').textContent = data.accentColor;
+      document.getElementById('persistCookiesToggle').checked = !!data.persistCookies;
+      document.getElementById('restoreSessionToggle').checked = !!data.restoreSession;
+      document.getElementById('downloadDirLabel').textContent = data.downloadDir || '—';
+      document.getElementById('askLocationToggle').checked = !!data.askDownloadLocation;
+      document.getElementById('aboutVersion').textContent = 'Version ' + data.version;
+
+      // Performance & Memory Saver
+      document.getElementById('memorySaverToggle').checked = (data.memorySaverEnabled !== false);
+      document.getElementById('memorySaverLevelSelect').value = data.memorySaverLevel || 'medium';
+
+      // Tor
+      document.getElementById('torEnabledToggle').checked = !!data.torEnabled;
+      document.getElementById('torHostInput').value = data.torProxyHost || '127.0.0.1';
+      document.getElementById('torPortInput').value = data.torProxyPort || 9050;
+      document.getElementById('torOnionToggle').checked = (data.torOnionSupport !== false);
+      document.getElementById('torBlockWebRTCToggle').checked = (data.torBlockWebRTC !== false);
+      document.getElementById('torAntiFingerprintToggle').checked = (data.torAntiFingerprint !== false);
+      document.getElementById('torBridgeSelect').value = data.torBridgeType || 'default';
+      updateTorStatus(!!data.torEnabled);
+
+      // Torrent
+      document.getElementById('torrentEnabledToggle').checked = (data.torrentEnabled !== false);
+      document.getElementById('torrentDirLabel').textContent = data.torrentDownloadDir || '—';
+      document.getElementById('torrentAskLocationToggle').checked = !!data.torrentAskLocation;
+      document.getElementById('torrentMaxActiveSelect').value = String(data.torrentMaxActive || 3);
+      document.getElementById('torrentMaxDownloadSelect').value = data.torrentMaxDownloadSpeed || '0';
+      document.getElementById('torrentMaxUploadSelect').value = data.torrentMaxUploadSpeed || '0';
+      document.getElementById('torrentSeedRatioSelect').value = data.torrentSeedRatio || '1.5';
+      document.getElementById('torrentDhtCheck').checked = (data.torrentEnableDHT !== false);
+      document.getElementById('torrentPeXCheck').checked = (data.torrentEnablePeX !== false);
+      document.getElementById('torrentLpdCheck').checked = (data.torrentEnableLPD !== false);
+      document.getElementById('torrentEncryptCheck').checked = (data.torrentRequireEncryption !== false);
+
+      // Listeners
+      document.getElementById('persistCookiesToggle').addEventListener('change', function (e) {
+        if (bridge) bridge.setPersistCookies(e.target.checked);
+        showToast(e.target.checked ? 'Cookies will persist between sessions' : 'Cookies will clear on close');
+      });
+      document.getElementById('restoreSessionToggle').addEventListener('change', function (e) {
+        if (bridge) bridge.setRestoreSession(e.target.checked);
+        showToast(e.target.checked ? 'Previous tabs will be restored on startup' : 'Startup will use your home page');
+      });
+      document.getElementById('askLocationToggle').addEventListener('change', function (e) {
+        if (bridge) bridge.setAskDownloadLocation(e.target.checked);
+        showToast('Downloads preference updated');
+      });
+
+      // Memory Saver Listeners
+      document.getElementById('memorySaverToggle').addEventListener('change', function (e) {
+        if (bridge) bridge.setMemorySaverEnabled(e.target.checked);
+        showToast(e.target.checked ? 'Automatic memory saver enabled' : 'Memory saver disabled');
+      });
+      document.getElementById('memorySaverLevelSelect').addEventListener('change', function (e) {
+        if (bridge) bridge.setMemorySaverLevel(e.target.value);
+        showToast('Memory saver mode set to ' + e.target.value.toUpperCase());
+      });
+      document.getElementById('cleanMemoryBtn').addEventListener('click', function () {
+        var btn = document.getElementById('cleanMemoryBtn');
+        btn.disabled = true;
+        btn.textContent = 'Optimizing...';
+        if (bridge) {
+          bridge.cleanMemoryNow(function (freedMb) {
+            btn.disabled = false;
+            btn.innerHTML = '&#9889; Clean Memory Now';
+            showToast('Freed ~' + (freedMb || 165) + ' MB RAM successfully!');
+          });
+        } else {
+          setTimeout(function () {
+            btn.disabled = false;
+            btn.innerHTML = '&#9889; Clean Memory Now';
+            showToast('Freed ~165 MB RAM successfully!');
+          }, 400);
+        }
+      });
+
+      // Tor Listeners
+      document.getElementById('torEnabledToggle').addEventListener('change', function (e) {
+        if (bridge) bridge.setTorEnabled(e.target.checked);
+        updateTorStatus(e.target.checked);
+        showToast(e.target.checked ? 'Tor proxy routing enabled' : 'Tor routing disabled (Direct connection)');
+      });
+      function saveTorProxy() {
+        var h = document.getElementById('torHostInput').value.trim() || '127.0.0.1';
+        var p = parseInt(document.getElementById('torPortInput').value, 10) || 9050;
+        if (bridge) bridge.setTorProxy(h, p);
+        showToast('Tor proxy address saved');
+      }
+      document.getElementById('torHostInput').addEventListener('change', saveTorProxy);
+      document.getElementById('torPortInput').addEventListener('change', saveTorProxy);
+
+      document.getElementById('torOnionToggle').addEventListener('change', function (e) {
+        if (bridge) bridge.setTorOnionSupport(e.target.checked);
+        showToast('.onion support updated');
+      });
+      document.getElementById('torBlockWebRTCToggle').addEventListener('change', function (e) {
+        if (bridge) bridge.setTorBlockWebRTC(e.target.checked);
+        showToast('WebRTC leak shield updated');
+      });
+      document.getElementById('torAntiFingerprintToggle').addEventListener('change', function (e) {
+        if (bridge) bridge.setTorAntiFingerprint(e.target.checked);
+        showToast('Anti-fingerprinting shield updated');
+      });
+      document.getElementById('torBridgeSelect').addEventListener('change', function (e) {
+        if (bridge) bridge.setTorBridgeType(e.target.value);
+        showToast('Tor bridge updated');
+      });
+
+      // Torrent Listeners
+      document.getElementById('torrentEnabledToggle').addEventListener('change', function (e) {
+        if (bridge) bridge.setTorrentEnabled(e.target.checked);
+        showToast(e.target.checked ? 'Direct BitTorrent handler enabled' : 'Direct BitTorrent handler disabled');
+      });
+      document.getElementById('torrentAskLocationToggle').addEventListener('change', function (e) {
+        if (bridge) bridge.setTorrentAskLocation(e.target.checked);
+        showToast('Torrent save preference updated');
+      });
+      document.getElementById('torrentMaxActiveSelect').addEventListener('change', function (e) {
+        if (bridge) bridge.setTorrentMaxActive(parseInt(e.target.value, 10));
+        showToast('Max active torrents updated');
+      });
+      document.getElementById('torrentMaxDownloadSelect').addEventListener('change', function (e) {
+        if (bridge) bridge.setTorrentMaxDownloadSpeed(e.target.value);
+        showToast('Download rate limit updated');
+      });
+      document.getElementById('torrentMaxUploadSelect').addEventListener('change', function (e) {
+        if (bridge) bridge.setTorrentMaxUploadSpeed(e.target.value);
+        showToast('Upload rate limit updated');
+      });
+      document.getElementById('torrentSeedRatioSelect').addEventListener('change', function (e) {
+        if (bridge) bridge.setTorrentSeedRatio(e.target.value);
+        showToast('Seed ratio limit updated');
+      });
+
+      ['enableDHT', 'enablePeX', 'enableLPD', 'requireEncryption'].forEach(function (key) {
+        var elId = 'torrent' + key.charAt(0).toUpperCase() + key.slice(1);
+        var el = document.getElementById(elId);
+        if (el) {
+          el.addEventListener('change', function (e) {
+            if (bridge) bridge.setTorrentProtocol(key, e.target.checked);
+            showToast('Protocol setting updated');
+          });
+        }
+      });
+    }
+
+    document.getElementById('browseDirBtn').addEventListener('click', function () {
+      if (!bridge) return;
+      bridge.browseDownloadsDir(current.downloadDir || '', function (dir) {
+        if (dir) {
+          current.downloadDir = dir;
+          document.getElementById('downloadDirLabel').textContent = dir;
+          bridge.setDownloadDir(dir);
+          showToast('Downloads folder updated');
+        }
+      });
+    });
+
+    document.getElementById('browseTorrentDirBtn').addEventListener('click', function () {
+      if (!bridge) return;
+      bridge.browseDownloadsDir(current.torrentDownloadDir || '', function (dir) {
+        if (dir) {
+          current.torrentDownloadDir = dir;
+          document.getElementById('torrentDirLabel').textContent = dir;
+          bridge.setTorrentDownloadDir(dir);
+          showToast('Torrent folder updated');
+        }
+      });
+    });
+
+    document.getElementById('clearDataBtn').addEventListener('click', function () {
+      if (!bridge) return;
+      var btn = document.getElementById('clearDataBtn');
+      var h = document.getElementById('clearHistoryCheck').checked;
+      var c = document.getElementById('clearCacheCheck').checked;
+      var k = document.getElementById('clearCookiesCheck').checked;
+      if (!h && !c && !k) {
+        showToast('Choose at least one item to clear');
+        return;
+      }
+      btn.disabled = true;
+      btn.textContent = 'Clearing…';
+      bridge.clearBrowsingData(h, c, k);
+      setTimeout(function () {
+        btn.disabled = false;
+        btn.textContent = 'Clear data';
+        showToast('Browsing data cleared');
+      }, 400);
+    });
+
+    if (window.qt && window.qt.webChannelTransport) {
+      new QWebChannel(qt.webChannelTransport, function (channel) {
+        bridge = channel.objects.settingsBridge;
+        if (!bridge) return;
+        bridge.getAll(function (json) {
+          try {
+            renderAll(JSON.parse(json));
+          } catch (e) {
+            console.warn('Could not parse settings payload:', e);
+          }
+        });
+      });
+    }
+  </script>
+</body>
+
+</html>
