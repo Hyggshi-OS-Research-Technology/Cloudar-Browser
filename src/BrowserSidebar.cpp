@@ -371,6 +371,16 @@ void BrowserSidebar::refresh()
     m_tabList->blockSignals(false);
 }
 
+QSize BrowserSidebar::sizeHint() const
+{
+    return QSize(m_expanded ? 240 : kCollapsedWidth, 600);
+}
+
+QSize BrowserSidebar::minimumSizeHint() const
+{
+    return QSize(kCollapsedWidth, 100);
+}
+
 void BrowserSidebar::setExpanded(bool expanded)
 {
     const bool changed = m_expanded != expanded;
@@ -386,6 +396,7 @@ void BrowserSidebar::setExpanded(bool expanded)
     m_newTabButton->setText(expanded ? "+  New tab" : "+");
     m_newTabButton->setToolTip("New tab");
 
+    updateGeometry();
     refresh();
 
     if (changed)

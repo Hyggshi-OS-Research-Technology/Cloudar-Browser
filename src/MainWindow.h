@@ -47,6 +47,7 @@ public:
 
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
+    void showEvent(QShowEvent *event) override;
 
 private slots:
     void navigateToAddressBarInput();
@@ -106,6 +107,7 @@ private:
     QRect m_resizeStartGeometry;
     bool m_resizing = false;
     bool m_isIncognito = false;
+    bool m_firstShowDone = false;
     QVariantAnimation *m_sidebarAnimation = nullptr;
 
     // Cloudar features

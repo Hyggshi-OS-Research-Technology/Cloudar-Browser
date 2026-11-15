@@ -17,6 +17,9 @@ public:
     bool isExpanded() const { return m_expanded; }
     void setExpanded(bool expanded);
 
+    QSize sizeHint() const override;
+    QSize minimumSizeHint() const override;
+
 signals:
     void hideRequested();
     void expandedChanged(bool expanded);

@@ -34,6 +34,8 @@
 #include <QMouseEvent>
 #include <QHBoxLayout>
 #include <QSplitter>
+#include <QTimer>
+#include <QShowEvent>
 
 MainWindow::MainWindow(bool isIncognito, QWidget *parent)
     : QMainWindow(parent), m_isIncognito(isIncognito)
@@ -623,6 +625,23 @@ void MainWindow::setSidebarVisible(bool visible)
     QSettings().setValue("browser/sidebarEnabled", visible);
 }
 
+void MainWindow::showEvent(QShowEvent *event)
+{
+    QMainWindow::showEvent(event);
+    if (!m_firstShowDone) {
+        m_firstShowDone = true;
+        QTimer::singleShot(0, this, [this]() {
+            if (m_sidebar && m_sidebar->isVisible() && m_browserSplitter) {
+                const bool expanded = m_sidebar->isExpanded();
+                const int target = expanded ? QSettings().value("browser/sidebarWidth", 240).toInt() : 54;
+                const int totalWidth = m_browserSplitter->width();
+                const int rightWidth = (totalWidth > target) ? (totalWidth - target) : 10000;
+                m_browserSplitter->setSizes({target, rightWidth});
+            }
+        });
+    }
+}
+
 void MainWindow::setSidebarExpanded(bool expanded, bool animated)
 {
     if (!m_sidebar || !m_browserSplitter)
@@ -630,11 +649,18 @@ void MainWindow::setSidebarExpanded(bool expanded, bool animated)
     const int target = expanded ? QSettings().value("browser/sidebarWidth", 240).toInt() : 54;
     QSettings().setValue("browser/sidebarExpanded", expanded);
 
+    const int totalWidth = m_browserSplitter->width();
+    const int rightWidth = (totalWidth > target) ? (totalWidth - target) : 10000;
+
+    if (!animated || !isVisible()) {
+        m_browserSplitter->setSizes({target, rightWidth});
+        return;
+    }
+
     QList<int> sizes = m_browserSplitter->sizes();
     int currentWidth = sizes.isEmpty() ? 54 : sizes[0];
-
-    if (!animated || !isVisible() || currentWidth == target) {
-        m_browserSplitter->setSizes({target, qMax(1, m_browserSplitter->width() - target)});
+    if (currentWidth == target) {
+        m_browserSplitter->setSizes({target, rightWidth});
         return;
     }
 
