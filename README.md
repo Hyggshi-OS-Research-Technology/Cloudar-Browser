@@ -222,4 +222,4 @@ Cloudar-Browser/
 
 ## 📄 License
 
-Cloudar Browser is open-source software licensed under the **[MIT License](file:///home/hyggshi/Downloads/Cloudar-Browser/LICENSE)**.
+Cloudar Browser is open-source software licensed under the **[MIT License](LICENSE)**.
