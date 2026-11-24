@@ -264,9 +264,10 @@ MainWindow::MainWindow(bool isIncognito, QWidget *parent)
         statusBar()->setFixedHeight(16);
         statusBar()->setSizeGripEnabled(false);
     } else {
+        // Decorated window: the platform border handles resizing, so the grip
+        // would be redundant chrome Chrome 2009 never had.
         statusBar()->setSizeGripEnabled(true);
         statusBar()->setFixedHeight(20);
-        QSettings().setDefault("browser/bookmarkBarVisible", true);
         statusBar()->showMessage(tr("Ready"));
     }
 
