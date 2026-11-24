@@ -54,11 +54,14 @@ jobs:
           rc=$?
           echo "cmake exit=$rc"
           if [ $rc -ne 0 ]; then
-            while IFS= read -r line; do
+            # Only the tail matters, and annotations are capped at 10 per step.
+            tail -n 10 cfg.log | while IFS= read -r line; do
               line="${line//'%'/'%25'}"
               line="${line//$'\r'/}"
               echo "::error title=configure::${line}"
-            done < cfg.log
+            done
+            echo "--- full tail ---"
+            tail -n 40 cfg.log
             exit 1
           fi
           echo "configure OK"
