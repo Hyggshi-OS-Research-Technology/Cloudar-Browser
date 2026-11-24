@@ -51,6 +51,28 @@ cmake --build build
 windeployqt --release --webenginewidgets build/cloudar-browser.exe
 ```
 
+### Running straight from the build directory
+
+The binary can be started from `build/`, but QtWebEngine renders pages in a
+helper process that Qt resolves relative to *its own* installation. That works
+with a distro Qt, and on Ubuntu 22.04 the helper ships in a package the `-dev`
+package does not pull in:
+
+```bash
+sudo apt install -y libqt6webenginecore6-bin    # Ubuntu 22.04 only
+```
+
+Without it the browser aborts with `Could not find QtWebEngineProcess`
+(SIGABRT / exit 134) the moment it opens a page. If you installed Qt elsewhere
+or moved the build, point Qt at the helper explicitly:
+
+```bash
+export QTWEBENGINEPROCESS_PATH=$(find /usr -name QtWebEngineProcess | head -1)
+```
+
+`cmake --install build` sidesteps the issue entirely by putting the binary next
+to a Qt the loader can resolve.
+
 ## 3. Run
 
 ```bash
