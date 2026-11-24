@@ -219,11 +219,14 @@ MainWindow::MainWindow(bool isIncognito, QWidget *parent)
         });
         connect(menu, &PageContextMenu::searchRequested, this, [this](const QString &text) {
             // Same path the address bar uses, so the configured engine applies.
-            const QString templateUrl =
+            // QString::replace() is non-const, so this has to be a mutable copy
+            // (the first version was `const` and failed to compile).
+            QString templateUrl =
                     QSettings().value("browser/searchEngine",
                                       "https://duckduckgo.com/?q=%s").toString();
-            m_tabs->addNewTab(QUrl(templateUrl.replace("%s", QString::fromLatin1(
-                    QUrl::toPercentEncoding(text)))), true);
+            templateUrl.replace(QStringLiteral("%s"),
+                                QString::fromLatin1(QUrl::toPercentEncoding(text)));
+            m_tabs->addNewTab(QUrl(templateUrl), true);
         });
         connect(menu, &PageContextMenu::printRequested, this, [this, view]() {
             if (QWebEnginePage *page = view->page()) {
