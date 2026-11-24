@@ -60,15 +60,23 @@ var CloudarQuickAccess = (function () {
   function resolveIcon(entry, faviconEl) {
     if (icons[entry.id]) { applyIcon(faviconEl, icons[entry.id], entry); return; }
 
-    var cached = CloudarNewTab.faviconFor(entry.url);
-    if (cached) {
-      icons[entry.id] = cached;
-      applyIcon(faviconEl, cached, entry);
-      return;
-    }
+    // faviconFor() is asynchronous: qwebchannel delivers the slot's return value
+    // to a callback, so a synchronous `var cached = faviconFor(...)` was always
+    // undefined and every tile stayed a letter. That was the "no real favicon"
+    // bug, and it was in the calling convention, not in the native store.
+    CloudarNewTab.faviconFor(entry.url, function (cached) {
+      if (cached) {
+        icons[entry.id] = cached;
+        applyIcon(faviconEl, cached, entry);
+        return;
+      }
+      tryHostIcon(entry, faviconEl);
+    });
+  }
 
-    // Nothing cached yet. Ask the host directly — one request per tile without
-    // an icon, which is what every speed dial does.
+  // No cached icon. Ask the site itself — one request per tile, which is what
+  // every speed dial does.
+  function tryHostIcon(entry, faviconEl) {
     var host = CloudarNewTab.hostOf(entry.url);
     if (!host || /^(cloudar|browser|light)$/i.test(entry.url.split(':')[0])) return;
 

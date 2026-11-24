@@ -280,35 +280,23 @@ var CloudarBackground = (function () {
   // The page cannot write QSettings itself, so every local upload and every
   // colour/URL choice is mirrored to the browser. This is what makes the choice
   // survive a restart; localStorage alone never did.
+  //
+  // Asynchronous, because the QWebChannel method that does the writing delivers
+  // its result to a callback (see the header of scripts/app.js). The previous
+  // version treated the call as synchronous, so it could not tell success from
+  // failure and reported nothing either way.
   function persist(kind, blobOrNull, value) {
-    var bridge = CloudarNewTab.bridge();
-    if (!bridge || !bridge.saveWallpaperMedia) {
-      onStatus('Saved for this tab only: the browser bridge is not available here, ' +
-               'so this choice will not survive a restart.', true);
-      return;
-    }
-    if (!blobOrNull) {
-      bridge.saveWallpaperMedia(kind, '', value || '');
-      return;
-    }
-    var reader = new FileReader();
-    reader.onerror = function () {
-      onStatus('Could not read the file to save it (' +
-               ((reader.error && reader.error.name) || 'read error') + ').', true);
-    };
-    reader.onload = function () {
-      // FileReader gives "data:<mime>;base64,<payload>"; the bridge wants the
-      // payload alone and does its own base64 decode.
-      var raw = String(reader.result || '');
-      var comma = raw.indexOf(',');
-      var payload = comma >= 0 ? raw.slice(comma + 1) : '';
-      var url = bridge.saveWallpaperMedia(kind, payload, '');
-      if (!url) {
-        onStatus('The browser could not store the file on disk. It still works ' +
-                 'until you close the tab.', true);
+    CloudarNewTab.saveMedia(kind, blobOrNull, value, function (ok, detail) {
+      if (ok) return;
+      if (detail === 'no bridge') {
+        onStatus('Saved for this tab only: the browser bridge is not available here, ' +
+                 'so this choice will not survive a restart.', true);
+      } else {
+        onStatus('The browser could not store this on disk' +
+                 (detail ? ' (' + detail + ')' : '') +
+                 '. It still works until you close the tab.', true);
       }
-    };
-    reader.readAsDataURL(blobOrNull);
+    });
   }
 
   // Apply whatever the browser says is stored, without touching its own copy.
@@ -374,7 +362,7 @@ var CloudarBackground = (function () {
         body.classList.add('custom-bg');
         saveSetting({ type: 'image', source: 'local' });
         persist('image', blob, '');
-        onStatus('Image stored in IndexedDB (' + formatBytes(blob.size) + ').');
+        onStatus('Image saved (' + formatBytes(blob.size) + '). It will still be here next time.');
       });
     });
   }
@@ -403,8 +391,8 @@ var CloudarBackground = (function () {
         if (wrapper) wrapper.classList.add('show');
         videoPreview.play().catch(function () {});
       }
-      onStatus('Video stored in IndexedDB (' + formatBytes(file.size) +
-               '). It is played from memory each time the tab opens.');
+      onStatus('Video saved (' + formatBytes(file.size) +
+               '). It will still be here next time.');
     });
   }
 
@@ -463,8 +451,7 @@ var CloudarBackground = (function () {
     if (imagePreview) imagePreview.classList.remove('show');
     saveSetting({ type: 'default' });
     persist('default', null, '');
-    var bridge = CloudarNewTab.bridge();
-    if (bridge && bridge.clearWallpaperMedia) bridge.clearWallpaperMedia();
+    CloudarNewTab.clearMedia();
     onStatus('');
   }
 
@@ -475,8 +462,8 @@ var CloudarBackground = (function () {
   //   2. the local IndexedDB blob, if the browser had nothing (a wallpaper the
   //      browser refused to store still works while the profile lives);
   //   3. the old localStorage descriptor, mapped onto a stored URL when possible.
-  function restoreFromBrowser() {
-    var state = CloudarNewTab.state();
+  function restoreFromBrowser(state) {
+    state = state || CloudarNewTab.state();
     if (state && state.wallpaper) return applyFromState(state.wallpaper);
     return false;
   }
@@ -548,14 +535,16 @@ var CloudarBackground = (function () {
         }
       });
 
-      // Applying what the browser stored needs the channel, which is not open
-      // yet when this runs (app.js starts it on DOMContentLoaded). So: paint
-      // from local storage immediately, then repaint from the browser's copy as
-      // soon as the channel answers. The second paint is the one that survives
-      // restarts; the first only prevents a flash of the default background.
+      // Two-stage restore, and both stages are needed:
+      //   1. IndexedDB/localStorage, synchronously, so there is no flash of the
+      //      default background while the channel opens;
+      //   2. the browser's copy, once initialState() has actually answered.
+      // Step 2 is the one that survives restarts — step 1 only ever held data
+      // for the lifetime of the profile. whenReady() fires after the reply
+      // arrives, which is the whole reason it exists.
       restoreFromIndexedDb();
-      CloudarNewTab.afterChannel(function () {
-        if (restoreFromBrowser())
+      CloudarNewTab.whenReady(function (state) {
+        if (restoreFromBrowser(state))
           onStatus('');
       });
     },

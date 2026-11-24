@@ -172,7 +172,9 @@ void PageContextMenu::showAt(const QPoint &pos)
 
     menu.addSeparator();
     QAction *inspect = menu.addAction(tr("Inspect element"));
-    inspect->setCheckable(false);
+    inspect->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_I));
+    QAction *devTools = menu.addAction(tr("Developer tools"));
+    devTools->setShortcut(QKeySequence(Qt::Key_F12));
 
     QAction *chosen = menu.exec(m_view->mapToGlobal(pos));
     if (!chosen)
@@ -183,9 +185,13 @@ void PageContextMenu::showAt(const QPoint &pos)
     else if (chosen == copyPageUrl) QApplication::clipboard()->setText(pageUrl.toString());
     else if (chosen == pageSource && m_pageSourceHandler) m_pageSourceHandler(pageUrl);
     else if (chosen == printPage) emit printRequested();
-    else if (chosen == inspect) {
-        // QtWebEngineWidgets has no scripting inspector; the DevTools window is
-        // the supported route and is what "Inspect" means to anyone using it.
-        m_view->page()->triggerAction(QWebEnginePage::InspectElement);
+    else if (chosen == inspect || chosen == devTools) {
+        // QtWebEngineWidgets has no in-page inspector overlay: DevTools lives in
+        // its own QWebEngineView showing devtools://devtools/bundled/inspector.html
+        // with setInspectedPage() pointing at this page. triggerAction(
+        // InspectElement) is what opens it, but the view that appears is created
+        // by Qt with no chrome of its own — which is why MainWindow builds a
+        // proper window for it instead (see MainWindow::openDevTools).
+        emit devToolsRequested();
     }
 }

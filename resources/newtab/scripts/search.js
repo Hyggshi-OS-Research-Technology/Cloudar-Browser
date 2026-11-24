@@ -59,14 +59,8 @@
       }
     });
 
-    CloudarNewTab.afterChannel(function () {
-      var name = CloudarNewTab.searchName();
-      if (engine && name) {
-        // A fact reported by the browser, not a guess: empty stays empty.
-        engine.textContent = name;
-        engine.title = 'Searches go to ' + name +
-                       ' (change it in Settings \u203a Search)';
-      }
-    });
+    // The engine label is rendered by components/search-bar.js, which owns it;
+    // this file only decides where a query goes. Two owners of the same label
+    // was how the old page ended up able to disagree with itself.
   });
 })();

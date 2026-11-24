@@ -124,7 +124,81 @@ if (!/chromeStyle/.test(bridgeCpp)) {
   errors.push('NewTabBridge never reports chromeStyle, so --classic cannot reach the page');
 }
 
-// --- 5: syntax --------------------------------------------------------------
+// --- 5: no synchronous use of a value-returning bridge slot ---------------
+// qwebchannel.js delivers a slot's return value to a trailing callback and
+// returns `undefined` itself. So `var x = bridge.foo()` is *always* undefined,
+// which looks exactly like "the native side returned nothing". That mistake is
+// what made the saved wallpaper and the real favicons both appear broken.
+//
+// Only slots that actually return something matter here; void slots such as
+// openUrl() are fire-and-forget by design and must NOT take a callback.
+const VALUE_SLOTS = new Set(['initialState', 'faviconUrl', 'saveWallpaperMedia', 'wallpaperState', 'wallpaperMediaUrl']);
+// Strip line comments so prose about the API does not trip the check.
+const stripComments = (src) =>
+  src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:\\])\/\/[^\n]*/g, '$1');
+
+for (const file of jsFiles) {
+  const src = stripComments(read(file));
+  // `!bridge.foo` is an existence guard, not a call.
+  const callPattern = /(?<![!.\w])(?:bridge|newTabBridge|api)\.(\w+)\s*\(/g;
+  for (const m of src.matchAll(callPattern)) {
+    if (!VALUE_SLOTS.has(m[1])) continue;
+
+    // Find the matching close paren, skipping over string literals so a ")"
+    // inside a message cannot end the argument list early.
+    let i = (m.index || 0) + m[0].length;
+    let depth = 1;
+    let start = i;
+    let quote = null;
+    while (i < src.length && depth > 0) {
+      const ch = src[i];
+      if (quote) {
+        if (ch === '\\') { i += 2; continue; }
+        if (ch === quote) quote = null;
+      } else if (ch === '"' || ch === "'" || ch === '`') {
+        quote = ch;
+      } else if (ch === '(') {
+        depth++;
+      } else if (ch === ')') {
+        depth--;
+        if (depth === 0) break;
+      }
+      i++;
+    }
+    const args = src.slice(start, i);
+    // Split on commas at nesting depth 0 only: a comma inside the callback's own
+    // body is not an argument separator, which is what made the first version of
+    // this check report a correct call as broken.
+    let lastArg = '';
+    let pdepth = 0;
+    let pq = null;
+    const parts = [];
+    for (let k = 0; k < args.length; k++) {
+      const ch = args[k];
+      if (pq) {
+        if (ch === '\\') { lastArg += ch + (args[++k] || ''); continue; }
+        if (ch === pq) pq = null;
+        lastArg += ch;
+        continue;
+      }
+      if (ch === '"' || ch === "'" || ch === '`') { pq = ch; lastArg += ch; continue; }
+      if ('([{'.includes(ch)) pdepth++;
+      if (')]}'.includes(ch)) pdepth--;
+      if (ch === ',' && pdepth === 0) { parts.push(lastArg); lastArg = ''; continue; }
+      lastArg += ch;
+    }
+    lastArg = lastArg.trim();
+    const isFn = /^(?:function\b|\()/.test(lastArg) || /=>/.test(lastArg);
+    if (!isFn) {
+      errors.push(
+        `${path.relative(ROOT, file)}: ${m[1]}() is called without a callback — ` +
+        `qwebchannel returns undefined, so the value would be silently lost`
+      );
+    }
+  }
+}
+
+// --- 6: syntax --------------------------------------------------------------
 for (const file of jsFiles) {
   const src = read(file);
   try {

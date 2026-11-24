@@ -57,6 +57,11 @@ protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
     void showEvent(QShowEvent *event) override;
 
+public slots:
+    // Opens (or focuses) the DevTools window for the current tab. Public because
+    // both the F12 shortcut and the context menu reach it.
+    void openDevToolsForCurrentTab();
+
 private slots:
     void navigateToAddressBarInput();
     void updateAddressBar(const QUrl &url);

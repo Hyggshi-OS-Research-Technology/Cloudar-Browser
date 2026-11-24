@@ -25,6 +25,6 @@
     el.title = 'Searches go to ' + name;
   }
 
-  CloudarNewTab.afterChannel(label);
+  CloudarNewTab.whenReady(label);
   document.addEventListener('cloudar:stylechange', label);
 })();

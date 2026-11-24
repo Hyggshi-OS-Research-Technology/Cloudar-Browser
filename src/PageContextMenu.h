@@ -59,6 +59,8 @@ signals:
     void openInNewWindow(const QUrl &url);
     void searchRequested(const QString &text);
     void printRequested();
+    // MainWindow owns the DevTools window; the menu only asks for it.
+    void devToolsRequested();
 
 private:
     QWebEngineView *m_view = nullptr;

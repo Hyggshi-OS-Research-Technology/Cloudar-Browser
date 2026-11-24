@@ -174,9 +174,8 @@ var CloudarCustomize = (function () {
       // copy; the page's own localStorage is only a fast path while this tab is
       // open. Without this the panel showed "no image" even when a wallpaper was
       // loaded, because nothing ever read the browser's answer back.
-      CloudarNewTab.afterChannel(function () {
-        var state = CloudarNewTab.state() || {};
-        var wallpaper = state.wallpaper || { kind: 'default' };
+      CloudarNewTab.whenReady(function (state) {
+        var wallpaper = (state && state.wallpaper) || { kind: 'default' };
         if (wallpaper.kind === 'color' && wallpaper.value) {
           markActive(wallpaper.value);
         } else if (wallpaper.kind === 'web' && wallpaper.value) {

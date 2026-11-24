@@ -15,6 +15,7 @@
 #include "FaviconStore.h"
 #include "NewTabBridge.h"
 #include "PageContextMenu.h"
+#include "DevToolsWindow.h"
 
 #include <QApplication>
 #include <QMenuBar>
@@ -46,6 +47,7 @@
 #include <QTabBar>
 #include <QSignalBlocker>
 #include <QMenu>
+#include <QShortcut>
 #include <QFileDialog>
 #include <QSysInfo>
 
@@ -193,6 +195,22 @@ MainWindow::MainWindow(bool isIncognito, QWidget *parent)
     m_webChannel->registerObject("youtube", m_youtubeBridge);
     m_webChannel->registerObject("torrent", m_torrentBridge);
 
+    // F12 / Ctrl+Shift+I as real window shortcuts, not just menu accelerators.
+    // The web view swallows key presses, and the classic chrome has no menu entry
+    // for DevTools at all, so a menu shortcut alone would leave it unreachable.
+    {
+        auto *devToolsShortcut = new QShortcut(QKeySequence(Qt::Key_F12), this);
+        devToolsShortcut->setContext(Qt::WindowShortcut);
+        connect(devToolsShortcut, &QShortcut::activated,
+                this, &MainWindow::openDevToolsForCurrentTab);
+
+        auto *inspectShortcut = new QShortcut(
+                QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_I), this);
+        inspectShortcut->setContext(Qt::WindowShortcut);
+        connect(inspectShortcut, &QShortcut::activated,
+                this, &MainWindow::openDevToolsForCurrentTab);
+    }
+
     m_tabs = new BrowserTabWidget(m_profile, m_webChannel, this);
     m_tabs->setWebExtensionManager(m_webExtensionManager);
     // Every favicon Chromium decodes passes through here, which is what makes
@@ -227,6 +245,10 @@ MainWindow::MainWindow(bool isIncognito, QWidget *parent)
             templateUrl.replace(QStringLiteral("%s"),
                                 QString::fromLatin1(QUrl::toPercentEncoding(text)));
             m_tabs->addNewTab(QUrl(templateUrl), true);
+        });
+        connect(menu, &PageContextMenu::devToolsRequested, this, [this, view]() {
+            if (view->page())
+                DevToolsWindow::showFor(view->page(), this);
         });
         connect(menu, &PageContextMenu::printRequested, this, [this, view]() {
             if (QWebEnginePage *page = view->page()) {
@@ -961,6 +983,12 @@ void MainWindow::buildModernMenu()
             m_settingsBridge->relaunch();
     });
 
+    // There was no way to open DevTools at all: F12 was unhandled, the
+    // InspectElement web action was never triggered, and no menu offered it.
+    auto *devTools = menu->addAction(tr("Developer tools"));
+    devTools->setShortcut(QKeySequence(Qt::Key_F12));
+    connect(devTools, &QAction::triggered, this, &MainWindow::openDevToolsForCurrentTab);
+
     auto *quit = menu->addAction("Quit");
     quit->setShortcut(QKeySequence::Quit);
     connect(quit, &QAction::triggered, this, &QWidget::close);
@@ -1311,6 +1339,14 @@ void MainWindow::updateProgress(int percent)
     }
 }
 
+void MainWindow::openDevToolsForCurrentTab()
+{
+    QWebEngineView *view = m_tabs ? m_tabs->currentView() : nullptr;
+    if (!view || !view->page())
+        return;
+    DevToolsWindow::showFor(view->page(), this);
+}
+
 void MainWindow::openPageSource(const QUrl &url)
 {
     if (!url.isValid() || url.isEmpty())
@@ -1522,6 +1558,10 @@ void MainWindow::buildClassicMenu()
     auto *flags = toolsMenu->addAction(tr("&Under the hood"));
     connect(flags, &QAction::triggered, this,
             [this]() { m_tabs->focusOrOpenTab("cloudar://flags", QUrl("cloudar://flags/")); });
+    toolsMenu->addSeparator();
+    auto *devTools = toolsMenu->addAction(tr("&Developer tools"));
+    devTools->setShortcut(QKeySequence(Qt::Key_F12));
+    connect(devTools, &QAction::triggered, this, &MainWindow::openDevToolsForCurrentTab);
     auto *restart = toolsMenu->addAction(tr("&Restart"));
     connect(restart, &QAction::triggered, this, [this]() {
         // Settings that change the Chromium command line only take effect on a

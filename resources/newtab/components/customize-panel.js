@@ -11,16 +11,18 @@
   'use strict';
 
   function iconFor(url, imgEl) {
-    var cached = CloudarNewTab.faviconFor(url);
-    if (cached) { imgEl.src = cached; return; }
-    var host = CloudarNewTab.hostOf(url);
-    if (host) {
-      imgEl.src = 'https://' + host + '/favicon.ico';
-      imgEl.addEventListener('error', function () { imgEl.style.visibility = 'hidden'; },
-                             { once: true });
-    } else {
-      imgEl.style.visibility = 'hidden';
-    }
+    // Callback, not a return value: see the note at the top of scripts/app.js.
+    CloudarNewTab.faviconFor(url, function (cached) {
+      if (cached) { imgEl.src = cached; return; }
+      var host = CloudarNewTab.hostOf(url);
+      if (host) {
+        imgEl.src = 'https://' + host + '/favicon.ico';
+        imgEl.addEventListener('error', function () { imgEl.style.visibility = 'hidden'; },
+                               { once: true });
+      } else {
+        imgEl.style.visibility = 'hidden';
+      }
+    });
   }
 
   function renderRecent() {
@@ -79,5 +81,5 @@
     });
   });
 
-  CloudarNewTab.afterChannel(renderRecent);
+  CloudarNewTab.whenReady(renderRecent);
 })();

@@ -39,6 +39,7 @@ set(SOURCES
     src/ClassicTheme.cpp
     src/CrxInstaller.cpp
     src/DownloadManager.cpp
+    src/DevToolsWindow.cpp
     src/ExtensionManager.cpp
     src/ExtensionsDialog.cpp
     src/FaviconStore.cpp
@@ -81,6 +82,7 @@ set(HEADERS
     src/ClassicTheme.h
     src/CrxInstaller.h
     src/DownloadManager.h
+    src/DevToolsWindow.h
     src/ExtensionManager.h
     src/ExtensionsDialog.h
     src/FaviconStore.h
