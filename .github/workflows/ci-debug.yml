@@ -6,35 +6,28 @@ on:
   workflow_dispatch:
 
 jobs:
-  probe:
-    name: Probe ${{ matrix.os }} / ${{ matrix.qt }}
+  build:
+    name: Build errors on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: ubuntu-24.04
             qt: distro
-          - os: ubuntu-22.04
-            qt: distro
-          - os: windows-2022
-            qt: 6.8.3
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install base tools (exact CI list)
+      - name: Install base tools
         shell: bash
         run: |
-          if [ "$RUNNER_OS" = "Linux" ]; then
-            sudo apt-get update
-            sudo apt-get install -y --no-install-recommends \
-              build-essential cmake ninja-build zlib1g-dev \
-              xvfb libgl1-mesa-dri libgl1 libegl1 libxkbcommon-x11-0 \
-              libnss3 libasound2t64 || sudo apt-get install -y --no-install-recommends \
-              libnss3 libasound2
-          fi
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build zlib1g-dev libgl-dev libglu1-mesa-dev \
+            xvfb libgl1-mesa-dri libgl1 libegl1 libxkbcommon-x11-0 \
+            libnss3 libasound2t64 || sudo apt-get install -y --no-install-recommends libnss3 libasound2
 
       - name: Install Qt (distro)
         if: matrix.qt == 'distro'
@@ -42,42 +35,22 @@ jobs:
         run: |
           sudo apt-get install -y --no-install-recommends \
             qt6-base-dev qt6-webengine-dev qt6-webengine-dev-tools \
-            libqt6webenginewidgets6 libqt6webchannel6-dev 2>&1 | tail -25
+            libqt6webenginewidgets6 libqt6webchannel6-dev
 
-      - name: Install Qt (installer)
-        if: matrix.qt != 'distro'
-        uses: jurplel/install-qt-action@v4
-        with:
-          version: ${{ matrix.qt }}
-          arch: win64_msvc2022_64
-          modules: 'qtwebengine qtwebchannel'
-          cache: true
-
-      - name: Inventory Qt
+      - name: Configure
         shell: bash
-        run: |
-          echo "Qt6_DIR=$Qt6_DIR"
-          echo "QT_ROOT_DIR=$QT_ROOT_DIR"
-          echo "CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH"
-          for root in "$Qt6_DIR" "$QT_ROOT_DIR" "$CMAKE_PREFIX_PATH"; do
-            [ -n "$root" ] || continue
-            echo "--- under $root"
-            find "$root" -maxdepth 6 -name 'Qt6WebEngineWidgetsConfig.cmake' 2>/dev/null | head -3
-            find "$root" -maxdepth 4 -type d -name 'QtWebEngine*' 2>/dev/null | head -5
-          done
+        run: cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release
 
-      - name: Configure with Ninja (exact CI command)
+      - name: Build and annotate every error
         shell: bash
         run: |
           set +e
-          cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release > cfg.log 2>&1
+          ninja -C build -j4 > build.log 2>&1
           rc=$?
-          echo "cmake exit=$rc"
-          # Only the diagnostic lines, so the 10-annotation budget is not
-          # spent on compiler-detection noise.
-          grep -nE "Could not find|Expected Config|missing:|dependency|Qt6[A-Za-z]*Config|error:|CMake Error|reason given|Target \"" cfg.log \
-            | head -10 | while IFS= read -r line; do
+          echo "ninja exit=$rc"
+          # error lines plus the file:line directly above them
+          grep -nE "error:|Error|FAILED:" build.log | head -10 | while IFS= read -r line; do
             line="${line//'%'/'%25'}"; line="${line//$'\r'/}"
-            echo "::error title=cfg::${line}"
+            echo "::error title=build::${line}"
           done
           exit $rc
