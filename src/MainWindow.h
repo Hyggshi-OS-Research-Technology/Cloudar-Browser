@@ -74,37 +74,39 @@ private slots:
     void saveSession();
 
 private:
-    QWebEngineProfile *m_profile;
-    BrowserTabWidget *m_tabs;
-    BrowserSidebar *m_sidebar;
-    QSplitter *m_browserSplitter;
-    QLineEdit *m_addressBar;
-    QProgressBar *m_progressBar;
-    QPropertyAnimation *m_progressAnim;
-    QGraphicsDropShadowEffect *m_addressGlow;
-    QPropertyAnimation *m_addressGlowAnim;
-    SpinnerWidget *m_spinner;
-    DownloadManager *m_downloadManager;
-    HistoryManager *m_historyManager;
-    SessionManager *m_sessionManager;
-    BookmarkManager *m_bookmarkManager;
-    BookmarkBar *m_bookmarkBar;
-    QAction *m_bookmarkStarAction;
-    QAction *m_backAction;
-    QAction *m_forwardAction;
-    QAction *m_reloadStopAction;
-    // Created later in buildMenu(), while the sidebar preference is applied
-    // during buildSidebar(). Initialise explicitly so startup cannot inspect
-    // an indeterminate QAction pointer.
+    QWebEngineProfile *m_profile = nullptr;
+    BrowserTabWidget *m_tabs = nullptr;
+    BrowserSidebar *m_sidebar = nullptr;
+    QSplitter *m_browserSplitter = nullptr;
+    QLineEdit *m_addressBar = nullptr;
+    QProgressBar *m_progressBar = nullptr;
+    QPropertyAnimation *m_progressAnim = nullptr;
+    QGraphicsDropShadowEffect *m_addressGlow = nullptr;
+    QPropertyAnimation *m_addressGlowAnim = nullptr;
+    SpinnerWidget *m_spinner = nullptr;
+    DownloadManager *m_downloadManager = nullptr;
+    HistoryManager *m_historyManager = nullptr;
+    SessionManager *m_sessionManager = nullptr;
+    BookmarkManager *m_bookmarkManager = nullptr;
+    BookmarkBar *m_bookmarkBar = nullptr;
+    QAction *m_bookmarkStarAction = nullptr;
+    QAction *m_backAction = nullptr;
+    QAction *m_forwardAction = nullptr;
+    QAction *m_reloadStopAction = nullptr;
+    // Every raw pointer above and below starts as nullptr. This is not tidiness:
+    // the classic chrome never creates the drop-shadow effect or the toolbar
+    // progress bar, so without the initialiser applyTheme() dereferenced
+    // whatever happened to be in that member and the browser segfaulted four
+    // seconds into every classic-chrome start.
     QAction *m_sidebarAction = nullptr;
-    QAction *m_zoomInAction;
-    QAction *m_zoomOutAction;
-    QAction *m_zoomResetAction;
-    ExtensionManager *m_extensionManager;
-    WebExtensionManager *m_webExtensionManager; // real, manifest.json-based Chrome-style extensions
-    QWebChannel *m_webChannel;
-    NativeBridge *m_nativeBridge;
-    SettingsBridge *m_settingsBridge;
+    QAction *m_zoomInAction = nullptr;
+    QAction *m_zoomOutAction = nullptr;
+    QAction *m_zoomResetAction = nullptr;
+    ExtensionManager *m_extensionManager = nullptr;
+    WebExtensionManager *m_webExtensionManager = nullptr; // real, manifest.json-based Chrome-style extensions
+    QWebChannel *m_webChannel = nullptr;
+    NativeBridge *m_nativeBridge = nullptr;
+    SettingsBridge *m_settingsBridge = nullptr;
     // Both are null on the classic chrome, which uses the OS window frame and
     // QMainWindow's own menu bar; everything that touches them checks first.
     TitleBar *m_titleBar = nullptr;
