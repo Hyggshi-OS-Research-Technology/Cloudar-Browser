@@ -26,6 +26,13 @@
 // performance/cpuTier setting (see docs/CPU_COMPATIBILITY.md).
 // ---------------------------------------------------------------------------
 
+namespace PerformanceProfile {
+
+// The public types live inside the namespace alongside the functions, so call
+// sites read PerformanceProfile::CpuTier / ::RenderMode / ::CpuInfo. (Keeping
+// them at global scope while the functions were namespaced meant the qualifier
+// every caller wrote simply did not exist.)
+
 enum class CpuTier {
     Legacy,   // pre-2011 CPUs, <3 GB RAM: software rendering, no UI animation
     Low,      // older dual/quad cores, <=6 GB RAM: lean GPU path, minimal motion
@@ -57,8 +64,6 @@ struct CpuInfo {
     bool avx512 = false;
     bool fma = false;
 };
-
-namespace PerformanceProfile {
 
 // Detected once, cached for the process lifetime.
 CpuInfo cpuInfo();

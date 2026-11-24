@@ -23,12 +23,16 @@
 // this class for metrics instead of hard-coding them.
 // ---------------------------------------------------------------------------
 
+namespace Theme {
+
+// Lives inside the namespace so callers write Theme::ThemeStyle, which is what
+// every use site already does. A global enum plus a namespace of functions is
+// the one combination that reads inconsistently and, as it turned out here,
+// silently fails to compile at every call site.
 enum class ThemeStyle {
     Modern,
     Classic
 };
-
-namespace Theme {
 
 // The style in force for *this process*, persisted at "browser/themeStyle"
 // ("classic" or "modern").

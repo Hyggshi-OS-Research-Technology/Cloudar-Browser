@@ -142,9 +142,9 @@ int physicalCoreCount(int logical, bool smt)
     return std::max(1, logical / 2);
 }
 
-CpuInfo detectCpu()
+PerformanceProfile::CpuInfo detectCpu()
 {
-    CpuInfo info;
+    PerformanceProfile::CpuInfo info;
     info.vendor = cpuVendor();
     info.brand = cpuBrandString();
     info.logicalCores = std::max(1, QThread::idealThreadCount());

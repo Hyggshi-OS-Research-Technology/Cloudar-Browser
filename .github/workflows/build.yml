@@ -44,8 +44,15 @@ jobs:
       - name: Install base build tools
         run: |
           sudo apt-get update
+          # libgl-dev is not optional: Qt6Gui's CMake config calls
+          # find_package(WrapOpenGL) and configure fails on Ubuntu 22.04
+          # without the OpenGL *development* headers. libxkbcommon-dev is the
+          # same story for Qt6Gui's XKB check. The runtime libraries below are
+          # for the smoke tests, not for linking.
           sudo apt-get install -y --no-install-recommends \
             build-essential cmake ninja-build zlib1g-dev \
+            libgl-dev libglu1-mesa-dev libxkbcommon-dev libxkbcommon-x11-dev \
+            libfontconfig1-dev libfreetype6-dev libdbus-1-dev \
             xvfb libgl1-mesa-dri libgl1 libegl1 libxkbcommon-x11-0 \
             libnss3 libasound2t64 || sudo apt-get install -y --no-install-recommends \
             libnss3 libasound2
@@ -62,7 +69,7 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           version: ${{ matrix.qt }}
-          modules: 'qtwebengine qtwebchannel'
+          modules: 'qtwebengine qtwebchannel qtpositioning'
           cache: true
 
       - name: Configure CMake
@@ -161,7 +168,11 @@ jobs:
         with:
           version: ${{ matrix.qt }}
           arch: win64_msvc2022_64
-          modules: 'qtwebengine qtwebchannel'
+          # qtpositioning is a hard dependency of Qt6WebEngineCore's CMake
+          # config (Qt6WebEngineCoreConfig calls find_dependency(Qt6Positioning)).
+          # Leaving it out fails configure with "Qt6Positioning_DIR not found",
+          # which is what happened before this was added.
+          modules: 'qtwebengine qtwebchannel qtpositioning'
           cache: true
 
       - name: Configure CMake
