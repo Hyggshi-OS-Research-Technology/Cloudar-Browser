@@ -108,7 +108,23 @@ jobs:
         run: cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release
 
       - name: Build with Ninja
-        run: ninja -C build -j$(nproc)
+        run: |
+          # Compiler diagnostics are the one thing a failed build always has, but
+          # they only live in the step log — which is not readable from every
+          # tool that needs to triage a run. Re-publish the error lines as
+          # annotations so a failure explains itself. The build still fails
+          # normally through the exit status.
+          set +e
+          ninja -C build -j$(nproc) 2>&1 | tee build.log
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ $status -ne 0 ]; then
+            grep -E 'error:|error C[0-9]+|undefined reference|fatal error' build.log \
+              | head -n 8 | while IFS= read -r line; do
+                echo "::error title=compile::$line"
+              done
+            exit $status
+          fi
 
       - name: Verify binary
         run: |

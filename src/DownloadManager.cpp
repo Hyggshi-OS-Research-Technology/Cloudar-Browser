@@ -104,13 +104,17 @@ DownloadRecord *DownloadManager::recordForFile(const QString &filename)
 
 void DownloadManager::syncList()
 {
-    if (!m_list)
-        return;
-    m_list->clear();
-    for (const DownloadRecord &record : m_records) {
-        auto *item = new QListWidgetItem(describe(record));
-        item->setData(Qt::UserRole, record.path);
-        m_list->addItem(item);
+    // The dialog is created lazily, but the change notification is not optional:
+    // cloudar://downloads is a real consumer and it has no dialog to wait for.
+    // Emitting only after the native list existed meant a download started
+    // before anyone opened the dialog never reached the page.
+    if (m_list) {
+        m_list->clear();
+        for (const DownloadRecord &record : m_records) {
+            auto *item = new QListWidgetItem(describe(record));
+            item->setData(Qt::UserRole, record.path);
+            m_list->addItem(item);
+        }
     }
     emit changed();
 }
@@ -194,19 +198,32 @@ void DownloadManager::handleDownloadRequested(QWebEngineDownloadRequest *downloa
                     showDialog();
                     break;
                 case QWebEngineDownloadRequest::DownloadCancelled:
+                case QWebEngineDownloadRequest::DownloadInterrupted:
+                    // Both end the transfer; they differ only in
+                    // interruptReason(), which the page does not display.
                     rec->cancelled = true;
                     rec->paused = false;
                     rec->request = nullptr;
                     break;
-                case QWebEngineDownloadRequest::DownloadInterrupted:
-                    rec->cancelled = true; // "interrupted" and "cancelled" differ
-                    rec->paused = false;   // only in the reason, which the native
-                    rec->request = nullptr;// list does not print either
-                    break;
                 default:
-                    rec->paused = (state == QWebEngineDownloadRequest::DownloadPaused);
+                    // DownloadState has five values and none of them is
+                    // "paused": pausing leaves the state at DownloadInProgress
+                    // and flips isPaused() instead.
+                    rec->paused = download->isPaused();
                     break;
                 }
+                if (m_list)
+                    syncList();
+            });
+
+    // pause()/resume() flip isPaused() without changing the state, so without
+    // this a paused download would keep rendering as "Downloading 42%".
+    connect(download, &QWebEngineDownloadRequest::isPausedChanged, this,
+            [this, download]() {
+                const int row = indexOfRequest(download);
+                if (row < 0)
+                    return;
+                m_records[row].paused = download->isPaused();
                 if (m_list)
                     syncList();
             });
@@ -241,10 +258,9 @@ void DownloadManager::pauseDownload(const QString &filename)
     DownloadRecord *record = recordForFile(filename);
     if (!record || !record->request || record->completed || record->cancelled)
         return;
+    // isPausedChanged() updates the record; setting the flag here too would
+    // claim success even if the engine refused to pause.
     record->request->pause();
-    record->paused = true;
-    if (m_list)
-        syncList();
 }
 
 void DownloadManager::resumeDownload(const QString &filename)
@@ -253,9 +269,6 @@ void DownloadManager::resumeDownload(const QString &filename)
     if (!record || !record->request || record->completed || record->cancelled)
         return;
     record->request->resume();
-    record->paused = false;
-    if (m_list)
-        syncList();
 }
 
 void DownloadManager::cancelDownload(const QString &filename)
