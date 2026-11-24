@@ -1,0 +1,76 @@
+name: CI debug (temporary)
+
+on:
+  push:
+    branches: ["arena/3cab4054-cloudar-browser"]
+  workflow_dispatch:
+
+jobs:
+  cfg22:
+    name: Configure ubuntu-22.04 distro
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Base tools
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build zlib1g-dev \
+            libgl-dev libglu1-mesa-dev libxkbcommon-dev libxkbcommon-x11-dev
+      - name: Qt distro (build.yml list)
+        shell: bash
+        run: |
+          set +e
+          sudo apt-get install -y --no-install-recommends \
+            qt6-base-dev qt6-base-dev-tools qt6-opengl-dev \
+            qt6-webengine-dev qt6-webengine-dev-tools \
+            libqt6webenginewidgets6 libqt6webchannel6-dev > apt.log 2>&1
+          echo "apt exit=$?"
+          grep -E "E: |Unable to locate|has no installation candidate" apt.log | head -6 | while IFS= read -r l; do
+            echo "::error title=apt::$l"
+          done
+          apt-cache search qt6-opengl 2>/dev/null | head -5
+          apt-cache policy qt6-opengl-dev 2>/dev/null | head -5
+
+  crash:
+    name: Backtrace ubuntu-24.04 distro
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Base tools
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build zlib1g-dev gdb \
+            libgl-dev libglu1-mesa-dev libxkbcommon-dev libxkbcommon-x11-dev \
+            xvfb libgl1-mesa-dri libgl1 libegl1 libxkbcommon-x11-0 \
+            libnss3 libasound2t64 libqt6webenginewidgets6
+      - name: Qt distro
+        shell: bash
+        run: |
+          sudo apt-get install -y --no-install-recommends \
+            qt6-base-dev qt6-base-dev-tools qt6-opengl-dev \
+            qt6-webengine-dev qt6-webengine-dev-tools libqt6webchannel6-dev
+      - name: Build
+        shell: bash
+        run: |
+          cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          ninja -C build -j4
+      - name: Run under gdb and annotate the backtrace
+        shell: bash
+        run: |
+          export QTWEBENGINE_DISABLE_SANDBOX=1
+          export QT_QPA_PLATFORM=xcb
+          set +e
+          timeout 40 xvfb-run -a gdb -batch \
+            -ex "run --classic" -ex "bt 25" -ex "info registers rip" \
+            ./build/cloudar-browser > gdb.log 2>&1
+          echo "gdb exit=$?"
+          grep -E "^#[0-9]+ |SIGSEGV|SIGABRT|Program received" gdb.log | head -10 | while IFS= read -r l; do
+            l="${l//'%'/'%25'}"
+            echo "::error title=bt::$l"
+          done
