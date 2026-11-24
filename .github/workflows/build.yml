@@ -60,17 +60,17 @@ jobs:
       - name: Install Qt 6 (distribution packages)
         if: matrix.qt == 'distro'
         run: |
-          # Ubuntu 22.04 ships Qt6OpenGL as a separate package, and Qt6Gui's
-          # CMake config requires it there. Ubuntu 24.04 folded it into
-          # qt6-base-dev and has no qt6-opengl-dev, so apt would abort the whole
-          # install. Try the superset first, fall back to the plain set.
+          # Ubuntu 22.04's Qt 6.2 splits Qt6OpenGL into libqt6opengl6-dev, and
+          # Qt6Gui's CMake config requires it there; without it configure dies
+          # with "Could NOT find Qt6OpenGL (missing: Qt6OpenGL_DIR)". Ubuntu
+          # 24.04's Qt 6.4 folds it into qt6-base-dev and has no such package,
+          # so the extra install must not be allowed to abort the job.
           sudo apt-get install -y --no-install-recommends \
-            qt6-base-dev qt6-base-dev-tools qt6-opengl-dev \
-            qt6-webengine-dev qt6-webengine-dev-tools \
-            libqt6webenginewidgets6 libqt6webchannel6-dev \
-          || sudo apt-get install -y --no-install-recommends \
             qt6-base-dev qt6-webengine-dev qt6-webengine-dev-tools \
             libqt6webenginewidgets6 libqt6webchannel6-dev
+          if ! sudo apt-get install -y --no-install-recommends libqt6opengl6-dev; then
+            echo "libqt6opengl6-dev not needed on this release (expected on 24.04)"
+          fi
 
       - name: Install Qt ${{ matrix.qt }} (official installer)
         if: matrix.qt != 'distro'
@@ -182,6 +182,14 @@ jobs:
           # which is what happened before this was added.
           modules: 'qtwebengine qtwebchannel qtpositioning'
           cache: true
+
+      - name: Set up the MSVC environment
+        # Without this, Ninja picks up the MinGW gcc that is also on the PATH and
+        # links against a Qt that was built with MSVC: every Qt symbol comes back
+        # as an undefined reference.
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
 
       - name: Provide zlib (vcpkg)
         # Windows has no system zlib, and CrxInstaller needs it to inflate CRX
