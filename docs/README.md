@@ -1,179 +1,43 @@
-# Hyggshi Browser
+# Cloudar Browser — Documentation
 
-A modern, feature-rich web browser built with **PyQt6** and **QWebEngine**, inspired by Google Chrome and Comet Browser.
+Cloudar Browser is a C++17 / Qt 6 desktop browser built on QtWebEngine, with two
+complete user interfaces (a Chrome 2009 reconstruction and a modern dark chrome).
+Start with the top-level [README](../README.md) for installation; the documents
+here cover the parts that need more than a paragraph.
 
-![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)
-![PyQt6](https://img.shields.io/badge/PyQt6-6.6+-green.svg)
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
+## Read these first
 
-## ✨ Features
+| Document | What it answers |
+|:---|:---|
+| [PLATFORM_MATRIX.md](PLATFORM_MATRIX.md) | Which Windows/Linux/Android versions actually run, and why the rest need separate legacy/mobile branches. |
+| [CPU_COMPATIBILITY.md](CPU_COMPATIBILITY.md) | How the Legacy/Low/Balanced/High tiers are detected, what Chromium switches each one sets, and the hard SSE3 floor. |
+| [CLASSIC_UI.md](CLASSIC_UI.md) | What the Chrome 2009 interface reproduces exactly, what it deliberately does not, and how to add a third chrome. |
+| [KNOWN_ISSUES.md](KNOWN_ISSUES.md) | Everything the browser does not do yet: extension gaps, incognito caveats, missing benchmarks and tests. |
 
-- **🗂️ Tabbed Browsing** - Multiple tabs with easy switching and management
-- **🔍 Smart Address Bar** - URL autocomplete and integrated search
-- **⭐ Bookmark Management** - Save and organize your favorite sites
-- **📜 Browsing History** - Track and revisit your browsing history
-- **⬇️ Download Manager** - Track downloads with progress indicators
-- **🎨 Modern Dark Theme** - Sleek, Chrome-inspired dark interface
-- **⚙️ Customizable Settings** - Configure home page, search engine, and more
-- **🔒 HTTPS Support** - Secure browsing with SSL/TLS
-- **⌨️ Keyboard Shortcuts** - Efficient navigation with hotkeys
+## Feature notes
 
-## 📋 Requirements
+| Document | Subject |
+|:---|:---|
+| [RAM_MONITORING.md](RAM_MONITORING.md) | Memory reporting. Explains why the old per-tab "Memory usage: N MB" numbers were removed and what a correct implementation would look like. |
+| [FILE_PROTOCOL_SECURITY.md](FILE_PROTOCOL_SECURITY.md) | `file://` handling; what local content may and may not reach. |
+| [IMAGE_OPTIMIZATION.md](IMAGE_OPTIMIZATION.md) | New Tab background image storage and resizing. |
+| [QUICKSTART.md](QUICKSTART.md) | Build, run and troubleshoot in five minutes. |
 
-- Python 3.8 or higher
-- PyQt6
-- PyQt6-WebEngine
+## Agent / contributor notes
 
-## 🚀 Installation
+| Document | Subject |
+|:---|:---|
+| [AGENTS.md](AGENTS.md) | Repository guidance for automated coding agents. Describes the **legacy Python prototype** in `legacy/` — the native tree under `src/` is the current implementation and does not share its module layout. |
+| [CLAUDE.md](CLAUDE.md) | The same guidance in Claude-specific form. |
 
-1. **Clone or download this repository**
+## Where the code lives
 
-2. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-   Or install manually:
-   ```bash
-   pip install PyQt6 PyQt6-WebEngine
-   ```
-
-3. **Run the browser:**
-   ```bash
-   python main.py
-   ```
-
-> [!IMPORTANT]
-> **Windows Users:** If you encounter a `DLL load failed` error, you need to install the **Visual C++ Redistributable**:
-> 1. Download from: https://aka.ms/vs/17/release/vc_redist.x64.exe
-> 2. Install and restart your computer
-> 3. Run `python main.py` again
-> 
-> See the [Troubleshooting](#-troubleshooting) section for more details.
-
-## 🎮 Usage
-
-### Keyboard Shortcuts
-
-- `Ctrl+T` - New tab
-- `Ctrl+W` - Close current tab
-- `Ctrl+N` - New window
-- `Ctrl+D` - Add bookmark
-- `Ctrl+H` - Show history
-- `Ctrl+J` - Show downloads
-- `Ctrl+Q` - Quit browser
-- `F5` - Reload page
-- `Ctrl+L` - Focus address bar
-
-### Navigation
-
-- **Address Bar**: Enter URLs or search queries
-- **Back/Forward**: Navigate through page history
-- **Home**: Return to your home page
-- **Reload**: Refresh the current page
-- **Bookmark Star**: Add/remove current page from bookmarks
-
-### Features
-
-#### Bookmarks
-- Click the star icon in the address bar to bookmark the current page
-- Access bookmarks via the Bookmarks menu
-- Double-click a bookmark to navigate to it
-
-#### History
-- All visited pages are automatically saved to history
-- View history via `Ctrl+H` or the History menu
-- Search through your browsing history
-- Clear history when needed
-
-#### Downloads
-- Downloads are automatically tracked
-- View download progress and history via `Ctrl+J`
-- Downloads are saved to your configured download location
-
-#### Settings
-- Configure your home page
-- Set your preferred search engine
-- Choose download location
-- Access via Tools → Settings
-
-## 📁 Project Structure
-
+```text
+src/ClassicTheme.*        both chrome stylesheets, per-chrome metrics, painted icons
+src/PerformanceProfile.*  CPUID/RAM detection, Chromium switches, animation policy
+src/MemorySaver.*         idle-tab discard, sleep placeholders, statistics
+src/MainWindow.*          window, menus, omnibox decoration, chrome switching
+src/BrowserTabWidget.*    tab host, sleep/wake, thumbnails, closed-tab stack
+src/SettingsBridge.*      backend for cloudar://settings
+resources/*.html          internal pages; each renders a classic and a modern variant
 ```
-HyggshiWebEngine/
-├── main.py                 # Application entry point
-├── browser_window.py       # Main browser window
-├── web_view.py            # Custom web view widget
-├── bookmark_manager.py    # Bookmark management
-├── history_manager.py     # History tracking
-├── download_manager.py    # Download handling
-├── settings_dialog.py     # Settings/preferences
-├── styles.py              # UI stylesheet
-├── resources.py           # Resource management
-├── requirements.txt       # Python dependencies
-├── browser_data/          # User data directory
-│   ├── bookmarks.json    # Saved bookmarks
-│   ├── history.json      # Browsing history
-│   ├── settings.json     # User preferences
-│   └── downloads.json    # Download records
-└── README.md             # This file
-```
-
-## 🎨 Customization
-
-### Changing the Theme
-
-Edit `styles.py` to customize colors and styling. The browser uses Qt Style Sheets (QSS) for theming.
-
-### Default Settings
-
-Modify `DEFAULT_SETTINGS` in `resources.py` to change default values:
-
-```python
-DEFAULT_SETTINGS = {
-    "home_page": "https://www.google.com",
-    "search_engine": "https://www.google.com/search?q={}",
-    "download_location": os.path.expanduser("~/Downloads"),
-    "theme": "dark",
-    "show_bookmark_bar": True
-}
-```
-
-## 🔧 Troubleshooting
-
-### Browser won't start
-- Ensure PyQt6 and PyQt6-WebEngine are installed correctly
-- Check Python version (3.8+ required)
-
-### Pages won't load
-- Check your internet connection
-- Verify firewall settings aren't blocking the browser
-
-### Downloads not working
-- Check download location permissions
-- Ensure the download directory exists
-
-## 🤝 Contributing
-
-Contributions are welcome! Feel free to:
-- Report bugs
-- Suggest new features
-- Submit pull requests
-
-## 📄 License
-
-This project is open source and available under the MIT License.
-
-## 🙏 Acknowledgments
-
-- Built with [PyQt6](https://www.riverbankcomputing.com/software/pyqt/)
-- Powered by [QtWebEngine](https://doc.qt.io/qt-6/qtwebengine-index.html)
-- Inspired by Google Chrome and Comet Browser
-
-## 📧 Contact
-
-For questions or support, please open an issue on the project repository.
-
----
-
-**Enjoy browsing with Hyggshi Browser! 🚀**

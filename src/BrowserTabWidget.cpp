@@ -1,6 +1,8 @@
 #include "BrowserTabWidget.h"
+#include "FaviconStore.h"
 #include "TabPreviewPopup.h"
 #include "WebExtensionManager.h"
+#include "ClassicTheme.h"
 
 #include <QWebEnginePage>
 #include <QWebEngineNewWindowRequest>
@@ -18,6 +20,9 @@
 #include <QJsonObject>
 #include <QJsonValue>
 #include <QMenu>
+#include <QPushButton>
+#include <QVBoxLayout>
+#include <QLabel>
 #include <QClipboard>
 #include <QGuiApplication>
 #include <cmath>
@@ -45,7 +50,7 @@ BrowserTabWidget::BrowserTabWidget(QWebEngineProfile *profile, QWebChannel *chan
     connect(tabBar(), &QTabBar::customContextMenuRequested, this, [this](const QPoint &pos) {
         int idx = tabBar()->tabAt(pos);
         if (idx >= 0) {
-            hidePreview();
+            dismissPreview();
             showTabContextMenu(idx, tabBar()->mapToGlobal(pos));
         }
     });
@@ -77,6 +82,17 @@ BrowserTabWidget::BrowserTabWidget(QWebEngineProfile *profile, QWebChannel *chan
             m_lastCurrentView = nullptr;
             return;
         }
+        // A slept tab's placeholder is not a web view: waking it rebuilds the
+        // real page in place, and the resulting currentChanged() call lands
+        // back here with a proper QWebEngineView.
+        if (m_sleptUrls.contains(index)) {
+            const QUrl sleptUrl(m_sleptUrls.value(index));
+            QMetaObject::invokeMethod(this, [this, index]() { reopenTabAt(index); },
+                                      Qt::QueuedConnection);
+            emit urlChangedForCurrentTab(sleptUrl);
+            return;
+        }
+
         auto *view = qobject_cast<QWebEngineView *>(widget(index));
         if (!view)
             return;
@@ -116,7 +132,7 @@ bool BrowserTabWidget::eventFilter(QObject *watched, QEvent *event)
             int idx = tabBar()->tabAt(mouseEvent->pos());
             if (idx != m_hoveredTabIndex) {
                 m_hoveredTabIndex = idx;
-                hidePreview();
+                dismissPreview();
                 m_previewTimer->stop();
                 if (idx >= 0)
                     m_previewTimer->start(kHoverDelayMs);
@@ -124,7 +140,7 @@ bool BrowserTabWidget::eventFilter(QObject *watched, QEvent *event)
         } else if (event->type() == QEvent::Leave) {
             m_hoveredTabIndex = -1;
             m_previewTimer->stop();
-            hidePreview();
+            dismissPreview();
         } else if (event->type() == QEvent::Resize ||
                    event->type() == QEvent::LayoutRequest ||
                    event->type() == QEvent::Show ||
@@ -202,11 +218,26 @@ void BrowserTabWidget::showPreviewForTab(int index)
 {
     if (index < 0 || index >= count())
         return;
+
+    // A slept tab still deserves a hover card — it just has no live view to
+    // read a URL from, so fall back to the URL we remembered.
+    if (m_sleptUrls.contains(index)) {
+        m_previewPopup->setContent(QPixmap(), tabText(index),
+                                    QUrl(m_sleptUrls.value(index)),
+                                    tr("Sleeping (memory released)"));
+        const QRect sleptRect = tabBar()->tabRect(index);
+        m_previewPopup->move(tabBar()->mapToGlobal(QPoint(sleptRect.left(), sleptRect.bottom() + 6)));
+        m_previewPopup->fadeIn();
+        return;
+    }
+
     auto *view = qobject_cast<QWebEngineView *>(widget(index));
     if (!view)
         return;
 
-    m_previewPopup->setContent(tabThumbnail(index), tabText(index), view->url(), index);
+    const bool active = (index == currentIndex());
+    m_previewPopup->setContent(tabThumbnail(index), tabText(index), view->url(),
+                                active ? tr("Active renderer") : tr("Background renderer"));
 
     const QRect tabRect = tabBar()->tabRect(index);
     const QPoint anchor = tabBar()->mapToGlobal(QPoint(tabRect.left(), tabRect.bottom() + 6));
@@ -214,14 +245,26 @@ void BrowserTabWidget::showPreviewForTab(int index)
     m_previewPopup->fadeIn();
 }
 
-void BrowserTabWidget::hidePreview()
+void BrowserTabWidget::dismissPreview()
 {
     m_previewPopup->fadeOut();
 }
 
 void BrowserTabWidget::wireView(QWebEngineView *view)
 {
+    // Right-click menu. QtWebEngine's own default is a bare list (see
+    // PageContextMenu) and on some platforms it is absent entirely, so every tab,
+    // including the ones restored from a session, gets ours.
+    if (m_contextMenuFactory)
+        m_contextMenuFactory(view);
+
     connect(view, &QWebEngineView::iconChanged, this, [this, view](const QIcon &icon) {
+        // Feed the favicon store first: it keys on the page URL, and the tab
+        // strip's own icon handling below may replace a null icon with a
+        // generated placeholder that would be wrong to cache as the site's icon.
+        if (m_favicons && !icon.isNull())
+            m_favicons->record(view->url(), icon);
+
         int idx = indexOf(view);
         if (idx >= 0) {
             const QIcon eff = icon.isNull() ? defaultFavicon(view->url()) : icon;
@@ -283,6 +326,21 @@ void BrowserTabWidget::wireView(QWebEngineView *view)
     });
 
     connect(view, &QWebEngineView::loadFinished, this, [this, view](bool ok) {
+        // Every internal page reads this key to decide whether to render its
+        // classic (2009) or modern variant, and localStorage is the only
+        // channel those pages share. Writing it on each internal load means a
+        // theme switch is picked up by the next cloudar:// page even before the
+        // window itself is restarted.
+        const QUrl loadedUrl = view->url();
+        if (ok && (loadedUrl.scheme() == QLatin1String("cloudar")
+                   || loadedUrl.scheme() == QLatin1String("browser")
+                   || loadedUrl.scheme() == QLatin1String("light"))) {
+            const QString styleKey = Theme::keyFor(Theme::current());
+            view->page()->runJavaScript(
+                QStringLiteral("try{localStorage.setItem('cloudar.chromeStyle','%1')}catch(e){}")
+                    .arg(styleKey));
+        }
+
         if (currentWidget() == view) {
             emit loadFinishedForCurrentTab(ok);
             captureThumbnail(view);
@@ -371,7 +429,19 @@ void BrowserTabWidget::closeTabAt(int index)
     if (index == m_hoveredTabIndex) {
         m_hoveredTabIndex = -1;
         m_previewTimer->stop();
-        hidePreview();
+        dismissPreview();
+    }
+
+    // Sleeping tabs are tracked by index, so every index above the closed
+    // one shifts down by one.
+    if (!m_sleptUrls.isEmpty()) {
+        QHash<int, QString> shifted;
+        for (auto it = m_sleptUrls.constBegin(); it != m_sleptUrls.constEnd(); ++it) {
+            if (it.key() == index)
+                continue;
+            shifted.insert(it.key() > index ? it.key() - 1 : it.key(), it.value());
+        }
+        m_sleptUrls = shifted;
     }
 
     removeTab(index);
@@ -404,6 +474,14 @@ QStringList BrowserTabWidget::openUrls() const
 {
     QStringList urls;
     for (int i = 0; i < count(); ++i) {
+        // A slept tab has no QWebEngineView, but its URL is remembered and is
+        // still part of the session the user expects to get back.
+        if (m_sleptUrls.contains(i)) {
+            const QUrl slept(m_sleptUrls.value(i));
+            if (slept.isValid() && !slept.isEmpty())
+                urls.append(slept.toString());
+            continue;
+        }
         if (auto *view = qobject_cast<QWebEngineView *>(widget(i))) {
             const QUrl url = view->url();
             // An empty URL is a transient construction state, not a useful
@@ -466,6 +544,8 @@ bool BrowserTabWidget::closeTabForExtension(int index)
 
 QString BrowserTabWidget::urlForTabIndex(int index) const
 {
+    if (m_sleptUrls.contains(index))
+        return m_sleptUrls.value(index);
     auto *view = qobject_cast<QWebEngineView *>(widget(index));
     return view ? view->url().toString() : QString();
 }
@@ -569,6 +649,112 @@ void BrowserTabWidget::reopenClosedTab()
         const QString urlStr = m_closedTabUrls.takeFirst();
         addNewTab(QUrl(urlStr), true);
     }
+}
+
+// ---------------------------------------------------------------------------
+// Memory Saver
+//
+// QtWebEngine gives us no public "discard this tab's renderer" call, so the
+// only way to actually return a background tab's memory to the OS is to drop
+// its QWebEngineView (and with it the QWebEnginePage / renderer process) and
+// remember the URL. The replacement widget is a plain QLabel: no engine, no
+// process, a few kilobytes.
+// ---------------------------------------------------------------------------
+
+bool BrowserTabWidget::isTabSlept(int index) const
+{
+    return m_sleptUrls.contains(index);
+}
+
+bool BrowserTabWidget::sleepTab(int index)
+{
+    if (index < 0 || index >= count() || index == currentIndex())
+        return false;
+    if (m_sleptUrls.contains(index))
+        return false; // already asleep
+
+    auto *view = qobject_cast<QWebEngineView *>(widget(index));
+    if (!view)
+        return false;
+
+    const QUrl url = view->url();
+    if (!url.isValid() || url.isEmpty() || url.scheme() == QLatin1String("about"))
+        return false;
+
+    const QString title = tabText(index);
+    const QIcon icon = tabIcon(index);
+
+    m_sleptUrls.insert(index, url.toString());
+    m_thumbnails.remove(view);
+
+    // A lightweight stand-in that keeps the tab visually present in both the
+    // strip and the vertical sidebar, with a hint explaining what happened.
+    auto *placeholder = new QWidget(this);
+    auto *layout = new QVBoxLayout(placeholder);
+    layout->setContentsMargins(24, 24, 24, 24);
+    layout->setSpacing(10);
+    layout->setAlignment(Qt::AlignCenter);
+
+    auto *headline = new QLabel(tr("This tab is sleeping to save memory"), placeholder);
+    QFont headlineFont = headline->font();
+    headlineFont.setPointSizeF(headlineFont.pointSizeF() + 2.0);
+    headlineFont.setBold(true);
+    headline->setFont(headlineFont);
+    headline->setAlignment(Qt::AlignCenter);
+
+    auto *detail = new QLabel(url.toString(), placeholder);
+    detail->setAlignment(Qt::AlignCenter);
+    detail->setWordWrap(true);
+    detail->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    detail->setStyleSheet(QStringLiteral("color: palette(mid);"));
+
+    auto *wake = new QPushButton(tr("Reload this tab"), placeholder);
+    wake->setCursor(Qt::PointingHandCursor);
+    connect(wake, &QPushButton::clicked, this, [this, placeholder]() {
+        const int idx = indexOf(placeholder);
+        if (idx >= 0)
+            setCurrentIndex(idx);
+    });
+
+    layout->addWidget(headline);
+    layout->addWidget(detail);
+    layout->addWidget(wake, 0, Qt::AlignCenter);
+
+    removeTab(index);
+    view->deleteLater();
+    insertTab(index, placeholder, icon, title);
+    setTabToolTip(index, tr("%1 (sleeping)").arg(url.toString()));
+    repositionNewTabButton();
+    emit tabsChanged();
+    return true;
+}
+
+bool BrowserTabWidget::reopenTabAt(int index)
+{
+    if (!m_sleptUrls.contains(index))
+        return false;
+    const QUrl url(m_sleptUrls.take(index));
+    if (index < 0 || index >= count())
+        return false;
+
+    QWidget *placeholder = widget(index);
+    const QString title = tabText(index);
+    removeTab(index);
+    if (placeholder)
+        placeholder->deleteLater();
+
+    auto *view = addNewTab(url, true);
+    if (!view)
+        return false;
+    const int newIndex = indexOf(view);
+    if (newIndex != index) {
+        tabBar()->moveTab(newIndex, index);
+        setCurrentIndex(index);
+    }
+    if (!title.isEmpty() && !title.startsWith(tr("Sleeping")))
+        setTabText(index, title);
+    emit tabsChanged();
+    return true;
 }
 
 void BrowserTabWidget::showTabContextMenu(int index, const QPoint &globalPos)

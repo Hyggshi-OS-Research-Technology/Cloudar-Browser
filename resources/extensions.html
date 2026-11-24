@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Extensions</title>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" />
   <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
   <style>
     :root {
@@ -16,10 +15,115 @@
       --accent: #a78bfa;
       --border: rgba(255,255,255,0.08);
     }
+    /* ---------------------------------------------------------------------
+       Classic (Chrome 2009) chrome. BrowserTabWidget writes the active chrome
+       to localStorage before this page's scripts run, so the class is applied
+       without a flash. Same beige Win32 palette as cloudar://settings: a dark
+       glowing card inside a decorated grey window reads as a bug, not a style.
+       --------------------------------------------------------------------- */
+    html.classic {
+      --bg: #e8e8e8;
+      --panel: #ffffff;
+      --panel-2: #f4f4f4;
+      --text: #1a1a1a;
+      --muted: #6b6b6b;
+      --border: #a0a0a0;
+    }
+
+    html.classic body {
+      font-family: Tahoma, "Segoe UI", Verdana, sans-serif;
+      font-size: 12px;
+      background: var(--bg);
+    }
+
+    html.classic header {
+      padding: 6px 10px;
+      background: linear-gradient(#f6f6f6, #dcdcdc);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: none;
+    }
+
+    html.classic h1 {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    html.classic .panel,
+    html.classic .card,
+    html.classic .row,
+    html.classic .bookmark-card,
+    html.classic .layout {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 0;
+      box-shadow: none;
+      backdrop-filter: none;
+    }
+
+    html.classic button,
+    html.classic select,
+    html.classic input {
+      border-radius: 0;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 12px;
+      font-family: inherit;
+      padding: 2px 8px;
+    }
+
+    html.classic button:hover,
+    html.classic select:hover {
+      background: #e4eefb;
+      border-color: #9fc3ef;
+    }
+
+    html.classic code {
+      background: #f0f0f0;
+      border: 1px solid #d0d0d0;
+      border-radius: 0;
+      font-size: 11px;
+    }
+
+    html.classic .folder-item.active,
+    html.classic .tag {
+      background: #c3daf5;
+      border: 1px solid #7da2ce;
+      border-radius: 0;
+      color: #1a1a1a;
+    }
+
+    html.classic .progress {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 0;
+    }
+
+    html.classic .progress > div {
+      background: #3a9b3a;
+      border-radius: 0;
+    }
+
+    html.classic .toggle {
+      border-radius: 0;
+    }
+
+    html.classic .toggle::after {
+      border-radius: 0;
+    }
+
+    html.classic th {
+      color: #1a1a1a;
+      text-transform: none;
+      letter-spacing: 0;
+      background: var(--panel-2);
+    }
+
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: 'Space Grotesk', sans-serif;
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
       color: var(--text);
       background: radial-gradient(1200px 500px at 30% -20%, rgba(167,139,250,0.18), transparent), var(--bg);
       height: 100vh;
@@ -88,6 +192,16 @@
   <div class="note">Restart tabs to ensure content scripts are applied everywhere.</div>
 
   <script>
+    // The active chrome, written to localStorage by the native side on every
+    // internal page load (BrowserTabWidget::wireView). Read before rendering so
+    // the classic palette is in place instead of flashing dark first.
+    (function applyChromeStyle() {
+      try {
+        if (localStorage.getItem('cloudar.chromeStyle') === 'classic')
+          document.documentElement.classList.add('classic');
+      } catch (e) { /* storage disabled: stay with the modern look */ }
+    })();
+
     let bridge = null;
     const listEl = document.getElementById('list');
 
@@ -111,7 +225,7 @@
         const toggle = card.querySelector('.toggle');
         toggle.onclick = () => {
           const next = !toggle.classList.contains('on');
-          bridge.toggleExtension(ext.id, next, () => {});
+          bridge.toggleExtension(ext.id, next);
         };
         listEl.appendChild(card);
       });

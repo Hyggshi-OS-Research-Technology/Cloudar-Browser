@@ -21,9 +21,14 @@ public:
     // Black or white, whichever reads better on top of `bg`.
     static QColor readableTextOn(const QColor &bg);
 
-    // Full app QSS built from the current accent color. Re-apply via
-    // qApp->setStyleSheet() whenever accentChanged() fires.
+    // Full app QSS for whichever chrome is active (see ClassicTheme.h).
+    // Re-apply via qApp->setStyleSheet() whenever accentChanged() fires.
     QString appStyleSheet() const;
+
+    // The original dark sheet, exposed so Theme::appStyleSheet() can
+    // delegate to it when the Modern style is selected instead of a second
+    // copy drifting out of sync with this one.
+    QString modernStyleSheet(const QColor &accent) const;
 
 signals:
     void accentChanged(const QColor &color);

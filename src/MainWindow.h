@@ -23,6 +23,8 @@
 #include "ExtensionManager.h"
 #include "WebExtensionManager.h"
 #include "NativeBridge.h"
+#include "InternalBridge.h"
+#include "NewTabBridge.h"
 #include "SettingsBridge.h"
 #include "SpinnerWidget.h"
 #include "TitleBar.h"
@@ -32,8 +34,13 @@
 #include "YouTubeDownloader.h"
 #include "TorrentDownloader.h"
 #include "IdleEasterEgg.h"
+#include "MemorySaver.h"
+#include "PerformanceProfile.h"
+#include "ClassicTheme.h"
 
 class QSplitter;
+class QToolBar;
+class QToolButton;
 
 class MainWindow : public QMainWindow
 {
@@ -43,11 +50,17 @@ public:
 
     void openUrl(const QUrl &url);
     void setSidebarVisible(bool visible);
+    MemorySaver *memorySaver() const { return m_memorySaver; }
     bool isIncognito() const { return m_isIncognito; }
 
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
     void showEvent(QShowEvent *event) override;
+
+public slots:
+    // Opens (or focuses) the DevTools window for the current tab. Public because
+    // both the F12 shortcut and the context menu reach it.
+    void openDevToolsForCurrentTab();
 
 private slots:
     void navigateToAddressBarInput();
@@ -56,6 +69,9 @@ private slots:
     void updateProgress(int percent);
     void showHistoryDialog();
     void openSettingsPage(); // opens/focuses a tab on cloudar://settings/
+    // Page context menu helpers (see PageContextMenu).
+    void openPageSource(const QUrl &url);
+    void openInNewWindow(const QUrl &url);
     void showExtensionsDialog();
     void toggleBookmarkForCurrentPage();
     void updateBookmarkStar(const QUrl &url);
@@ -68,40 +84,51 @@ private slots:
     void saveSession();
 
 private:
-    QWebEngineProfile *m_profile;
-    BrowserTabWidget *m_tabs;
-    BrowserSidebar *m_sidebar;
-    QSplitter *m_browserSplitter;
-    QLineEdit *m_addressBar;
-    QProgressBar *m_progressBar;
-    QPropertyAnimation *m_progressAnim;
-    QGraphicsDropShadowEffect *m_addressGlow;
-    QPropertyAnimation *m_addressGlowAnim;
-    SpinnerWidget *m_spinner;
-    DownloadManager *m_downloadManager;
-    HistoryManager *m_historyManager;
-    SessionManager *m_sessionManager;
-    BookmarkManager *m_bookmarkManager;
-    BookmarkBar *m_bookmarkBar;
-    QAction *m_bookmarkStarAction;
-    QAction *m_backAction;
-    QAction *m_forwardAction;
-    QAction *m_reloadStopAction;
-    // Created later in buildMenu(), while the sidebar preference is applied
-    // during buildSidebar(). Initialise explicitly so startup cannot inspect
-    // an indeterminate QAction pointer.
+    QWebEngineProfile *m_profile = nullptr;
+    BrowserTabWidget *m_tabs = nullptr;
+    BrowserSidebar *m_sidebar = nullptr;
+    QSplitter *m_browserSplitter = nullptr;
+    QLineEdit *m_addressBar = nullptr;
+    QProgressBar *m_progressBar = nullptr;
+    QPropertyAnimation *m_progressAnim = nullptr;
+    QGraphicsDropShadowEffect *m_addressGlow = nullptr;
+    QPropertyAnimation *m_addressGlowAnim = nullptr;
+    SpinnerWidget *m_spinner = nullptr;
+    DownloadManager *m_downloadManager = nullptr;
+    HistoryManager *m_historyManager = nullptr;
+    SessionManager *m_sessionManager = nullptr;
+    BookmarkManager *m_bookmarkManager = nullptr;
+    BookmarkBar *m_bookmarkBar = nullptr;
+    QAction *m_bookmarkStarAction = nullptr;
+    QAction *m_backAction = nullptr;
+    QAction *m_forwardAction = nullptr;
+    QAction *m_reloadStopAction = nullptr;
+    // Every raw pointer above and below starts as nullptr. This is not tidiness:
+    // the classic chrome never creates the drop-shadow effect or the toolbar
+    // progress bar, so without the initialiser applyTheme() dereferenced
+    // whatever happened to be in that member and the browser segfaulted four
+    // seconds into every classic-chrome start.
     QAction *m_sidebarAction = nullptr;
-    QAction *m_findAction;
-    QAction *m_zoomInAction;
-    QAction *m_zoomOutAction;
-    QAction *m_zoomResetAction;
-    ExtensionManager *m_extensionManager;
-    WebExtensionManager *m_webExtensionManager; // real, manifest.json-based Chrome-style extensions
-    QWebChannel *m_webChannel;
-    NativeBridge *m_nativeBridge;
-    SettingsBridge *m_settingsBridge;
-    TitleBar *m_titleBar;
-    QMenuBar *m_menuBar; // owned manually (not via menuBar()) so it can be nested below m_titleBar
+    QAction *m_zoomInAction = nullptr;
+    QAction *m_zoomOutAction = nullptr;
+    QAction *m_zoomResetAction = nullptr;
+    ExtensionManager *m_extensionManager = nullptr;
+    WebExtensionManager *m_webExtensionManager = nullptr; // real, manifest.json-based Chrome-style extensions
+    QWebChannel *m_webChannel = nullptr;
+    NativeBridge *m_nativeBridge = nullptr;
+    // Backs cloudar://bookmarks, /history, /downloads, /extensions and
+    // /permissions. Registered next to `native` on the same channel, which is
+    // only ever attached to internal pages.
+    InternalBridge *m_internalBridge = nullptr;
+    // Real favicons for internal pages, fed by BrowserTabWidget::wireView() and
+    // read by NewTabBridge / LightSchemeHandler.
+    FaviconStore *m_faviconStore = nullptr;
+    NewTabBridge *m_newTabBridge = nullptr;
+    SettingsBridge *m_settingsBridge = nullptr;
+    // Both are null on the classic chrome, which uses the OS window frame and
+    // QMainWindow's own menu bar; everything that touches them checks first.
+    TitleBar *m_titleBar = nullptr;
+    QMenuBar *m_menuBar = nullptr; // owned manually (not via menuBar()) so it can be nested below m_titleBar
     Qt::Edges m_resizeEdges;
     QPoint m_resizeStartGlobal;
     QRect m_resizeStartGeometry;
@@ -115,12 +142,34 @@ private:
     AISidebar *m_aiSidebar = nullptr;
     QAction *m_aiSidebarAction = nullptr;
     SplitView *m_splitView = nullptr;
-    QAction *m_splitViewAction = nullptr;
+    MemorySaver *m_memorySaver = nullptr;
+    QToolButton *m_classicPageIcon = nullptr;   // blue page glyph inside the omnibox
+    QToolButton *m_classicGoButton = nullptr;   // the 2009 "go" arrow
+    QAction *m_homeAction = nullptr;
+    QAction *m_themeClassicAction = nullptr;
+    QAction *m_themeModernAction = nullptr;
+    QAction *m_splitViewAction = nullptr;     // toolbar button (modern chrome only)
+    QAction *m_splitViewMenuAction = nullptr; // View > Split view, both chromes
     YouTubeDownloaderBridge *m_youtubeBridge = nullptr;
     TorrentDownloaderBridge *m_torrentBridge = nullptr;
     IdleEasterEgg *m_idleEasterEgg = nullptr;
 
     void buildTitleBar();  // frameless window chrome: title bar row + real menu bar, stacked as one unit
+    void applyChromeStyle();      // swaps frameless/modern for the classic windowed chrome
+    void buildClassicOmniboxDecor(); // page icon + go button inside the address field
+    QToolBar *m_navToolbar = nullptr;
+    QToolBar *m_bookmarkToolbar = nullptr;
+    void toggleSplitView(bool checked);
+    // The QWebEngineView navigation should act on: the split view's focused
+    // pane while it is up, otherwise the tab widget's current tab. Returns null
+    // when there is nothing to act on, so every caller can bail out the same way.
+    QWebEngineView *activeView() const;
+    // One message for both menu builders: they must not disagree about where
+    // the restart entry lives, which is exactly how the modern chrome ended up
+    // pointing at a Tools menu it does not have.
+    void announceStyleChange(Theme::ThemeStyle style);
+    void buildModernMenu();       // menu contents for the modern chrome
+    void buildClassicMenu();      // Chrome 2009-style Page/Tools menus
     void buildToolbar();
     void buildSidebar();
     void buildBookmarksBar(); // second toolbar row, directly below the nav toolbar

@@ -334,7 +334,7 @@ void ChromeExtensionAPI::alarmsCreate(const QString &extensionId, const QString 
         if (entryIt == extIt->end())
             return;
         if (entryIt->periodInMinutes > 0.0) {
-            entryIt->timer->start(static_cast<int>(std::max(1.0, entryIt->periodInMinutes) * 60000.0));
+            entryIt->timer->start(static_cast<int>((std::max)(1.0, entryIt->periodInMinutes) * 60000.0));
         } else {
             entryIt->timer->deleteLater();
             extIt->remove(name);
@@ -342,7 +342,7 @@ void ChromeExtensionAPI::alarmsCreate(const QString &extensionId, const QString 
     });
 
     m_alarms[extensionId].insert(name, AlarmEntry{timer, periodInMinutes});
-    timer->start(static_cast<int>(std::max(0.0, delayInMinutes) * 60000.0));
+    timer->start(static_cast<int>((std::max)(0.0, delayInMinutes) * 60000.0));
 }
 
 void ChromeExtensionAPI::alarmsClear(const QString &extensionId, const QString &name)

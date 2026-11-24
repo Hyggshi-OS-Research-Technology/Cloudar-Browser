@@ -1,0 +1,120 @@
+/* ==========================================================================
+   background.css — wallpaper surface (solid colour, image, live video).
+
+   The media itself is applied by scripts/background.js as inline styles on
+   <body> and on #bgVideo; this file only provides the classes that decide
+   *which* of those layers is visible.
+   ========================================================================== */
+
+/* --- Live wallpaper (local or remote video) ----------------------------- */
+
+.bg-video {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  min-width: 100%;
+  min-height: 100%;
+  width: auto;
+  height: auto;
+  z-index: 0;
+  transform: translate(-50%, -50%);
+  object-fit: cover;
+  display: none;
+  pointer-events: none;
+}
+
+body.video-bg {
+  animation: none;
+  background: #000;
+}
+
+body.video-bg .bg-video { display: block; }
+body.video-bg .blob { display: none; }
+body.video-bg .scrim { display: block; }
+
+/* A photo or a video makes the tiles' translucent glass unreadable; the scrim
+   above fixes the text, and this keeps the panel legible too. */
+body.custom-bg .panel,
+body.video-bg .panel {
+  background: var(--panel-bg);
+}
+
+/* --- Floating controls while a video wallpaper is playing ---------------- */
+
+.media-controls {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 10;
+  display: none;
+  gap: 8px;
+}
+.media-controls.show { display: flex; }
+
+.media-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(16, 19, 26, 0.75);
+  color: var(--text);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+  transition: transform 0.2s, background 0.2s;
+}
+.media-btn:hover {
+  transform: scale(1.08);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+html.classic .media-btn {
+  border-radius: 0;
+  background: linear-gradient(#fbfbfb, #e3e3e3);
+  border: 1px solid #a0a0a0;
+  color: #1a1a1a;
+  backdrop-filter: none;
+  transform: none;
+}
+html.classic .media-btn:hover { transform: none; background: linear-gradient(#f3f8fe, #d8e8fa); }
+
+/* --- Preview inside the customize panel --------------------------------- */
+
+.preview {
+  width: 100%;
+  height: 70px;
+  border-radius: 8px;
+  background-size: cover;
+  background-position: center;
+  margin-top: 8px;
+  border: 1px solid var(--field-border);
+  display: none;
+}
+.preview.show { display: block; }
+
+.video-preview-wrapper {
+  margin-top: 8px;
+  display: none;
+}
+.video-preview-wrapper.show { display: block; }
+.video-preview-wrapper video {
+  width: 100%;
+  height: 80px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid var(--field-border);
+}
+
+/* Status line that reports what the wallpaper is actually doing ("saved in
+   IndexedDB, 12.4 MB") — no invented sizes. */
+.bg-status {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 6px;
+  min-height: 14px;
+}
+.bg-status.warn { color: #e0803a; }
+html.classic .bg-status.warn { color: #a04000; }

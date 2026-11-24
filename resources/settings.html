@@ -24,6 +24,152 @@
       box-sizing: border-box;
     }
 
+    /* ------------------------------------------------------------------
+       Classic chrome variant of the settings page.
+
+       Only the chrome changes: the side navigation becomes a horizontal
+       2009-style toolbar and the panels lose their rounded corners, so the
+       settings UI does not look like a different product from the browser
+       around it. The class is applied from JS once the native side reports
+       which chrome is active.
+       ------------------------------------------------------------------ */
+    html.classic {
+      --bg: #e8e8e8;
+      --panel: #d4d0c8;
+      --panel-2: #ffffff;
+      --panel-3: #efefef;
+      --border: #a0a0a0;
+      --text: #1a1a1a;
+      --muted: #6b6b6b;
+    }
+
+    html.classic body {
+      font-family: Tahoma, "Segoe UI", Verdana, sans-serif;
+      font-size: 12px;
+    }
+
+    html.classic .layout {
+      flex-direction: column;
+    }
+
+    html.classic .sidebar {
+      width: 100%;
+      flex: 0 0 auto;
+      height: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 8px;
+      border-right: none;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(#f6f6f6, #dcdcdc);
+      overflow: visible;
+    }
+
+    html.classic .brand {
+      padding: 0 10px 0 2px;
+      gap: 6px;
+    }
+
+    html.classic .brand .mark {
+      width: 18px;
+      height: 18px;
+      border-radius: 2px;
+    }
+
+    html.classic .brand .name {
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    html.classic .search-box {
+      margin: 0;
+      width: 180px;
+    }
+
+    html.classic .search-box input {
+      padding: 3px 8px;
+      border-radius: 0;
+      font-size: 12px;
+      background: #fff;
+    }
+
+    html.classic nav.sections {
+      display: flex;
+      flex-direction: row;
+      gap: 2px;
+      flex-wrap: wrap;
+      overflow: visible;
+    }
+
+    html.classic nav.sections .item {
+      border-radius: 2px;
+      padding: 3px 8px;
+      margin: 0;
+      font-size: 12px;
+      color: var(--text);
+    }
+
+    html.classic nav.sections .item:hover {
+      background: #e4eefb;
+      border-color: #9fc3ef;
+    }
+
+    html.classic nav.sections .item.active {
+      background: #c3daf5;
+      border: 1px solid #7da2ce;
+      color: #1a1a1a;
+      font-weight: 600;
+    }
+
+    html.classic nav.sections .item .glyph {
+      display: none; /* 2009 had no emoji in menus */
+    }
+
+    html.classic main {
+      padding: 16px 20px;
+    }
+
+    html.classic .card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 0;
+      box-shadow: none;
+    }
+
+    html.classic .card-title {
+      border-bottom: 1px solid #d0d0d0;
+      padding-bottom: 6px;
+    }
+
+    html.classic h1 {
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    html.classic .switch .track {
+      border-radius: 0;
+      background: #fff;
+      border: 1px solid var(--border);
+    }
+
+    html.classic .switch .thumb {
+      border-radius: 0;
+      background: #d4d0c8;
+      border: 1px solid #8a8a8a;
+    }
+
+    html.classic .btn,
+    html.classic select,
+    html.classic input[type="text"] {
+      border-radius: 0;
+    }
+
+    html.classic .cpu-summary {
+      border-radius: 0;
+      background: #f7f7f7;
+    }
+
     html,
     body {
       margin: 0;
@@ -613,6 +759,21 @@
     .hidden {
       display: none !important;
     }
+
+    /* Hardware summary block on the performance page */
+    .cpu-summary {
+      margin: 0;
+      font-family: ui-monospace, "Cascadia Mono", "DejaVu Sans Mono", Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.55;
+      color: var(--text);
+      white-space: pre-wrap;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      max-width: 460px;
+    }
   </style>
 </head>
 
@@ -727,7 +888,63 @@
       <section class="page" data-page="appearance">
         <h1>Appearance</h1>
 
-        <div class="card" data-keywords="accent color theme title bar">
+        <div class="card" data-keywords="interface ui theme chrome classic modern 2009 retro skin layout">
+          <div class="card-title">Interface style</div>
+          <div class="row">
+            <div class="info">
+              <div class="label">Browser chrome</div>
+              <div class="desc">
+                <strong>Classic</strong> reproduces the Google Chrome 0.2/1.0 interface from 2009:
+                a native window frame, menu bar, grey gradient tab strip, 23&nbsp;px address bar with a page
+                icon and a &ldquo;go&rdquo; arrow, and a status bar.<br>
+                <strong>Modern</strong> is the dark, rounded chrome with a frameless window, vertical tab
+                sidebar and the AI panel.
+              </div>
+            </div>
+            <div class="control">
+              <select id="uiStyleSelect" class="field-wide">
+                <option value="classic">Classic (Chrome 2009)</option>
+                <option value="modern">Modern (dark)</option>
+              </select>
+            </div>
+          </div>
+          <div class="row">
+            <div class="info">
+              <div class="label">Show Home button</div>
+              <div class="desc">The house icon left of the address bar, as in Chrome 2009.</div>
+            </div>
+            <div class="control">
+              <span class="switch">
+                <input type="checkbox" id="showHomeToggle" checked>
+                <span class="track"><span class="thumb"></span></span>
+              </span>
+            </div>
+          </div>
+          <div class="row">
+            <div class="info">
+              <div class="label">Show bookmarks bar</div>
+              <div class="desc">The bookmark strip under the toolbar. Toggle it live with Ctrl+Shift+B.</div>
+            </div>
+            <div class="control">
+              <span class="switch">
+                <input type="checkbox" id="showBookmarkBarToggle" checked>
+                <span class="track"><span class="thumb"></span></span>
+              </span>
+            </div>
+          </div>
+          <div class="row">
+            <div class="info">
+              <div class="label">Restart required</div>
+              <div class="desc" id="uiStyleRestartHint">The window frame, tab placement and menu bar change with
+                the interface style, so a restart is needed for it to take effect.</div>
+            </div>
+            <div class="control">
+              <button class="btn secondary" id="restartNowBtn">Restart Cloudar</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" data-keywords="accent color theme title bar color">
           <div class="card-title">Accent color</div>
           <div class="swatches" id="accentSwatches"></div>
           <div class="row">
@@ -764,21 +981,24 @@
           <div class="row">
             <div class="info">
               <div class="label">Memory Inactivity Level</div>
-              <div class="desc">Choose how aggressively Cloudar Browser discards background tabs from RAM.</div>
+              <div class="desc">How long a background tab must stay idle before its renderer is released.
+                A discarded tab stays in the tab strip and reloads when you click it. The MB figures
+                quoted here are the per-tab estimate, not a measured benchmark.</div>
             </div>
             <div class="control">
               <select id="memorySaverLevelSelect" class="field-wide">
-                <option value="light">Light (Release memory after 2 hours — Saves ~15% RAM)</option>
-                <option value="medium" selected>Medium (Release memory after 1 hour — Saves ~30% RAM)</option>
-                <option value="high">High (Release memory after 15 mins — Saves ~50% RAM)</option>
-                <option value="ultra">Ultra (Immediate discard after 2 mins — Saves up to 75% RAM)</option>
+                <option value="light">Light &mdash; discard background tabs after 2 hours idle</option>
+                <option value="medium" selected>Medium &mdash; discard after 1 hour idle (recommended)</option>
+                <option value="high">High &mdash; discard after 15 minutes idle</option>
+                <option value="ultra">Ultra &mdash; discard after 2 minutes (most aggressive)</option>
               </select>
             </div>
           </div>
           <div class="row">
             <div class="info">
               <div class="label">Instant Memory Optimization</div>
-              <div class="desc">Immediately purge web caches and optimize memory footprint across all open tabs.</div>
+              <div class="desc">Discards every background tab's renderer and clears the HTTP cache. Tabs stay
+                in the tab strip and reload when you click them; unsaved form text in them is lost.</div>
             </div>
             <div class="control">
               <button class="btn primary" id="cleanMemoryBtn">&#9889; Clean Memory Now</button>
@@ -786,11 +1006,76 @@
           </div>
           <div class="row">
             <div class="info">
-              <div class="label">Memory Efficiency Status</div>
-              <div class="desc">Current system RAM footprint state.</div>
+              <div class="label">Tabs currently sleeping</div>
+              <div class="desc">Background tabs whose renderer has been released. Activating one reloads it.</div>
             </div>
             <div class="control">
-              <span id="memoryStatusBadge" class="status-badge active">&#127811; Optimal (Low RAM Footprint)</span>
+              <span id="memoryStatusBadge" class="status-badge active">0 tabs sleeping</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" data-keywords="cpu compatibility old hardware legacy pentium core 2 tier performance slow gpu acceleration graphics">
+          <div class="card-title">CPU &amp; hardware compatibility</div>
+          <div class="row">
+            <div class="info">
+              <div class="label">Detected hardware</div>
+              <div class="desc">Used to choose Chromium's raster thread count, renderer limit and whether GPU
+                compositing is attempted at all.</div>
+            </div>
+            <div class="control">
+              <span class="status-badge" id="cpuTierDetectedBadge">Detecting&hellip;</span>
+            </div>
+          </div>
+          <div class="row">
+            <div class="info">
+              <div class="label">Performance tier</div>
+              <div class="desc">
+                <strong>Auto</strong> picks a tier from the CPU, RAM and GPU. Override it if the automatic
+                choice is wrong for your machine (for example a VM with a broken GPU driver).<br>
+                <em>Takes effect after a restart.</em>
+              </div>
+            </div>
+            <div class="control">
+              <select id="cpuTierSelect" class="field-wide">
+                <option value="auto">Auto (recommended)</option>
+                <option value="legacy">Legacy &mdash; software rendering, no UI animation</option>
+                <option value="low">Low &mdash; older dual/quad core</option>
+                <option value="balanced">Balanced</option>
+                <option value="high">High &mdash; 8+ cores, 12 GB+ RAM</option>
+              </select>
+            </div>
+          </div>
+          <div class="row">
+            <div class="info">
+              <div class="label">Hardware acceleration</div>
+              <div class="desc">Use the GPU for page compositing. Turning this off fixes flickering and driver
+                crashes at the cost of CPU time. <em>Takes effect after a restart.</em></div>
+            </div>
+            <div class="control">
+              <span class="switch">
+                <input type="checkbox" id="hwAccelToggle" checked>
+                <span class="track"><span class="thumb"></span></span>
+              </span>
+            </div>
+          </div>
+          <div class="row">
+            <div class="info">
+              <div class="label">Interface animations</div>
+              <div class="desc">Tab fade-in, sidebar slide and the address-bar glow. Off by default on the
+                Legacy tier.</div>
+            </div>
+            <div class="control">
+              <span class="switch">
+                <input type="checkbox" id="animationsToggle" checked>
+                <span class="track"><span class="thumb"></span></span>
+              </span>
+            </div>
+          </div>
+          <div class="row">
+            <div class="info">
+              <div class="label">Hardware summary</div>
+              <div class="desc"><pre id="cpuSummary" class="cpu-summary">Reading&hellip;</pre></div>
             </div>
           </div>
         </div>
@@ -1112,7 +1397,20 @@
           </div>
           <div class="kv">
             <div class="k">Engine</div>
-            <div>Qt6 WebEngine (Chromium)</div>
+            <div>Qt&nbsp;<span id="aboutQtVersion">&mdash;</span> WebEngine
+              (Chromium&nbsp;<span id="aboutChromiumVersion">&mdash;</span>)</div>
+          </div>
+          <div class="kv">
+            <div class="k">Platform</div>
+            <div><span id="aboutPlatform">&mdash;</span> (<span id="aboutArch">&mdash;</span>)</div>
+          </div>
+          <div class="kv">
+            <div class="k">Interface</div>
+            <div><span id="aboutUiStyle">&mdash;</span></div>
+          </div>
+          <div class="kv">
+            <div class="k">Performance tier</div>
+            <div><span id="aboutCpuTier">&mdash;</span></div>
           </div>
           <div class="kv">
             <div class="k">Internal pages</div>
@@ -1335,6 +1633,20 @@
       document.getElementById('askLocationToggle').checked = !!data.askDownloadLocation;
       document.getElementById('aboutVersion').textContent = 'Version ' + data.version;
 
+      // Honest engine/build reporting: an old Chromium is the single most
+      // important security fact about a QtWebEngine browser, so it is shown
+      // here rather than left to a support request.
+      document.getElementById('aboutQtVersion').textContent = data.qtVersion || '?';
+      document.getElementById('aboutChromiumVersion').textContent = data.chromiumVersion || '?';
+      document.getElementById('aboutPlatform').textContent = data.platform || '?';
+      document.getElementById('aboutArch').textContent = data.arch || '?';
+      document.getElementById('aboutUiStyle').textContent =
+        data.uiStyle === 'classic' ? 'Classic (Chrome 2009)' : 'Modern (dark)';
+      document.getElementById('aboutCpuTier').textContent =
+        (data.cpuTierDetected || 'balanced') +
+        ((data.cpuTierSetting && data.cpuTierSetting !== 'auto') ? ' (forced: ' + data.cpuTierSetting + ')' : '') +
+        (data.renderMode === 'software' ? ' - software rendering' : ' - GPU compositing');
+
       // Performance & Memory Saver
       document.getElementById('memorySaverToggle').checked = (data.memorySaverEnabled !== false);
       document.getElementById('memorySaverLevelSelect').value = data.memorySaverLevel || 'medium';
@@ -1376,6 +1688,97 @@
         showToast('Downloads preference updated');
       });
 
+      // Interface style
+      var uiStyleSelect = document.getElementById('uiStyleSelect');
+      uiStyleSelect.value = data.uiStyle || 'classic';
+      // Reskin this page so it matches the chrome that is actually running (see
+      // the html.classic block in the stylesheet). The selected value and the
+      // running style diverge as soon as the user picks something else, and the
+      // page must keep following the *running* one: repainting itself classic
+      // while the window stays modern would suggest the switch had taken effect.
+      var runningStyle = data.uiStyleRunning || data.uiStyle || 'classic';
+      document.documentElement.classList.toggle('classic', runningStyle === 'classic');
+      uiStyleSelect.addEventListener('change', function (e) {
+        if (!bridge) return;
+        bridge.setUiStyle(e.target.value);
+        var pending = e.target.value !== runningStyle;
+        var hint = document.getElementById('uiStyleRestartHint');
+        if (hint) {
+          hint.innerHTML = pending
+            ? '<strong>A restart is pending</strong> &mdash; the ' + e.target.value +
+              ' interface will be used the next time Cloudar starts. The window ' +
+              'frame, tab placement and menu bar cannot change in place.'
+            : 'The window frame, tab placement and menu bar change with the interface-style setting.';
+        }
+        showToast('Interface style saved - restart Cloudar to apply it');
+      });
+      if (data.restartRequired) {
+        document.getElementById('uiStyleRestartHint').innerHTML =
+          '<strong>A restart is pending</strong> &mdash; the interface style or renderer configuration ' +
+          'changed since Cloudar started.';
+      }
+      document.getElementById('restartNowBtn').addEventListener('click', function () {
+        if (!bridge) return;
+        bridge.relaunch();
+      });
+      document.getElementById('showHomeToggle').checked = (data.showHomeButton !== false);
+      document.getElementById('showHomeToggle').addEventListener('change', function (e) {
+        if (!bridge) return;
+        bridge.setShowHomeButton(e.target.checked);
+        showToast(e.target.checked ? 'Home button shown' : 'Home button hidden');
+      });
+      document.getElementById('showBookmarkBarToggle').checked = (data.showBookmarkBar !== false);
+      document.getElementById('showBookmarkBarToggle').addEventListener('change', function (e) {
+        if (!bridge) return;
+        bridge.setShowBookmarkBar(e.target.checked);
+        showToast(e.target.checked ? 'Bookmarks bar shown' : 'Bookmarks bar hidden');
+      });
+
+      // CPU compatibility controls
+      document.getElementById('cpuTierSelect').value = data.cpuTierSetting || 'auto';
+      document.getElementById('cpuTierSelect').addEventListener('change', function (e) {
+        if (!bridge) return;
+        bridge.setCpuTierSetting(e.target.value);
+        showToast('Performance tier saved - restart Cloudar to apply it');
+      });
+      document.getElementById('hwAccelToggle').checked = (data.hardwareAcceleration !== false);
+      document.getElementById('hwAccelToggle').addEventListener('change', function (e) {
+        if (!bridge) return;
+        bridge.setHardwareAccelerationEnabled(e.target.checked);
+        showToast(e.target.checked ? 'Hardware acceleration will be enabled after a restart'
+                                   : 'Hardware acceleration will be disabled after a restart');
+      });
+      document.getElementById('animationsToggle').checked = (data.animationsEnabled !== false);
+      document.getElementById('animationsToggle').addEventListener('change', function (e) {
+        if (!bridge) return;
+        bridge.setAnimationsEnabled(e.target.checked);
+        showToast(e.target.checked ? 'Interface animations enabled' : 'Interface animations disabled (restart for toolbar effects)');
+      });
+      if (data.cpuSummary) document.getElementById('cpuSummary').textContent = data.cpuSummary;
+      document.getElementById('cpuTierDetectedBadge').textContent =
+        'Detected: ' + (data.cpuTierDetected || 'balanced').toUpperCase() +
+        (data.renderMode === 'software' ? ' | software rendering' : ' | GPU compositing');
+
+      // Live statistics refresh (sleeping tabs, released memory)
+      function refreshPerformanceStats() {
+        if (!bridge || typeof bridge.performanceStats !== 'function') return;
+        bridge.performanceStats(function (json) {
+          if (!json) return;
+          try {
+            var stats = JSON.parse(json);
+            var badge = document.getElementById('memoryStatusBadge');
+            var tabs = stats.sleptTabs || 0;
+            badge.textContent = tabs === 0 ? '0 tabs sleeping'
+              : tabs + ' tab' + (tabs === 1 ? '' : 's') + ' sleeping (~' +
+                Math.round(stats.releasedMbEstimate || 0) + ' MB released)';
+            badge.className = 'status-badge ' + (tabs > 0 ? 'active' : 'inactive');
+            if (stats.summary) document.getElementById('cpuSummary').textContent = stats.summary;
+          } catch (err) { /* a malformed snapshot must never break the page */ }
+        });
+      }
+      refreshPerformanceStats();
+      setInterval(refreshPerformanceStats, 5000);
+
       // Memory Saver Listeners
       document.getElementById('memorySaverToggle').addEventListener('change', function (e) {
         if (bridge) bridge.setMemorySaverEnabled(e.target.checked);
@@ -1393,13 +1796,15 @@
           bridge.cleanMemoryNow(function (freedMb) {
             btn.disabled = false;
             btn.innerHTML = '&#9889; Clean Memory Now';
-            showToast('Freed ~' + (freedMb || 165) + ' MB RAM successfully!');
+            showToast(freedMb > 0
+              ? 'Released about ' + freedMb + ' MB by discarding background tabs'
+              : 'Background tabs are already sleeping; caches were cleared');
           });
         } else {
           setTimeout(function () {
             btn.disabled = false;
             btn.innerHTML = '&#9889; Clean Memory Now';
-            showToast('Freed ~165 MB RAM successfully!');
+            showToast('Memory cleanup requires the native bridge');
           }, 400);
         }
       });

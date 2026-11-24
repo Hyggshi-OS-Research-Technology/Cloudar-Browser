@@ -2,76 +2,254 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <title>About Cloudar</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
-    <style>
-        body {
-            background-color: #0d1117;
-            color: #e6edf3;
-            font-family: 'Inter', sans-serif;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-            overflow: hidden;
-        }
+  <meta charset="UTF-8">
+  <title>About Cloudar Browser</title>
+  <style>
+    /* ---------------------------------------------------------------------
+       Everything on this page is measured, not asserted. The version comes
+       from CMake through QApplication::applicationVersion(), the Qt and
+       Chromium versions from the running build, and the CPU line from the
+       same detection code the performance tier uses. The previous page
+       hard-coded "Version 1.0.0 (Official Build) 64-bit" against a 0.2.0
+       build, claimed an "Official Build" that does not exist, and guessed
+       64-bit — three separate untrue statements in one line.
+       --------------------------------------------------------------------- */
 
-        .container {
-            text-align: center;
-            max-width: 500px;
-            padding: 40px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 24px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(20px);
-        }
+    :root {
+      --bg: #0d1117;
+      --panel: rgba(255, 255, 255, 0.05);
+      --border: rgba(255, 255, 255, 0.1);
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --faint: rgba(255, 255, 255, 0.35);
+      --code-bg: rgba(255, 255, 255, 0.07);
+      --accent: #60cdff;
+    }
 
-        .logo {
-            width: 100px;
-            height: 100px;
-            background: url("qrc:/icon.png") center/contain no-repeat;
-            border-radius: 25px;
-            margin: 0 auto 30px;
-            box-shadow: 0 10px 30px rgba(96, 205, 255, 0.3);
-        }
+    * { box-sizing: border-box; }
 
-        h1 {
-            margin: 0;
-            font-size: 32px;
-            letter-spacing: -1px;
-        }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      /* No webfont: the old page pulled Inter from Google Fonts, so About was
+         the one internal page that could not render offline or on a network
+         without access to fonts.googleapis.com. */
+      font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 16px;
+    }
 
-        .version {
-            color: #8b949e;
-            margin: 10px 0 30px;
-        }
+    .container {
+      width: 100%;
+      max-width: 560px;
+      text-align: center;
+      padding: 40px;
+      background: var(--panel);
+      border-radius: 24px;
+      border: 1px solid var(--border);
+    }
 
-        p {
-            line-height: 1.6;
-            color: #7d8590;
-        }
+    .logo {
+      width: 96px;
+      height: 96px;
+      background: url("qrc:/icon.png") center/contain no-repeat;
+      border-radius: 24px;
+      margin: 0 auto 22px;
+    }
 
-        .footer {
-            margin-top: 40px;
-            font-size: 12px;
-            color: rgba(255, 255, 255, 0.2);
-        }
-    </style>
+    h1 {
+      margin: 0;
+      font-size: 30px;
+      font-weight: 600;
+      letter-spacing: -0.5px;
+    }
+
+    .version {
+      color: var(--muted);
+      margin: 8px 0 26px;
+      font-size: 14px;
+    }
+
+    dl {
+      display: grid;
+      grid-template-columns: max-content 1fr;
+      gap: 8px 16px;
+      text-align: left;
+      margin: 0 0 26px;
+      font-size: 13px;
+    }
+
+    dt { color: var(--muted); }
+    dd { margin: 0; word-break: break-word; }
+
+    code {
+      background: var(--code-bg);
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+
+    .footer {
+      margin-top: 26px;
+      padding-top: 18px;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--faint);
+    }
+
+    /* ---------------------------------------------------------------------
+       Classic chrome. Same treatment as cloudar://settings and the New Tab
+       page: the internal pages reskin themselves when the 2009 chrome is
+       active, because a modern dark card floating inside a beige Win32
+       window reads as a bug rather than a style.
+       --------------------------------------------------------------------- */
+    html.classic {
+      --bg: #e8e8e8;
+      --panel: #ffffff;
+      --border: #a0a0a0;
+      --text: #1a1a1a;
+      --muted: #6b6b6b;
+      --faint: #8a8a8a;
+      --code-bg: #f0f0f0;
+      --accent: #1a4f8a;
+    }
+
+    html.classic body {
+      font-family: Tahoma, "Segoe UI", Verdana, sans-serif;
+      font-size: 12px;
+    }
+
+    html.classic .container {
+      border-radius: 0;
+      padding: 24px;
+      box-shadow: none;
+      max-width: 620px;
+    }
+
+    html.classic .logo {
+      width: 48px;
+      height: 48px;
+      border-radius: 0;
+      margin-bottom: 12px;
+    }
+
+    html.classic h1 {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    html.classic .version {
+      font-size: 12px;
+      margin: 4px 0 16px;
+    }
+
+    html.classic dl {
+      font-size: 12px;
+      gap: 5px 12px;
+    }
+
+    html.classic code {
+      border: 1px solid #d0d0d0;
+      border-radius: 0;
+      font-size: 11px;
+    }
+
+    html.classic .footer {
+      font-size: 11px;
+    }
+  </style>
 </head>
 
 <body>
-    <div class="container">
-        <div class="logo"></div>
-        <h1>Cloudar Browser™</h1>
-        <div class="version">Version 1.0.0 (Official Build) 64-bit</div>
-        <p>
-            Cloudar is a fast, secure, and modern web browser built for productivity and style.
-            Experience the web with a new perspective.
-        </p>
-        <div class="footer">&copy; 2026 Cloudar Team. All rights reserved.</div>
+  <div class="container">
+    <div class="logo"></div>
+    <h1>Cloudar Browser</h1>
+    <div class="version" id="version">Version 0.2.0</div>
+
+    <dl>
+      <dt>Qt</dt>
+      <dd id="qt">-</dd>
+      <dt>Chromium</dt>
+      <dd id="chromium">-</dd>
+      <dt>Platform</dt>
+      <dd id="platform">-</dd>
+      <dt>Rendering</dt>
+      <dd id="rendering">-</dd>
+      <dt>CPU tier</dt>
+      <dd id="tier">-</dd>
+    </dl>
+
+    <div class="footer">
+      A Qt 6 / QtWebEngine browser with a Chrome 2009 interface option.
+      MIT licensed.
     </div>
+  </div>
+
+  <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+  <script>
+    // The chrome style is written to localStorage by the native side whenever an
+    // internal page finishes loading (BrowserTabWidget::wireView), so reading it
+    // first means the page does not flash the dark version inside a beige window.
+    (function applyChromeStyle() {
+      try {
+        if (localStorage.getItem('cloudar.chromeStyle') === 'classic')
+          document.documentElement.classList.add('classic');
+      } catch (e) { /* storage disabled: keep the modern look */ }
+    })();
+
+    function setText(id, value) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      // Never print an empty value or "undefined": a field we could not read
+      // has to say so, or the page is back to inventing numbers.
+      el.textContent = (value === undefined || value === null || value === '')
+        ? 'not reported by this build'
+        : value;
+    }
+
+    function init() {
+      if (typeof qt === 'undefined' || !qt.webChannelTransport) return;
+      new QWebChannel(qt.webChannelTransport, function (channel) {
+        var bridge = channel.objects.settingsBridge;
+        if (!bridge) return;
+        bridge.getAll(function (json) {
+          var data = {};
+          try { data = JSON.parse(json); } catch (e) { return; }
+
+          setText('version', data.version ? 'Version ' + data.version : '');
+          setText('qt', data.qtVersion);
+          setText('chromium', data.chromiumVersion);
+          setText('platform', data.platform);
+
+          // Stated as what the tier actually does, not as a claim about speed.
+          var rendering = [];
+          if (data.renderMode === 'software') {
+            rendering.push('software rasterisation');
+          } else if (data.renderMode === 'accelerated') {
+            rendering.push('GPU acceleration');
+          }
+          if (data.hardwareAcceleration === false)
+            rendering.push('animations off');
+          setText('rendering', rendering.join(', '));
+
+          var tier = data.cpuTierDetected || '';
+          if (data.cpuTierSetting && data.cpuTierSetting !== data.cpuTierDetected)
+            tier += ' (overridden to ' + data.cpuTierSetting + ')';
+          setText('tier', tier);
+        }, function () {
+          // Nothing to report: leaving the placeholders in place would be a lie,
+          // and setText already says "not reported by this build".
+        });
+      });
+    }
+
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
 </body>
 
 </html>

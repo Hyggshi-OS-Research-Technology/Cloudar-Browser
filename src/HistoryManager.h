@@ -23,6 +23,11 @@ public:
     QVector<HistoryEntry> entries() const { return m_entries; }
     void clear();
 
+signals:
+    // Emitted after any change, so cloudar://history can refresh itself. The
+    // manager is the only writer, so the page never has to poll.
+    void changed();
+
 private:
     QString storagePath() const;
     void load();

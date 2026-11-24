@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>New Tab</title>
+
+<!-- The newtab page is split into these files; cloudar://newtab/assets/<path>
+     maps them one-to-one, so a stack trace or an inspector request points at
+     styles/base.css rather than at a 1,100-line HTML file. Load order matters
+     and is the dependency order: tokens before components, app.js before the
+     modules that call CloudarNewTab. -->
+<link rel="stylesheet" href="assets/styles/base.css">
+<link rel="stylesheet" href="assets/styles/themes.css">
+<link rel="stylesheet" href="assets/styles/background.css">
+<link rel="stylesheet" href="assets/styles/components.css">
+
+<!-- The one thing that cannot live in a deferred script: the classic/dark class
+     has to be on <html> before the stylesheets paint, or every New Tab flashes
+     the dark page inside a beige window. The native side writes this key on each
+     internal page load (BrowserTabWidget::wireView); scripts/app.js re-reads it
+     from the bridge afterwards, which is what makes --classic / CLOUDAR_THEME
+     show up here as well. -->
+<script>
+  try {
+    if (localStorage.getItem('cloudar.chromeStyle') === 'classic')
+      document.documentElement.classList.add('classic');
+  } catch (e) { /* storage disabled: keep the modern look */ }
+</script>
+</head>
+<body>
+  <video id="bgVideo" class="bg-video" autoplay loop muted playsinline></video>
+  <div class="scrim"></div>
+  <div class="blob one"></div>
+  <div class="blob two"></div>
+
+  <div class="media-controls" id="mediaControls">
+    <button class="media-btn" id="soundBtn" title="Toggle audio">&#128263;</button>
+    <button class="media-btn" id="playPauseBtn" title="Pause / Play">&#9208;</button>
+  </div>
+
+  <button class="customize-btn" id="customizeBtn" title="Customize this page">&#127912;</button>
+
+  <main class="content">
+    <h1 class="brand"><img src="qrc:/icon.png" alt="">Cloudar Browser</h1>
+
+    <form class="search" id="searchForm" autocomplete="off">
+      <input type="text" id="searchInput" name="q" placeholder="Search the web" autofocus>
+      <span class="search-engine" id="searchEngine"></span>
+    </form>
+
+    <div class="tiles">
+      <div class="tile" data-action="history" data-target="cloudar://history/">
+        <div class="icon">&#128337;</div>
+        <div class="label">History</div>
+      </div>
+      <div class="tile" data-action="downloads" data-target="cloudar://downloads/">
+        <div class="icon">&#8681;</div>
+        <div class="label">Downloads</div>
+      </div>
+      <div class="tile" data-action="extensions" data-target="cloudar://extensions/">
+        <div class="icon">&#129513;</div>
+        <div class="label">Extensions</div>
+      </div>
+      <div class="tile" data-action="settings" data-target="cloudar://settings/">
+        <div class="icon">&#9881;</div>
+        <div class="label">Settings</div>
+      </div>
+    </div>
+
+    <div class="speed-dial">
+      <div class="speed-tiles" id="speedTiles"></div>
+    </div>
+
+    <div class="recent" id="recent">
+      <div class="recent-inner" id="recentInner"></div>
+    </div>
+  </main>
+
+  <div class="footer">cloudar://newtab</div>
+
+  <div class="mini-overlay" id="addOverlay">
+    <div class="mini-dialog">
+      <h3>Add shortcut</h3>
+      <input type="text" id="addName" placeholder="Name" autocomplete="off">
+      <input type="text" id="addUrl" placeholder="https://example.com" autocomplete="off">
+      <div class="row">
+        <button class="secondary" id="addCancel" type="button">Cancel</button>
+        <button class="action" id="addConfirm" type="button">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <aside class="panel" id="panel">
+    <button class="close-btn" id="closePanel" type="button">&#10005;</button>
+    <h2>Customize this page</h2>
+
+    <section>
+      <label for="colorPicker">Background color</label>
+      <div class="swatches" id="swatches"></div>
+      <input type="color" id="colorPicker" value="#10131a">
+    </section>
+
+    <section>
+      <label for="imageFile">Background image or video (from this device)</label>
+      <input type="file" id="imageFile" accept="image/*,video/mp4,video/webm,video/ogg,video/*">
+      <div class="hint">Images (PNG, JPG, WebP) or videos (MP4, WebM for a live wallpaper).
+        Stored in this page's IndexedDB, not in localStorage.</div>
+      <div class="preview" id="imagePreview"></div>
+      <div class="video-preview-wrapper" id="videoPreviewWrapper">
+        <video id="videoPreview" muted loop autoplay playsinline></video>
+        <label style="font-size:12px; display:flex; align-items:center; gap:6px; margin-top:6px; cursor:pointer;">
+          <input type="checkbox" id="videoAudioToggle"> Enable sound
+        </label>
+      </div>
+    </section>
+
+    <section>
+      <label for="webImageUrl">Background media from the web (image or video URL)</label>
+      <input type="text" id="webImageUrl" placeholder="https://example.com/photo.jpg or video.mp4" autocomplete="off">
+      <button class="action" id="applyWebImage" type="button">Use this media</button>
+    </section>
+
+    <section>
+      <button class="action secondary" id="resetBg" type="button">Reset to default</button>
+    </section>
+
+    <div class="bg-status" id="bgStatus" role="status" aria-live="polite"></div>
+  </aside>
+
+  <script src="qrc:/qtwebchannel/qwebchannel.js"></script>
+  <script src="assets/scripts/app.js"></script>
+  <script src="assets/scripts/speed-dial.js"></script>
+  <script src="assets/scripts/search.js"></script>
+  <script src="assets/scripts/background.js"></script>
+  <script src="assets/scripts/customize.js"></script>
+  <script src="assets/components/search-bar.js"></script>
+  <script src="assets/components/quick-access.js"></script>
+  <script src="assets/components/customize-panel.js"></script>
+</body>
+</html>

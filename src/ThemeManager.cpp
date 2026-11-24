@@ -1,4 +1,5 @@
 #include "ThemeManager.h"
+#include "ClassicTheme.h"
 
 #include <QSettings>
 
@@ -49,9 +50,15 @@ QColor ThemeManager::readableTextOn(const QColor &bg)
 
 QString ThemeManager::appStyleSheet() const
 {
-    const QString accent = m_accent.name();
-    const QString accentHover = m_accent.lighter(115).name();
-    const QString text = readableTextOn(m_accent).name();
+    return Theme::appStyleSheet(m_accent);
+}
+
+QString ThemeManager::modernStyleSheet(const QColor &color) const
+{
+    const QColor accentColor = color.isValid() ? color : m_accent;
+    const QString accent = accentColor.name();
+    const QString accentHover = accentColor.lighter(115).name();
+    const QString text = readableTextOn(accentColor).name();
 
     // The custom TitleBar (see TitleBar.cpp) is the one place that's
     // fully accent-colored — that's the actual "recolor the title bar"

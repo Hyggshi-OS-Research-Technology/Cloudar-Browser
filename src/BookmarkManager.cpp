@@ -17,13 +17,48 @@ QString BookmarkManager::storagePath() const
     return dir + "/bookmarks.tsv";
 }
 
-void BookmarkManager::add(const QString &title, const QString &url)
+void BookmarkManager::add(const QString &title, const QString &url, const QString &folder)
 {
     if (contains(url))
         return;
-    m_entries.append(BookmarkEntry{title.isEmpty() ? url : title, url});
+    const QString cleanFolder = folder.trimmed();
+    if (!cleanFolder.isEmpty() && !m_folders.contains(cleanFolder))
+        m_folders.append(cleanFolder);
+    m_entries.append(BookmarkEntry{title.isEmpty() ? url : title, url, cleanFolder});
     save();
     emit changed();
+}
+
+void BookmarkManager::addFolder(const QString &name)
+{
+    const QString clean = name.trimmed();
+    // An empty name would be indistinguishable from "unfiled".
+    if (clean.isEmpty() || m_folders.contains(clean))
+        return;
+    m_folders.append(clean);
+    save();
+    emit changed();
+}
+
+void BookmarkManager::removeFolder(const QString &name, bool withBookmarks)
+{
+    if (!m_folders.removeOne(name))
+        return;
+    for (int i = m_entries.size() - 1; i >= 0; --i) {
+        if (m_entries[i].folder != name)
+            continue;
+        if (withBookmarks)
+            m_entries.remove(i);
+        else
+            m_entries[i].folder.clear();
+    }
+    save();
+    emit changed();
+}
+
+QStringList BookmarkManager::folders() const
+{
+    return m_folders;
 }
 
 void BookmarkManager::removeAt(int index)
@@ -76,10 +111,21 @@ void BookmarkManager::load()
     QTextStream in(&file);
     while (!in.atEnd()) {
         const QString line = in.readLine();
+        // Folders are stored as their own "FOLDER<TAB>name" rows rather than a
+        // header block: keeping one line per record means an empty folder
+        // survives a save/load cycle, and the two-column bookmark rows written
+        // by earlier versions still parse (they simply have no folder).
         const QStringList parts = line.split('\t');
-        if (parts.size() != 2)
-            continue;
-        m_entries.append(BookmarkEntry{parts[0], parts[1]});
+        if (parts.size() == 2 && parts[0] == QLatin1String("FOLDER")) {
+            if (!parts[1].isEmpty() && !m_folders.contains(parts[1]))
+                m_folders.append(parts[1]);
+        } else if (parts.size() == 2) {
+            m_entries.append(BookmarkEntry{parts[0], parts[1], QString()});
+        } else if (parts.size() == 3) {
+            if (!parts[2].isEmpty() && !m_folders.contains(parts[2]))
+                m_folders.append(parts[2]);
+            m_entries.append(BookmarkEntry{parts[0], parts[1], parts[2]});
+        }
     }
 }
 
@@ -90,6 +136,8 @@ void BookmarkManager::save() const
         return;
 
     QTextStream out(&file);
+    for (const QString &folder : m_folders)
+        out << "FOLDER\t" << folder << '\n';
     for (const auto &e : m_entries)
-        out << e.title << '\t' << e.url << '\n';
+        out << e.title << '\t' << e.url << '\t' << e.folder << '\n';
 }

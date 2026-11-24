@@ -18,6 +18,8 @@ class QTimer;
 class QToolButton;
 class TabPreviewPopup;
 class WebExtensionManager;
+class FaviconStore;
+class PageContextMenu;
 
 // A QTabWidget where each tab hosts one QWebEngineView. All views share a
 // single QWebEngineProfile so cookies/cache/history stay consistent and
@@ -54,6 +56,18 @@ public:
     // too — MainWindow does this right after constructing both objects.
     void setWebExtensionManager(WebExtensionManager *manager) { m_webExtensions = manager; }
 
+    // Optional. Every favicon Chromium decodes for a real page is handed to this
+    // store, which is how the New Tab speed dial can show actual site icons.
+    void setFaviconStore(FaviconStore *store) { m_favicons = store; }
+
+    // Optional. Installs a right-click menu on every page (see PageContextMenu,
+    // which explains why the platform default was not good enough). Named tabs
+    // and split panes are wired the same way.
+    void setContextMenuFactory(std::function<PageContextMenu *(QWebEngineView *)> factory)
+    {
+        m_contextMenuFactory = std::move(factory);
+    }
+
     // --- hooks for chrome.tabs.* / chrome.scripting.executeScript, wired
     // into WebExtensionManager by MainWindow. All of these use the tab's
     // current index as its "id", the same convention MainWindow's
@@ -66,13 +80,26 @@ public:
     void runJavaScriptInTab(int index, const QString &code,
                              std::function<void(const QString &resultJson)> callback);
 
+    // --- Memory Saver support (see MemorySaver.h) -------------------------
+    // Replaces the tab's live QWebEngineView with a static placeholder that
+    // can be rebuilt cheaply, returning `true` if the tab was slept. The
+    // caller (MemorySaver) owns the policy; this only performs the swap.
+    bool sleepTab(int index);
+    bool isTabSlept(int index) const;
     QIcon tabIcon(int index) const;
     QPixmap tabThumbnail(int index) const;
+
+    // The hover card is a top-level window, so it survives its parent being
+    // hidden or moved into a split view. Any caller that changes what is on
+    // screen (the split-view toggle, window close) has to dismiss it or it
+    // stays floating over unrelated content.
+    void hidePreview() { dismissPreview(); }
     static QIcon defaultFavicon(const QUrl &url);
 
     void showTabContextMenu(int index, const QPoint &globalPos);
     void reopenClosedTab();
     bool hasClosedTabs() const { return !m_closedTabUrls.isEmpty(); }
+    bool reopenTabAt(int index);
 
 signals:
     void urlChangedForCurrentTab(const QUrl &url);
@@ -103,6 +130,8 @@ private:
     QWebEngineProfile *m_profile;
     QWebChannel *m_channel;
     WebExtensionManager *m_webExtensions = nullptr;
+    FaviconStore *m_favicons = nullptr;
+    std::function<PageContextMenu *(QWebEngineView *)> m_contextMenuFactory;
     void wireView(QWebEngineView *view);
     void animateIn(QWidget *view);
 
@@ -118,10 +147,13 @@ private:
     TabPreviewPopup *m_previewPopup;
     QTimer *m_previewTimer;
     int m_hoveredTabIndex = -1;
+    // URL of every tab that Memory Saver has slept, keyed by tab index and
+    // dropped again when the tab is woken or closed.
+    QHash<int, QString> m_sleptUrls;
 
     void captureThumbnail(QWebEngineView *view);
     void showPreviewForTab(int index);
-    void hidePreview();
+    void dismissPreview();
 
     // --- "+" new-tab button, drawn right after the last tab in the tab
     // strip (Chrome/Firefox-style) instead of floating in the toolbar. ---

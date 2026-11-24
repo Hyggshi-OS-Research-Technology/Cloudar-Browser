@@ -28,12 +28,14 @@ void HistoryManager::addVisit(const QString &title, const QString &url)
         m_entries.resize(kMaxEntries);
 
     save();
+    emit changed();
 }
 
 void HistoryManager::clear()
 {
     m_entries.clear();
     save();
+    emit changed();
 }
 
 void HistoryManager::load()

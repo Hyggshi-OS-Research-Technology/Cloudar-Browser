@@ -3,9 +3,20 @@
         <file>icon.png</file>
         <file>close.svg</file>
         <file>close-hover.svg</file>
-        <file>newtab.html</file>
+        <file>newtab/index.html</file>
+        <file>newtab/styles/base.css</file>
+        <file>newtab/styles/themes.css</file>
+        <file>newtab/styles/background.css</file>
+        <file>newtab/styles/components.css</file>
+        <file>newtab/scripts/app.js</file>
+        <file>newtab/scripts/search.js</file>
+        <file>newtab/scripts/speed-dial.js</file>
+        <file>newtab/scripts/background.js</file>
+        <file>newtab/scripts/customize.js</file>
+        <file>newtab/components/search-bar.js</file>
+        <file>newtab/components/quick-access.js</file>
+        <file>newtab/components/customize-panel.js</file>
         <file>settings.html</file>
-        <file>version.html</file>
         <file>flags.html</file>
         <file>about.html</file>
         <file>bookmarks.html</file>

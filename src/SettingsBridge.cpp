@@ -1,8 +1,16 @@
 #include "SettingsBridge.h"
 #include "ThemeManager.h"
 #include "HistoryManager.h"
+#include "MainWindow.h"
+#include "MemorySaver.h"
+#include "PerformanceProfile.h"
+#include "ClassicTheme.h"
 
 #include <QWebEngineProfile>
+// qWebEngineChromiumVersion() is declared in qtwebenginecoreglobal.h. There is
+// no <QWebEngineCore> convenience header, so the module's own header is included
+// by path.
+#include <QtWebEngineCore/qtwebenginecoreglobal.h>
 #include <QWebEngineCookieStore>
 #include <QSettings>
 #include <QColorDialog>
@@ -10,8 +18,11 @@
 #include <QStandardPaths>
 #include <QWidget>
 #include <QDir>
+#include <QCoreApplication>
 #include <QJsonObject>
 #include <QJsonDocument>
+#include <QSysInfo>
+#include <QProcess>
 
 namespace {
 const char *kHomeKey = "browser/homePage";
@@ -74,6 +85,35 @@ QString SettingsBridge::getAll() const
     // Performance & Memory Saver (light / medium / high / ultra)
     obj["memorySaverEnabled"] = settings.value("performance/memorySaverEnabled", true).toBool();
     obj["memorySaverLevel"] = settings.value("performance/memorySaverLevel", "medium").toString();
+
+    // CPU / rendering compatibility
+    obj["animationsEnabled"] = animationsEnabled();
+    obj["hardwareAcceleration"] = hardwareAccelerationEnabled();
+    obj["cpuTierSetting"] = cpuTierSetting();
+    obj["cpuTierDetected"] = cpuTierDetected();
+    obj["cpuSummary"] = PerformanceProfile::summary();
+    obj["renderMode"] = PerformanceProfile::renderMode() == PerformanceProfile::RenderMode::Software
+                            ? "software" : "accelerated";
+    obj["chromiumFlags"] = PerformanceProfile::activeFlagSummary();
+
+    // Appearance
+    // Two different questions, two different answers: "uiStyle" is what the
+    // next launch will use (the control's value), "uiStyleRunning" is what this
+    // window is actually built from (used to reskin the page itself). They
+    // differ whenever the user has picked a style but not restarted, or launched
+    // with --classic/--modern.
+    obj["uiStyle"] = uiStyle();
+    obj["uiStyleRunning"] = Theme::keyFor(Theme::current());
+    obj["showHomeButton"] = settings.value("browser/showHomeButton", true).toBool();
+    obj["restartRequired"] = restartRequired();
+    obj["showBookmarkBar"] = settings.value("browser/bookmarkBarVisible", true).toBool();
+    obj["platform"] = QSysInfo::prettyProductName();
+    obj["arch"] = QSysInfo::currentCpuArchitecture();
+    obj["qtVersion"] = QString::fromLatin1(qVersion());
+    // A free function returning QString, not a QWebEngineProfile static: it
+    // reports the Chromium version this build of QtWebEngine was compiled
+    // against, which is what the About page claims.
+    obj["chromiumVersion"] = qWebEngineChromiumVersion();
 
     return QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
 }
@@ -170,13 +210,14 @@ void SettingsBridge::clearBrowsingData(bool history, bool cache, bool cookies)
     }
 }
 
-#include "MainWindow.h"
-#include <QCoreApplication>
-#include <QProcess>
-
 QString SettingsBridge::appVersion() const
 {
-    return "0.1.0";
+    // Single source of truth is QApplication::applicationVersion(), which main()
+    // sets from the CMake project version. The compile-time fallback only
+    // matters if a SettingsBridge is ever constructed before that call, and it
+    // keeps the About page from rendering a blank version.
+    const QString version = QCoreApplication::applicationVersion();
+    return version.isEmpty() ? QStringLiteral(CLOUDAR_VERSION) : version;
 }
 
 bool SettingsBridge::isSidebarEnabled() const
@@ -312,8 +353,150 @@ void SettingsBridge::setMemorySaverLevel(const QString &level)
 
 int SettingsBridge::cleanMemoryNow()
 {
+    // Two pools, in the order that returns the most first:
+    //   1. background renderers — MemorySaver tears them down entirely,
+    //   2. the profile's HTTP cache and visited-link store.
+    // The returned figure is an estimate for the renderers (QtWebEngine exposes
+    // no per-tab RSS); the settings page labels it accordingly.
+    int mb = 0;
+    if (auto *mw = qobject_cast<MainWindow *>(m_parentWidget)) {
+        if (MemorySaver *saver = mw->memorySaver())
+            mb += saver->discardAllBackgroundTabs();
+    }
+
     if (m_profile) {
         m_profile->clearHttpCache();
+        m_profile->clearAllVisitedLinks();
     }
-    return 145 + (std::rand() % 40);
+
+    emit settingsChanged();
+    return mb;
+}
+
+QString SettingsBridge::performanceStats() const
+{
+    QJsonObject obj;
+    const auto info = PerformanceProfile::cpuInfo();
+    obj["logicalCores"] = info.logicalCores;
+    obj["physicalCores"] = info.physicalCores;
+    obj["ramMb"] = static_cast<double>(info.ramMb);
+    obj["tierDetected"] = cpuTierDetected();
+    obj["tierLabel"] = PerformanceProfile::tierLabel(PerformanceProfile::tier());
+    obj["tierSetting"] = cpuTierSetting();
+    obj["animationsEnabled"] = animationsEnabled();
+    obj["renderMode"] = PerformanceProfile::renderMode() == PerformanceProfile::RenderMode::Software
+                            ? "software" : "accelerated";
+    obj["summary"] = PerformanceProfile::summary();
+    obj["chromiumFlags"] = PerformanceProfile::activeFlagSummary();
+
+    if (auto *mw = qobject_cast<MainWindow *>(m_parentWidget)) {
+        if (MemorySaver *saver = mw->memorySaver()) {
+            obj["sleptTabs"] = saver->sleptTabCount();
+            obj["releasedMbEstimate"] =
+                static_cast<double>(saver->approximatedFreedBytes() / (1024.0 * 1024.0));
+            obj["thresholdMinutes"] = saver->thresholdMs() / 60000;
+        }
+    }
+    return QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+}
+
+bool SettingsBridge::animationsEnabled() const
+{
+    return PerformanceProfile::animationsEnabled();
+}
+
+void SettingsBridge::setAnimationsEnabled(bool enabled)
+{
+    PerformanceProfile::setAnimationsEnabled(enabled);
+    emit settingsChanged();
+}
+
+bool SettingsBridge::hardwareAccelerationEnabled() const
+{
+    return QSettings().value("performance/hardwareAcceleration", true).toBool();
+}
+
+void SettingsBridge::setHardwareAccelerationEnabled(bool enabled)
+{
+    QSettings().setValue("performance/hardwareAcceleration", enabled);
+    emit settingsChanged();
+}
+
+QString SettingsBridge::uiStyle() const
+{
+    // The *saved* preference, so this control is not confused by a launch-time
+    // --classic / --modern / CLOUDAR_THEME override; restartRequired() is what
+    // reports "the running chrome is not the one you chose".
+    return Theme::keyFor(Theme::savedStyle());
+}
+
+void SettingsBridge::setUiStyle(const QString &style)
+{
+    Theme::ThemeStyle parsed;
+    if (!Theme::styleFromKey(style, &parsed))
+        return;
+    // Save only. An interface style is not a skin: it decides the window model
+    // (frameless vs. decorated), which tab surface exists and which menu bar is
+    // built, none of which can be swapped on a living window. Applying the new
+    // stylesheet alone would leave a half-classic window, so the change lands on
+    // the next launch and restartRequired() tells the settings page to say so.
+    Theme::setCurrent(parsed);
+    emit settingsChanged();
+}
+
+QString SettingsBridge::cpuTierSetting() const
+{
+    const QString value = QSettings().value("performance/cpuTier").toString();
+    return value.isEmpty() ? QStringLiteral("auto") : value;
+}
+
+void SettingsBridge::setCpuTierSetting(const QString &tier)
+{
+    PerformanceProfile::setForcedTier(tier);
+    emit settingsChanged();
+}
+
+void SettingsBridge::setShowHomeButton(bool enabled)
+{
+    QSettings().setValue("browser/showHomeButton", enabled);
+    emit settingsChanged();
+}
+
+void SettingsBridge::setShowBookmarkBar(bool enabled)
+{
+    QSettings().setValue("browser/bookmarkBarVisible", enabled);
+    emit settingsChanged();
+}
+
+bool SettingsBridge::restartRequired() const
+{
+    // Two settings change something that is fixed for the lifetime of a process:
+    //   - the interface style decides the window model (frameless vs.
+    //     decorated), the tab surface and which menu bar is built,
+    //   - the performance tier is baked into QTWEBENGINE_CHROMIUM_FLAGS.
+    // If either has changed since startup, the settings page says a restart is
+    // pending and offers the button, instead of quietly doing nothing.
+    QSettings settings;
+
+    // The running chrome against the saved preference. No timestamp or snapshot
+    // is needed: Theme::current() is what this process built its window from and
+    // Theme::savedStyle() is what the next launch will use. A launch-time
+    // --classic/--modern override also shows up here, which is correct — the
+    // next plain launch will look different.
+    if (Theme::current() != Theme::savedStyle())
+        return true;
+
+    const QString tierAtStartup = settings.value("performance/cpuTierAtStartup").toString();
+    if (tierAtStartup.isEmpty())
+        return false; // launched by a build that did not record it
+
+    // The tier that is actually in effect now, including a --perf-tier override.
+    return tierAtStartup != PerformanceProfile::tierKey(PerformanceProfile::tier());
+}
+
+QString SettingsBridge::cpuTierDetected() const
+{
+    // The hardware-only answer, ignoring any saved or environment override, so
+    // the settings page can show "detected: X" next to "in use: Y".
+    return PerformanceProfile::tierKey(PerformanceProfile::detectTierFromHardware());
 }

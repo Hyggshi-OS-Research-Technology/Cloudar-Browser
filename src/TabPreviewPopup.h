@@ -15,7 +15,13 @@ class TabPreviewPopup : public QWidget
 public:
     explicit TabPreviewPopup(QWidget *parent = nullptr);
 
-    void setContent(const QPixmap &thumbnail, const QString &title, const QUrl &url = QUrl(), int tabIndex = 0);
+    // `state` is a short, accurate description of the tab's memory state
+    // ("Active", "Background", "Sleeping"). It replaces the old per-tab
+    // "Memory usage: N MB" line, which was a hash of the URL rather than a
+    // measurement and misled users into thinking tabs were expensive when
+    // they were not.
+    void setContent(const QPixmap &thumbnail, const QString &title, const QUrl &url = QUrl(),
+                    const QString &state = QString());
     void fadeIn();
     void fadeOut();
 
@@ -29,6 +35,6 @@ private:
     QLabel *m_titleLabel;
     QLabel *m_domainLabel;
     QLabel *m_thumbnailLabel;
-    QLabel *m_memoryIcon;
-    QLabel *m_memoryLabel;
+    QLabel *m_stateIcon;
+    QLabel *m_stateLabel;
 };

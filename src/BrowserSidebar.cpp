@@ -1,5 +1,6 @@
 #include "BrowserSidebar.h"
 #include "BrowserTabWidget.h"
+#include "ClassicTheme.h"
 
 #include <QHBoxLayout>
 #include <QVBoxLayout>
@@ -16,8 +17,12 @@
 #include <QFrame>
 #include <QPainter>
 #include <QPainterPath>
+#include <QRectF>
 
 namespace {
+// Kept in sync with Theme::Metrics::sidebarCollapsedWidth / ExpandedWidth; the
+// classic chrome hides this widget entirely, so these only describe the modern
+// chrome.
 constexpr int kCollapsedWidth = 54;
 constexpr int kExpandedMaxWidth = 420;
 
@@ -36,13 +41,18 @@ public:
         layout->setSpacing(6);
 
         m_titleLabel = new QLabel(this);
-        m_titleLabel->setStyleSheet(QStringLiteral("color: #f8fafc; font-size: 13px; font-weight: 700; background: transparent;"));
+        // Same rule as TabPreviewPopup: these cards float over the page, so their
+        // colours come from the active chrome instead of the modern palette.
+        const Theme::PopupColors colors = Theme::popupColors();
+        m_titleLabel->setStyleSheet(QStringLiteral("color: %1; font-size: 13px; font-weight: 700; background: transparent;")
+                                        .arg(colors.text.name()));
         m_titleLabel->setWordWrap(true);
         m_titleLabel->setMaximumWidth(260);
         layout->addWidget(m_titleLabel);
 
         m_domainLabel = new QLabel(this);
-        m_domainLabel->setStyleSheet(QStringLiteral("color: #94a3b8; font-size: 12px; font-weight: 500; background: transparent;"));
+        m_domainLabel->setStyleSheet(QStringLiteral("color: %1; font-size: 12px; font-weight: 500; background: transparent;")
+                                         .arg(colors.dim.name()));
         layout->addWidget(m_domainLabel);
 
         m_thumbnailLabel = new QLabel(this);
@@ -50,7 +60,8 @@ public:
         m_thumbnailLabel->setScaledContents(true);
         m_thumbnailLabel->setAlignment(Qt::AlignCenter);
         m_thumbnailLabel->setStyleSheet(
-            QStringLiteral("background-color: #16181f; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.08);")
+            QStringLiteral("background-color: %1; border-radius: 4px; border: 1px solid %2;")
+                .arg(colors.placeholder.name(), colors.border.name())
         );
         layout->addWidget(m_thumbnailLabel);
 
@@ -63,13 +74,14 @@ public:
         footerLayout->setContentsMargins(0, 2, 0, 0);
         footerLayout->setSpacing(6);
 
-        m_memoryIcon = new QLabel(QStringLiteral("🍃"), this);
-        m_memoryIcon->setStyleSheet(QStringLiteral("font-size: 12px; background: transparent;"));
-        footerLayout->addWidget(m_memoryIcon);
+        m_stateIcon = new QLabel(this);
+        m_stateIcon->setStyleSheet(QStringLiteral("font-size: 12px; background: transparent;"));
+        footerLayout->addWidget(m_stateIcon);
 
-        m_memoryLabel = new QLabel(this);
-        m_memoryLabel->setStyleSheet(QStringLiteral("color: #cbd5e1; font-size: 12px; font-weight: 500; background: transparent;"));
-        footerLayout->addWidget(m_memoryLabel);
+        m_stateLabel = new QLabel(this);
+        m_stateLabel->setStyleSheet(QStringLiteral("color: %1; font-size: 12px; font-weight: 500; background: transparent;")
+                                        .arg(colors.dim.name()));
+        footerLayout->addWidget(m_stateLabel);
         footerLayout->addStretch();
         layout->addLayout(footerLayout);
 
@@ -80,7 +92,8 @@ public:
         setGraphicsEffect(shadow);
     }
 
-    void setTabInfo(const QString &title, const QUrl &url, int tabIndex, const QPixmap &thumbnail)
+    void setTabInfo(const QString &title, const QUrl &url, const QPixmap &thumbnail,
+                    const QString &state)
     {
         m_titleLabel->setText(title.isEmpty() ? QStringLiteral("New Tab") : title);
 
@@ -100,17 +113,20 @@ public:
             QPainter p(&rounded);
             p.setRenderHint(QPainter::Antialiasing);
             QPainterPath path;
-            path.addRoundedRect(QRectF(0, 0, 260, 146), 8, 8);
+            // The thumbnail's corners track the card's: the classic chrome uses a
+            // 3 px radius everywhere, the modern one 8 px here and 12 px on the card.
+            const qreal cornerRadius = Theme::current() == Theme::ThemeStyle::Classic ? 3.0 : 8.0;
+            path.addRoundedRect(QRectF(0, 0, 260, 146), cornerRadius, cornerRadius);
             p.setClipPath(path);
             p.drawPixmap(0, 0, 260, 146, thumbnail.scaled(260, 146, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation));
             p.end();
             m_thumbnailLabel->setPixmap(rounded);
         } else {
             QPixmap placeholder(260, 146);
-            placeholder.fill(QColor("#16181f"));
+            placeholder.fill(Theme::popupColors().placeholder);
             QPainter p(&placeholder);
             p.setRenderHint(QPainter::Antialiasing);
-            p.setPen(QColor("#64748b"));
+            p.setPen(Theme::popupColors().dim);
             QFont f = font();
             f.setPointSize(10);
             p.setFont(f);
@@ -119,8 +135,13 @@ public:
             m_thumbnailLabel->setPixmap(placeholder);
         }
 
-        int memMb = 120 + (std::abs((int)qHash(url.toString())) % 65) + (tabIndex * 12);
-        m_memoryLabel->setText(QStringLiteral("Memory usage: %1 MB").arg(memMb));
+        // Truthful state label. The previous implementation printed a value
+        // derived from qHash(url) and called it "Memory usage", which was not
+        // a measurement of anything.
+        const bool sleeping = state.startsWith(QStringLiteral("Sleeping"), Qt::CaseInsensitive);
+        m_stateIcon->setText(sleeping ? QString::fromUtf8("\xF0\x9F\x92\xA4")
+                                      : QString::fromUtf8("\xE2\x97\x8F"));
+        m_stateLabel->setText(state.isEmpty() ? QStringLiteral("Background") : state);
 
         adjustSize();
     }
@@ -130,17 +151,23 @@ protected:
     {
         QPainter p(this);
         p.setRenderHint(QPainter::Antialiasing);
-        p.setBrush(QColor("#20222a"));
-        p.setPen(QPen(QColor(255, 255, 255, 36), 1));
-        p.drawRoundedRect(rect().adjusted(1, 1, -1, -1), 12, 12);
+        // `surface` is the card itself; `placeholder` is the empty-thumbnail box
+        // drawn inside it. Conflating the two made the classic tooltip look like
+        // a dark rectangle with a dark box on it.
+        const Theme::PopupColors colors = Theme::popupColors();
+        const bool classic = Theme::current() == Theme::ThemeStyle::Classic;
+        p.setBrush(colors.surface);
+        p.setPen(QPen(classic ? colors.border : QColor(255, 255, 255, 36), 1));
+        const qreal radius = classic ? 3.0 : 12.0;
+        p.drawRoundedRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5), radius, radius);
     }
 
 private:
     QLabel *m_titleLabel;
     QLabel *m_domainLabel;
     QLabel *m_thumbnailLabel;
-    QLabel *m_memoryIcon;
-    QLabel *m_memoryLabel;
+    QLabel *m_stateIcon;
+    QLabel *m_stateLabel;
 };
 
 class SidebarTabItemWidget : public QWidget
@@ -170,8 +197,10 @@ public:
         layout->addWidget(m_iconLabel);
 
         m_titleLabel = new QLabel(title, this);
-        m_titleLabel->setStyleSheet(isCurrent ? QStringLiteral("color: #ffffff; font-weight: 600; font-size: 13px;")
-                                              : QStringLiteral("color: #d9deea; font-size: 13px;"));
+        const Theme::PopupColors colors = Theme::popupColors();
+        m_titleLabel->setStyleSheet(isCurrent
+            ? QStringLiteral("color: %1; font-weight: 600; font-size: 13px;").arg(colors.text.name())
+            : QStringLiteral("color: %1; font-size: 13px;").arg(colors.dim.name()));
         m_titleLabel->setAttribute(Qt::WA_TransparentForMouseEvents, true);
         m_titleLabel->setVisible(expanded);
         layout->addWidget(m_titleLabel, 1);
@@ -220,7 +249,12 @@ protected:
 
             if (m_hoverCard && m_tabs) {
                 const QPixmap thumbnail = m_tabs->tabThumbnail(m_index);
-                m_hoverCard->setTabInfo(m_title, m_url, m_index, thumbnail);
+                const bool slept = m_tabs->isTabSlept(m_index);
+                const bool active = (m_tabs->currentIndex() == m_index);
+                m_hoverCard->setTabInfo(m_title, m_url, thumbnail,
+                                        slept ? QStringLiteral("Sleeping (memory released)")
+                                              : active ? QStringLiteral("Active renderer")
+                                                       : QStringLiteral("Background renderer"));
                 const QPoint globalPos = mapToGlobal(QPoint(width() + 10, -6));
                 m_hoverCard->move(globalPos);
                 m_hoverCard->show();
@@ -357,8 +391,13 @@ void BrowserSidebar::refresh()
 
     for (int i = 0; i < m_tabs->count(); ++i) {
         auto *view = qobject_cast<QWebEngineView *>(m_tabs->widget(i));
-        const QString title = view && !view->title().isEmpty() ? view->title() : QStringLiteral("New Tab");
-        const QUrl url = view ? view->url() : QUrl();
+        // A slept tab has no view; its title/URL live on the tab bar itself.
+        const QString tabLabel = m_tabs->tabText(i);
+        const QString title = view && !view->title().isEmpty() ? view->title()
+                                                              : (tabLabel.isEmpty()
+                                                                     ? QStringLiteral("New Tab")
+                                                                     : tabLabel);
+        const QUrl url = view ? view->url() : QUrl(m_tabs->urlForTabIndex(i));
         const QIcon icon = m_tabs->tabIcon(i);
 
         auto *item = new QListWidgetItem(m_tabList);

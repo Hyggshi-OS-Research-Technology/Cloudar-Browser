@@ -1,0 +1,434 @@
+/* ==========================================================================
+   components.css — everything the page renders: search bar, shortcuts, the
+   customize panel, the add-shortcut dialog and the media tiles.
+   ========================================================================== */
+
+/* --- Search bar --------------------------------------------------------- */
+
+form.search {
+  width: 560px;
+  max-width: 80vw;
+  position: relative;
+  margin-bottom: 34px;
+}
+form.search input {
+  width: 100%;
+  padding: 14px 20px;
+  border-radius: var(--radius-field);
+  border: 1px solid var(--field-border);
+  background: var(--field-bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+form.search input:focus {
+  border-color: var(--accent);
+  background: var(--field-bg);
+  box-shadow: 0 0 0 4px rgba(45, 127, 249, 0.15);
+}
+html.classic form.search input {
+  font-size: 12px;
+  padding: 5px 8px;
+  box-shadow: none;
+}
+html.classic form.search input:focus {
+  border-color: #7aadea;
+  box-shadow: none;
+}
+
+/* The engine name is a fact reported by the bridge, not a decoration. */
+.search-engine {
+  position: absolute;
+  right: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  color: var(--muted);
+  pointer-events: none;
+}
+html.classic .search-engine { display: none; }
+
+/* --- Built-in tiles (history / downloads / extensions / settings) -------- */
+
+.tiles {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 4px;
+}
+.tile {
+  width: 108px;
+  padding: 16px 8px;
+  border-radius: var(--radius-tile);
+  background: var(--tile-bg);
+  border: 1px solid var(--tile-border);
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+  opacity: 0;
+  transform: translateY(10px);
+  animation: riseIn 0.5s ease-out forwards;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.tile:hover { background: var(--tile-bg-hover); transform: translateY(-2px); }
+.tile:active { transform: translateY(0); }
+.tile .icon { font-size: 22px; margin-bottom: 6px; }
+.tile .label { font-size: 12px; color: var(--muted); }
+
+.tile:nth-child(1) { animation-delay: 0.20s; }
+.tile:nth-child(2) { animation-delay: 0.28s; }
+.tile:nth-child(3) { animation-delay: 0.36s; }
+.tile:nth-child(4) { animation-delay: 0.44s; }
+
+html.classic .tile {
+  animation: none;
+  opacity: 1;
+  transform: none;
+  width: 96px;
+  padding: 12px 6px;
+}
+html.classic .tile:hover { transform: none; }
+
+/* --- Speed dial --------------------------------------------------------- */
+
+.speed-dial {
+  margin-top: 26px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+.speed-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  max-width: 560px;
+  justify-content: center;
+}
+
+.speed-tile {
+  position: relative;
+  width: 92px;
+  padding: 14px 6px 10px;
+  border-radius: var(--radius-tile);
+  background: var(--tile-bg);
+  border: 1px solid var(--tile-border);
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.15s ease, background 0.15s ease, opacity 0.15s ease;
+}
+.speed-tile:hover { background: var(--tile-bg-hover); transform: translateY(-2px); }
+.speed-tile:active { transform: translateY(0); }
+.speed-tile.dragging { opacity: 0.35; }
+.speed-tile.drag-over { border-color: var(--accent); }
+
+/* The letter is a fallback, not the design: it is only shown when the real
+   favicon is unavailable (no cached icon, /favicon.ico unreachable). */
+.speed-tile .favicon {
+  width: 34px;
+  height: 34px;
+  margin: 0 auto 6px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  text-transform: uppercase;
+  overflow: hidden;
+  background: var(--tile-bg-hover);
+}
+.speed-tile .favicon img {
+  width: 22px;
+  height: 22px;
+  display: block;
+  image-rendering: -webkit-optimize-contrast;
+}
+.speed-tile .favicon.real {
+  background: transparent;
+  border: none;
+}
+
+.speed-tile .label {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.speed-tile .remove-btn {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(20, 22, 30, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+.speed-tile:hover .remove-btn { opacity: 1; }
+.speed-tile .remove-btn:hover { color: #ff6b6b; }
+
+.speed-tile.add-tile {
+  background: transparent;
+  border: 1px dashed var(--tile-border);
+}
+.speed-tile.add-tile:hover { background: var(--tile-bg); }
+.speed-tile.add-tile .favicon {
+  background: transparent;
+  border: 1px dashed var(--tile-border);
+  color: var(--muted);
+  font-size: 18px;
+}
+
+html.classic .speed-tile { animation: none; }
+html.classic .speed-tile:hover { transform: none; }
+html.classic .speed-tile .remove-btn {
+  border-radius: 0;
+  background: #f0f0f0;
+  border: 1px solid #a0a0a0;
+  color: #444;
+  line-height: 15px;
+}
+
+/* --- Recent history strip ("continue browsing") ------------------------- */
+
+.recent {
+  margin-top: 22px;
+  width: 100%;
+  display: none;
+  justify-content: center;
+}
+.recent.show { display: flex; }
+.recent-inner {
+  display: flex;
+  gap: 10px;
+  max-width: 620px;
+  overflow-x: auto;
+  padding: 2px 4px 6px;
+}
+.recent-item {
+  flex: 0 0 auto;
+  max-width: 190px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
+  border-radius: var(--radius-tile);
+  background: var(--tile-bg);
+  border: 1px solid var(--tile-border);
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.recent-item:hover { background: var(--tile-bg-hover); color: var(--text); }
+.recent-item img { width: 14px; height: 14px; flex: 0 0 auto; }
+
+/* --- Customize button + panel ------------------------------------------- */
+
+.customize-btn {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--tile-bg);
+  border: 1px solid var(--field-border);
+  color: var(--text);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.customize-btn:hover { background: var(--tile-bg-hover); transform: rotate(20deg); }
+
+html.classic .customize-btn {
+  border-radius: 0;
+  background: linear-gradient(#fbfbfb, #e3e3e3);
+  border: 1px solid #a0a0a0;
+  color: #1a1a1a;
+}
+html.classic .customize-btn:hover { transform: none; }
+
+.panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: 300px;
+  max-width: 86vw;
+  background: var(--panel-bg);
+  backdrop-filter: blur(14px);
+  border-left: 1px solid var(--panel-border);
+  z-index: 3;
+  padding: 22px 20px;
+  transform: translateX(100%);
+  transition: transform 0.25s ease;
+  overflow-y: auto;
+}
+.panel.open { transform: translateX(0); }
+html.classic .panel { backdrop-filter: none; }
+
+.panel h2 {
+  font-size: 15px;
+  margin: 0 0 18px 0;
+  font-weight: 600;
+}
+.panel .close-btn {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 18px;
+  cursor: pointer;
+}
+.panel section { margin-bottom: 22px; }
+.panel label {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.swatch {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+}
+.swatch:hover, .swatch.active { border-color: var(--text); }
+html.classic .swatch { border-radius: 0; }
+
+.panel input[type="color"] {
+  width: 100%;
+  height: 34px;
+  border: none;
+  border-radius: var(--radius-panel);
+  background: transparent;
+  cursor: pointer;
+}
+.panel input[type="text"],
+.panel input[type="file"] {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius-panel);
+  border: 1px solid var(--field-border);
+  background: var(--field-bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+html.classic .panel input[type="text"],
+html.classic .panel input[type="file"] { font-size: 12px; padding: 4px 6px; }
+
+.panel button.action {
+  width: 100%;
+  padding: 9px;
+  border-radius: var(--radius-panel);
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 6px;
+}
+.panel button.action:hover { filter: brightness(1.08); }
+.panel button.secondary {
+  background: var(--tile-bg-hover);
+  color: var(--text);
+  border: none;
+  border-radius: var(--radius-panel);
+  padding: 9px;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+}
+
+.panel .hint {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+/* --- Add-shortcut dialog ------------------------------------------------ */
+
+.mini-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 7, 11, 0.55);
+  z-index: 4;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.mini-overlay.open { display: flex; }
+
+.mini-dialog {
+  width: 300px;
+  max-width: 86vw;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-tile);
+  padding: 20px;
+}
+.mini-dialog h3 {
+  margin: 0 0 14px 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.mini-dialog input[type="text"] {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius-panel);
+  border: 1px solid var(--field-border);
+  background: var(--field-bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+.mini-dialog .row { display: flex; gap: 8px; }
+.mini-dialog .row button {
+  flex: 1;
+  padding: 9px;
+  border-radius: var(--radius-panel);
+  border: none;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.mini-dialog .row button.action { background: var(--accent); color: #fff; }
+.mini-dialog .row button.action:hover { filter: brightness(1.08); }
+.mini-dialog .row button.secondary { background: var(--tile-bg-hover); color: var(--text); }

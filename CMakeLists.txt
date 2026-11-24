@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(cloudar-browser VERSION 0.1.0 LANGUAGES CXX)
+project(cloudar-browser VERSION 0.2.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -21,6 +21,9 @@ find_package(Qt6 REQUIRED COMPONENTS
     WebChannel
 )
 
+# CrxInstaller uses zlib directly for raw-DEFLATE. On Windows there is no
+# system zlib, so the Windows build job installs one via vcpkg; everywhere else
+# CMake's FindZLIB picks up the distro package.
 find_package(ZLIB REQUIRED)
 
 set(SOURCES
@@ -33,15 +36,24 @@ set(SOURCES
     src/BrowserSidebar.cpp
     src/BrowserTabWidget.cpp
     src/ChromeExtensionAPI.cpp
+    src/ClassicTheme.cpp
     src/CrxInstaller.cpp
     src/DownloadManager.cpp
+    src/DevToolsWindow.cpp
     src/ExtensionManager.cpp
     src/ExtensionsDialog.cpp
+    src/FaviconStore.cpp
     src/HistoryManager.cpp
+    src/InternalBridge.cpp
+    src/NewTabBridge.cpp
+    src/PermissionStore.cpp
+    src/PageContextMenu.cpp
     src/IdleEasterEgg.cpp
     src/Language.cpp
     src/LightSchemeHandler.cpp
     src/MainWindow.cpp
+    src/MemorySaver.cpp
+    src/PerformanceProfile.cpp
     src/ReaderMode.cpp
     src/SessionManager.cpp
     src/SettingsBridge.cpp
@@ -67,15 +79,24 @@ set(HEADERS
     src/BrowserSidebar.h
     src/BrowserTabWidget.h
     src/ChromeExtensionAPI.h
+    src/ClassicTheme.h
     src/CrxInstaller.h
     src/DownloadManager.h
+    src/DevToolsWindow.h
     src/ExtensionManager.h
     src/ExtensionsDialog.h
+    src/FaviconStore.h
     src/HistoryManager.h
+    src/InternalBridge.h
+    src/NewTabBridge.h
+    src/PermissionStore.h
+    src/PageContextMenu.h
     src/IdleEasterEgg.h
     src/Language.h
     src/LightSchemeHandler.h
     src/MainWindow.h
+    src/MemorySaver.h
+    src/PerformanceProfile.h
     src/NativeBridge.h
     src/ReaderMode.h
     src/SessionManager.h
@@ -99,8 +120,11 @@ add_executable(cloudar-browser
     resources/resources.qrc
 )
 
+# The version is defined in exactly one place: the project() line above. Both
+# --version and QApplication::applicationVersion() read it from here.
 target_compile_definitions(cloudar-browser PRIVATE
     CLOUDAR_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+    CLOUDAR_VERSION="${PROJECT_VERSION}"
 )
 
 target_include_directories(cloudar-browser PRIVATE

@@ -1,9 +1,12 @@
 #include "SplitView.h"
 #include "BrowserResources.h"
+#include "ClassicTheme.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFrame>
 #include <QWebEnginePage>
+#include <QApplication>
+#include <QFocusEvent>
 
 SplitPane::SplitPane(QWebEngineProfile *profile, const QUrl &url, QWidget *parent)
     : QWidget(parent) {
@@ -11,9 +14,11 @@ SplitPane::SplitPane(QWebEngineProfile *profile, const QUrl &url, QWidget *paren
     rootLayout->setContentsMargins(0, 0, 0, 0);
     rootLayout->setSpacing(0);
 
+    // 2009-sized bar in the classic chrome, roomier one in the modern chrome.
+    const bool classic = Theme::current() == Theme::ThemeStyle::Classic;
     QFrame *bar = new QFrame(this);
     bar->setObjectName("SplitPaneBar");
-    bar->setFixedHeight(42);
+    bar->setFixedHeight(classic ? 28 : 42);
     QHBoxLayout *barLayout = new QHBoxLayout(bar);
     barLayout->setContentsMargins(8, 5, 8, 5);
     barLayout->setSpacing(6);
@@ -21,17 +26,17 @@ SplitPane::SplitPane(QWebEngineProfile *profile, const QUrl &url, QWidget *paren
     m_backBtn = new QToolButton(bar);
     m_backBtn->setObjectName("SplitPaneButton");
     m_backBtn->setText(BrowserResources::getIcon("back"));
-    m_backBtn->setFixedSize(28, 28);
+    m_backBtn->setFixedSize(classic ? 22 : 28, classic ? 22 : 28);
 
     m_forwardBtn = new QToolButton(bar);
     m_forwardBtn->setObjectName("SplitPaneButton");
     m_forwardBtn->setText(BrowserResources::getIcon("forward"));
-    m_forwardBtn->setFixedSize(28, 28);
+    m_forwardBtn->setFixedSize(classic ? 22 : 28, classic ? 22 : 28);
 
     m_reloadBtn = new QToolButton(bar);
     m_reloadBtn->setObjectName("SplitPaneButton");
     m_reloadBtn->setText(BrowserResources::getIcon("reload"));
-    m_reloadBtn->setFixedSize(28, 28);
+    m_reloadBtn->setFixedSize(classic ? 22 : 28, classic ? 22 : 28);
 
     m_urlBar = new QLineEdit(bar);
     m_urlBar->setObjectName("SplitPaneUrlBar");
@@ -61,6 +66,15 @@ SplitPane::SplitPane(QWebEngineProfile *profile, const QUrl &url, QWidget *paren
     connect(m_reloadBtn, &QToolButton::clicked, m_webView, &QWebEngineView::reload);
     connect(m_urlBar, &QLineEdit::returnPressed, this, &SplitPane::onReturnPressed);
     connect(m_webView, &QWebEngineView::urlChanged, this, &SplitPane::onUrlChanged);
+
+    // Keyboard shortcuts configured as QAction shortcuts belong to the main
+    // window, which routes them to the tab widget — which is hidden while the
+    // split view is up. Forwarding focus changes up lets the window know which
+    // pane a shortcut should apply to.
+    connect(qApp, &QApplication::focusChanged, this, [this](QWidget *, QWidget *now) {
+        if (now && (now == this || isAncestorOf(now)))
+            emit focusGained();
+    });
 }
 
 void SplitPane::onUrlChanged(const QUrl &url) {
@@ -82,6 +96,17 @@ void SplitPane::navigateToUrl(const QString &text) {
         url = QUrl(QString("https://www.google.com/search?q=%1").arg(QUrl::toPercentEncoding(text)));
     }
     m_webView->setUrl(url);
+}
+
+SplitPane *SplitView::activePane() const
+{
+    for (SplitPane *pane : {m_leftPane, m_rightPane}) {
+        if (pane && pane->hasFocus())
+            return pane;
+    }
+    // Nothing focused yet (the view was just switched to), or focus sits on the
+    // splitter handle itself: the left pane is the one the user was reading.
+    return m_leftPane;
 }
 
 SplitView::SplitView(QWebEngineProfile *profile, const QUrl &url1, const QUrl &url2, QWidget *parent)

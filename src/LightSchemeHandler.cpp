@@ -1,8 +1,14 @@
 #include "LightSchemeHandler.h"
 
+#include "FaviconStore.h"
+
 #include <QWebEngineUrlScheme>
 #include <QBuffer>
 #include <QFile>
+#include <QFileInfo>
+#include <QSettings>
+#include <QStandardPaths>
+#include <QUrlQuery>
 
 void LightSchemeHandler::registerScheme()
 {
@@ -33,6 +39,97 @@ void LightSchemeHandler::serveResource(QWebEngineUrlRequestJob *job, const QStri
     job->reply(mimeType, buffer);
 }
 
+void LightSchemeHandler::serveBytes(QWebEngineUrlRequestJob *job, const QByteArray &data,
+                                    const QByteArray &mimeType)
+{
+    auto *buffer = new QBuffer(job);
+    buffer->setData(data);
+    buffer->open(QIODevice::ReadOnly);
+    job->reply(mimeType, buffer);
+}
+
+void LightSchemeHandler::serveNewTabAsset(QWebEngineUrlRequestJob *job, const QString &path)
+{
+    // The New Tab page was split out of one 1100-line file into styles/ and
+    // scripts/, and those files are served from the resource system under their
+    // own paths so the page keeps readable URLs (assets/base.css) instead of one
+    // flat qrc prefix. `path` arrives already normalised by QUrl, but it is still
+    // checked: "../" or a leading "/" would otherwise let a page name any
+    // resource in the binary.
+    QString clean = path;
+    while (clean.startsWith(QLatin1Char('/')))
+        clean.remove(0, 1);
+    if (clean.isEmpty() || clean.contains(QLatin1String(".."))
+        || clean.contains(QLatin1Char('\\'))) {
+        job->fail(QWebEngineUrlRequestJob::UrlNotFound);
+        return;
+    }
+
+    const QString resource = QStringLiteral(":/newtab/") + clean;
+    QByteArray mimeType = "application/octet-stream";
+    if (clean.endsWith(QLatin1String(".css")))
+        mimeType = "text/css; charset=utf-8";
+    else if (clean.endsWith(QLatin1String(".js")))
+        mimeType = "text/javascript; charset=utf-8";
+    else if (clean.endsWith(QLatin1String(".html")))
+        mimeType = "text/html; charset=utf-8";
+    else if (clean.endsWith(QLatin1String(".svg")))
+        mimeType = "image/svg+xml";
+    else if (clean.endsWith(QLatin1String(".png")))
+        mimeType = "image/png";
+
+    serveResource(job, resource, mimeType);
+}
+
+void LightSchemeHandler::serveFavicon(QWebEngineUrlRequestJob *job)
+{
+    // Real icons that Chromium decoded and FaviconStore kept on disk. The page
+    // passes the *page* URL (?u=...), not a host, so the store can apply the same
+    // normalisation it uses when it records an icon.
+    if (!m_favicons) {
+        job->fail(QWebEngineUrlRequestJob::UrlNotFound);
+        return;
+    }
+    const QUrlQuery query(job->requestUrl());
+    const QString raw = query.queryItemValue(QStringLiteral("u"), QUrl::FullyDecoded);
+    QByteArray data;
+    QByteArray mimeType;
+    if (raw.isEmpty() || !m_favicons->bytesForPageUrl(QUrl(raw), &data, &mimeType)) {
+        job->fail(QWebEngineUrlRequestJob::UrlNotFound);
+        return;
+    }
+    serveBytes(job, data, mimeType);
+}
+
+void LightSchemeHandler::serveWallpaperMedia(QWebEngineUrlRequestJob *job, const QString &path)
+{
+    // Only the two names NewTabBridge ever writes are served. Anything else under
+    // /media/ is a 404, so a page cannot use this host to read arbitrary files by
+    // guessing names — the same reason the assets handler rejects "..".
+    const QString fileName = path.mid(path.lastIndexOf(QLatin1Char('/')) + 1);
+    if (fileName != QLatin1String("wallpaper.jpg")
+        && fileName != QLatin1String("wallpaper.mp4")) {
+        job->fail(QWebEngineUrlRequestJob::UrlNotFound);
+        return;
+    }
+
+    // Read the *setting*, not the directory listing: a stale file left on disk
+    // must not be served for a wallpaper the user has already replaced.
+    const QSettings settings;
+    const QString stored = settings.value(
+                QStringLiteral("browser/newTabWallpaper/file")).toString();
+    if (stored.isEmpty() || !QFileInfo::exists(stored)
+        || QFileInfo(stored).fileName() != fileName) {
+        job->fail(QWebEngineUrlRequestJob::UrlNotFound);
+        return;
+    }
+
+    const QByteArray mimeType = fileName.endsWith(QLatin1String(".mp4"))
+            ? QByteArrayLiteral("video/mp4")
+            : QByteArrayLiteral("image/jpeg");
+    serveResource(job, stored, mimeType);
+}
+
 void LightSchemeHandler::requestStarted(QWebEngineUrlRequestJob *job)
 {
     // Hosts are matched case-insensitively, so cloudar://Settings/ and
@@ -43,7 +140,29 @@ void LightSchemeHandler::requestStarted(QWebEngineUrlRequestJob *job)
     const QString host = job->requestUrl().host().toLower();
 
     if (host == "newtab" || host == "new" || host.isEmpty()) {
-        serveResource(job, ":/newtab.html", "text/html; charset=utf-8");
+        const QString path = job->requestUrl().path();
+        // cloudar://newtab/assets/styles/base.css and friends. Same origin as the
+        // page, which is why the favicon below is served from here too.
+        if (path.startsWith(QLatin1String("/assets/"))) {
+            serveNewTabAsset(job, path.mid(8));
+            return;
+        }
+        // cloudar://newtab/favicon?u=<page url>
+        if (path == QLatin1String("/favicon")) {
+            serveFavicon(job);
+            return;
+        }
+        // cloudar://newtab/media/wallpaper.jpg|.mp4 — survives restarts because
+        // it lives in AppDataLocation, not in the renderer's storage partition.
+        if (path.startsWith(QLatin1String("/media/"))) {
+            serveWallpaperMedia(job, path);
+            return;
+        }
+        serveResource(job, ":/newtab/index.html", "text/html; charset=utf-8");
+    } else if (host == "favicon") {
+        // Also reachable as its own host so an internal page that is not the New
+        // Tab page can use it without knowing about the newtab host.
+        serveFavicon(job);
     } else if (host == "settings") {
         serveResource(job, ":/settings.html", "text/html; charset=utf-8");
     } else if (host == "version" || host == "about") {

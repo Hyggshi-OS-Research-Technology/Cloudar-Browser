@@ -1,5 +1,6 @@
 #include "BookmarkBar.h"
 #include "BookmarkManager.h"
+#include "ClassicTheme.h"
 
 #include <QHBoxLayout>
 #include <QLabel>
@@ -101,8 +102,11 @@ BookmarkBar::BookmarkBar(BookmarkManager *manager, QWidget *parent)
     m_layout->setContentsMargins(6, 2, 6, 2);
     m_layout->setSpacing(4);
 
-    m_emptyHint = new QLabel("Drag pages here or use the \u2606 button to add bookmarks", this);
-    m_emptyHint->setStyleSheet("color: rgba(255,255,255,0.35); font-size: 11px;");
+    m_emptyHint = new QLabel(tr("Drag pages here or use the \u2606 button to add bookmarks"), this);
+    // Was a hard-coded 35%-white, which is invisible on the classic chrome's
+    // beige bookmarks strip. The hint follows the active chrome's dim text.
+    m_emptyHint->setStyleSheet(QStringLiteral("color: %1; font-size: 11px;")
+                                   .arg(Theme::dimTextColor().name()));
 
     connect(m_manager, &BookmarkManager::changed, this, &BookmarkBar::refresh);
     refresh();

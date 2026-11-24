@@ -26,7 +26,7 @@ Implemented a file-based image storage system with automatic optimization:
 - Only resizes if image exceeds target dimensions
 - **Benefit**: Reduces memory usage by 50-75% for large images
 
-### 3. Image Caching in Renderer (`internal_pages/newtab.html`)
+### 3. Image Caching in Renderer (`resources/newtab/`, see docs/NEWTAB.md)
 - JavaScript caches decoded Image objects
 - Prevents re-decoding on component re-renders
 - Only reloads image if URL actually changes
