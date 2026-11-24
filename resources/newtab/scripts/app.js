@@ -24,6 +24,9 @@ var CloudarNewTab = (function () {
   // null forever when the page is opened outside Cloudar.
   var state = null;
   var bridge = null;
+  // True once the channel has connected or every retry has been used up, so
+  // afterChannel() knows whether to call back immediately.
+  var channelSettled = false;
   var pending = [];
   var readyCallbacks = [];
 
@@ -66,6 +69,7 @@ var CloudarNewTab = (function () {
 
   function bridgeReady(fn) {
     if (bridge) { fn(bridge); return; }
+    if (channelSettled) { fn(null); return; }
     pending.push(fn);
   }
 
@@ -88,6 +92,7 @@ var CloudarNewTab = (function () {
         setTimeout(initChannel, 50);
         return;
       }
+      channelSettled = true;
       readyCallbacks.forEach(function (fn) { try { fn(null); } catch (e) {} });
       readyCallbacks = [];
       return;
@@ -116,6 +121,7 @@ var CloudarNewTab = (function () {
         }
       }
 
+      channelSettled = true;
       flush();
       readyCallbacks.forEach(function (fn) { try { fn(bridge); } catch (e) {} });
       readyCallbacks = [];
@@ -176,7 +182,16 @@ var CloudarNewTab = (function () {
     // Runs `fn(bridgeOrNull)` once the channel has either connected or given up.
     // Separate from bridgeReady() because that one runs immediately on a
     // connected channel and never fires on a page with no channel at all.
-    afterChannel: function (fn) { readyCallbacks.push(fn); },
+    // Fires once the channel is up (or has definitively failed). If it is
+    // already up, fires immediately — otherwise a module that loads after the
+    // channel opened would wait forever.
+    afterChannel: function (fn) {
+      if (channelSettled) {
+        try { fn(bridge); } catch (e) { console.error('[newtab] channel callback failed', e); }
+        return;
+      }
+      readyCallbacks.push(fn);
+    },
     startChannel: initChannel
   };
 })();

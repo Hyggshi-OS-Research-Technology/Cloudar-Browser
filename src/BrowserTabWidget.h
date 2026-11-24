@@ -19,6 +19,7 @@ class QToolButton;
 class TabPreviewPopup;
 class WebExtensionManager;
 class FaviconStore;
+class PageContextMenu;
 
 // A QTabWidget where each tab hosts one QWebEngineView. All views share a
 // single QWebEngineProfile so cookies/cache/history stay consistent and
@@ -58,6 +59,14 @@ public:
     // Optional. Every favicon Chromium decodes for a real page is handed to this
     // store, which is how the New Tab speed dial can show actual site icons.
     void setFaviconStore(FaviconStore *store) { m_favicons = store; }
+
+    // Optional. Installs a right-click menu on every page (see PageContextMenu,
+    // which explains why the platform default was not good enough). Named tabs
+    // and split panes are wired the same way.
+    void setContextMenuFactory(std::function<PageContextMenu *(QWebEngineView *)> factory)
+    {
+        m_contextMenuFactory = std::move(factory);
+    }
 
     // --- hooks for chrome.tabs.* / chrome.scripting.executeScript, wired
     // into WebExtensionManager by MainWindow. All of these use the tab's
@@ -122,6 +131,7 @@ private:
     QWebChannel *m_channel;
     WebExtensionManager *m_webExtensions = nullptr;
     FaviconStore *m_favicons = nullptr;
+    std::function<PageContextMenu *(QWebEngineView *)> m_contextMenuFactory;
     void wireView(QWebEngineView *view);
     void animateIn(QWidget *view);
 

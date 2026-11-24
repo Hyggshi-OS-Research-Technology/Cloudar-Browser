@@ -14,6 +14,7 @@
 #include "PermissionStore.h"
 #include "FaviconStore.h"
 #include "NewTabBridge.h"
+#include "PageContextMenu.h"
 
 #include <QApplication>
 #include <QMenuBar>
@@ -45,6 +46,7 @@
 #include <QTabBar>
 #include <QSignalBlocker>
 #include <QMenu>
+#include <QFileDialog>
 #include <QSysInfo>
 
 MainWindow::MainWindow(bool isIncognito, QWidget *parent)
@@ -196,6 +198,51 @@ MainWindow::MainWindow(bool isIncognito, QWidget *parent)
     // Every favicon Chromium decodes passes through here, which is what makes
     // the New Tab speed dial show the real icon instead of a letter.
     m_tabs->setFaviconStore(m_faviconStore);
+    // Right-click menu for page content, on every tab. QWebEngineView's default
+    // is the bare Back/Forward/Reload/Save/View-source list with no icons and no
+    // state; PageContextMenu explains and replaces it.
+    m_tabs->setContextMenuFactory([this](QWebEngineView *view) -> PageContextMenu * {
+        auto *menu = new PageContextMenu(view, view);
+        // Not setBookmarkAction(m_bookmarkStarAction) here: the factory is
+        // installed while the tab widget is being constructed, and the toolbar
+        // (which owns the star action) does not exist yet. The menu reads the
+        // pointer when it is opened instead, via this accessor.
+        menu->setBookmarkActionProvider([this]() { return m_bookmarkStarAction; });
+        menu->setPageSourceHandler([this](const QUrl &url) {
+            openPageSource(url);
+        });
+        connect(menu, &PageContextMenu::openInNewTab, this, [this](const QUrl &url) {
+            m_tabs->addNewTab(url, true);
+        });
+        connect(menu, &PageContextMenu::openInNewWindow, this, [this](const QUrl &url) {
+            openInNewWindow(url);
+        });
+        connect(menu, &PageContextMenu::searchRequested, this, [this](const QString &text) {
+            // Same path the address bar uses, so the configured engine applies.
+            const QString templateUrl =
+                    QSettings().value("browser/searchEngine",
+                                      "https://duckduckgo.com/?q=%s").toString();
+            m_tabs->addNewTab(QUrl(templateUrl.replace("%s", QString::fromLatin1(
+                    QUrl::toPercentEncoding(text)))), true);
+        });
+        connect(menu, &PageContextMenu::printRequested, this, [this, view]() {
+            if (QWebEnginePage *page = view->page()) {
+                // QWebEnginePage::printToPdf is the only print path QtWebEngine
+                // exposes to a page's own content; there is no print preview and
+                // no QPrinter overload. Rather than offering a half-wired "Print"
+                // that opens a dialog and prints nothing, this writes a PDF the
+                // user chooses — and the menu item says so.
+                const QString target = QFileDialog::getSaveFileName(
+                        view, tr("Print to PDF"), QDir::homePath() + "/page.pdf",
+                        tr("PDF files (*.pdf)"));
+                if (target.isEmpty())
+                    return;
+                page->printToPdf(target);
+                statusBar()->showMessage(tr("Printing to %1…").arg(target), 4000);
+            }
+        });
+        return menu;
+    });
 
     // chrome.tabs.query() backing data — a plain JSON snapshot of open tabs,
     // rebuilt on demand (not cached) since it's only read when an
@@ -1259,6 +1306,35 @@ void MainWindow::updateProgress(int percent)
             m_progressBar->setVisible(false);
         }, Qt::SingleShotConnection);
     }
+}
+
+void MainWindow::openPageSource(const QUrl &url)
+{
+    if (!url.isValid() || url.isEmpty())
+        return;
+    // view-source: for an internal page would show the Qt resource's HTML, which
+    // is not what the user is looking at — the menu only enables this for real
+    // documents, so this is a belt-and-braces check.
+    const QString scheme = url.scheme().toLower();
+    if (scheme == QLatin1String("cloudar") || scheme == QLatin1String("browser")
+        || scheme == QLatin1String("light"))
+        return;
+    m_tabs->addNewTab(QUrl(QStringLiteral("view-source:") + url.toString()), true);
+}
+
+void MainWindow::openInNewWindow(const QUrl &url)
+{
+    if (!url.isValid() || url.isEmpty())
+        return;
+    // A new window is a new MainWindow around one tab. It builds its own
+    // QWebEngineProfile — that is the constructor's contract — so this is a
+    // separate profile rather than a shared one. Cookies and logins therefore do
+    // not carry across, which is a real limitation and is why the menu item is
+    // worded "Open link in new window" and nothing more.
+    auto *window = new MainWindow(false);
+    window->setAttribute(Qt::WA_DeleteOnClose, true);
+    window->show();
+    window->m_tabs->addNewTab(url, true);
 }
 
 void MainWindow::showHistoryDialog()

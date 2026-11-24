@@ -38,6 +38,9 @@ private:
     void serveNewTabAsset(QWebEngineUrlRequestJob *job, const QString &path);
     // cloudar://newtab/favicon?u=... and cloudar://favicon/?u=...
     void serveFavicon(QWebEngineUrlRequestJob *job);
+    // cloudar://newtab/media/wallpaper.jpg|.mp4 — the saved New Tab wallpaper,
+    // read from AppDataLocation rather than from the renderer's storage.
+    void serveWallpaperMedia(QWebEngineUrlRequestJob *job, const QString &path);
 
     FaviconStore *m_favicons = nullptr;
 };

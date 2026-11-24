@@ -46,6 +46,7 @@ set(SOURCES
     src/InternalBridge.cpp
     src/NewTabBridge.cpp
     src/PermissionStore.cpp
+    src/PageContextMenu.cpp
     src/IdleEasterEgg.cpp
     src/Language.cpp
     src/LightSchemeHandler.cpp
@@ -87,6 +88,7 @@ set(HEADERS
     src/InternalBridge.h
     src/NewTabBridge.h
     src/PermissionStore.h
+    src/PageContextMenu.h
     src/IdleEasterEgg.h
     src/Language.h
     src/LightSchemeHandler.h

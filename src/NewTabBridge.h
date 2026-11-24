@@ -60,6 +60,36 @@ public slots:
     // reuses the open settings tab instead of stacking a second one.
     void openUrl(const QString &url);
 
+    // Wallpaper bytes handed to the browser instead of being kept in the
+    // renderer's storage.
+    //
+    // Why this exists at all: a cloudar:// page's localStorage and IndexedDB
+    // belong to the renderer's *storage partition*, and this build clears
+    // browsing data on exit for anyone who did not opt in to persistent cookies
+    // — "open it again and the wallpaper is gone" was exactly that. QSettings is
+    // tied to the installation, not to the browsing session, so a wallpaper
+    // saved here survives, and it also survives clearing browsing data, which is
+    // what a person expects of a preference they chose deliberately.
+    //
+    // `base64` is the raw file bytes, already re-encoded by the page (max 2560 px
+    // JPEG for images). `kind` is "image" | "video" | "web" | "color" |
+    // "default"; `value` carries the URL/colour for the last three.
+    // Returns the cloudar://newtab/media/<file> URL to display, or "" on failure.
+    QString saveWallpaperMedia(const QString &kind, const QString &base64,
+                               const QString &value);
+
+    // The cloudar:// URL for the stored wallpaper, or "" when none is stored.
+    // The page asks for this at startup (initialState().wallpaper comes from the
+    // same code) so it never has to guess whether its media survived.
+    QString wallpaperMediaUrl();
+
+    // What is currently stored: { kind, value, url, bytes } — kind is "default"
+    // when nothing is set. `bytes` is the real file size, so the panel can say
+    // how much disk the wallpaper uses instead of estimating.
+    QVariantMap wallpaperState();
+
+    void clearWallpaperMedia();
+
 signals:
     // (pageUrl, iconUrl) — iconUrl is exactly what faviconUrl() would return now
     // that the icon has been stored. The page matches on pageUrl, not on host,

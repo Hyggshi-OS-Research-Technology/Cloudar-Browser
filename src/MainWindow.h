@@ -64,6 +64,9 @@ private slots:
     void updateProgress(int percent);
     void showHistoryDialog();
     void openSettingsPage(); // opens/focuses a tab on cloudar://settings/
+    // Page context menu helpers (see PageContextMenu).
+    void openPageSource(const QUrl &url);
+    void openInNewWindow(const QUrl &url);
     void showExtensionsDialog();
     void toggleBookmarkForCurrentPage();
     void updateBookmarkStar(const QUrl &url);

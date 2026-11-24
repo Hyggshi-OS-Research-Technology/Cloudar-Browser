@@ -1,7 +1,18 @@
 /* ==========================================================================
    background.js — the wallpaper layer (solid colour, image, live video).
 
-   Two storage problems in the version this replaces:
+   Three storage problems in the version this replaces:
+
+   0. **Nothing survived a restart.** A cloudar:// page's localStorage and
+      IndexedDB live in the renderer's storage partition, and this build clears
+      browsing data on exit unless the user opted in to persistent cookies — so
+      "upload a wallpaper, reopen the browser, it is gone" was not a bug in this
+      file, it was the storage being thrown away underneath it. The bytes now go
+      to the browser through newTabBridge.saveWallpaperMedia(), which writes them
+      under AppDataLocation (QSettings-tied, not browsing-data-tied) and the page
+      gets them back at setup() from initialState().wallpaper. IndexedDB is still
+      used as a fast path while the tab is open, and as the store for media the
+      browser refused (quota), so a failure is reported rather than silent.
 
    1. **Images were data: URLs in localStorage.** A 1920x1080 JPEG re-encoded at
       quality 0.85 is roughly 300-600 KB, and base64 makes it ~33% larger.
@@ -265,6 +276,80 @@ var CloudarBackground = (function () {
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   }
 
+  // --- browser-backed storage --------------------------------------------
+  // The page cannot write QSettings itself, so every local upload and every
+  // colour/URL choice is mirrored to the browser. This is what makes the choice
+  // survive a restart; localStorage alone never did.
+  function persist(kind, blobOrNull, value) {
+    var bridge = CloudarNewTab.bridge();
+    if (!bridge || !bridge.saveWallpaperMedia) {
+      onStatus('Saved for this tab only: the browser bridge is not available here, ' +
+               'so this choice will not survive a restart.', true);
+      return;
+    }
+    if (!blobOrNull) {
+      bridge.saveWallpaperMedia(kind, '', value || '');
+      return;
+    }
+    var reader = new FileReader();
+    reader.onerror = function () {
+      onStatus('Could not read the file to save it (' +
+               ((reader.error && reader.error.name) || 'read error') + ').', true);
+    };
+    reader.onload = function () {
+      // FileReader gives "data:<mime>;base64,<payload>"; the bridge wants the
+      // payload alone and does its own base64 decode.
+      var raw = String(reader.result || '');
+      var comma = raw.indexOf(',');
+      var payload = comma >= 0 ? raw.slice(comma + 1) : '';
+      var url = bridge.saveWallpaperMedia(kind, payload, '');
+      if (!url) {
+        onStatus('The browser could not store the file on disk. It still works ' +
+                 'until you close the tab.', true);
+      }
+    };
+    reader.readAsDataURL(blobOrNull);
+  }
+
+  // Apply whatever the browser says is stored, without touching its own copy.
+  function applyFromState(wallpaper) {
+    if (!wallpaper || !wallpaper.kind || wallpaper.kind === 'default') return false;
+    var kind = wallpaper.kind;
+    if (kind === 'color') {
+      applyColor(wallpaper.value);
+      return true;
+    }
+    if (kind === 'web') {
+      if (/\.(mp4|webm|ogg|ogv|mov|m4v)(\?.*)?$/i.test(wallpaper.value || '')) {
+        applyVideo(wallpaper.value, false);
+      } else {
+        applyImageUrl(wallpaper.value);
+      }
+      return true;
+    }
+    if (!wallpaper.url) {
+      // Stored preference exists but the file does not. Say so instead of
+      // quietly showing the default background.
+      onStatus('The saved wallpaper file is missing; showing the default background.', true);
+      return false;
+    }
+    if (kind === 'video') {
+      applyVideo(wallpaper.url, false);
+      if (videoPreview) {
+        videoPreview.src = wallpaper.url;
+        var wrapper = document.getElementById('videoPreviewWrapper');
+        if (wrapper) wrapper.classList.add('show');
+      }
+      return true;
+    }
+    applyImageUrl(wallpaper.url);
+    if (imagePreview) {
+      imagePreview.style.backgroundImage = 'url("' + wallpaper.url + '")';
+      imagePreview.classList.add('show');
+    }
+    return true;
+  }
+
   // --- public: setting local media ---------------------------------------
   function setLocalImage(file) {
     prepareImage(file, function (err, blob) {
@@ -288,6 +373,7 @@ var CloudarBackground = (function () {
         stopVideo();
         body.classList.add('custom-bg');
         saveSetting({ type: 'image', source: 'local' });
+        persist('image', blob, '');
         onStatus('Image stored in IndexedDB (' + formatBytes(blob.size) + ').');
       });
     });
@@ -307,6 +393,7 @@ var CloudarBackground = (function () {
       var url = setObjectUrl('video', file);
       applyVideo(url, false);
       saveSetting({ type: 'video', source: 'local', sound: false });
+      persist('video', file, '');
 
       if (videoPreview) {
         videoPreview.src = setObjectUrl('preview', file);
@@ -332,6 +419,7 @@ var CloudarBackground = (function () {
       releaseObjectUrl('image');
       applyVideo(url, false);
       saveSetting({ type: 'video', source: 'web', value: url, sound: false });
+      persist('web', null, url);
       if (videoPreview) {
         videoPreview.src = url;
         var wrapper = document.getElementById('videoPreviewWrapper');
@@ -342,6 +430,7 @@ var CloudarBackground = (function () {
       stopVideo();
       applyImageUrl(url);
       saveSetting({ type: 'web', value: url });
+      persist('web', null, url);
       if (imagePreview) {
         imagePreview.style.backgroundImage = 'url("' + url + '")';
         imagePreview.classList.add('show');
@@ -356,6 +445,7 @@ var CloudarBackground = (function () {
     releaseObjectUrl('image');
     applyColor(hex);
     saveSetting({ type: 'color', value: hex });
+    persist('color', null, hex);
     if (imagePreview) imagePreview.classList.remove('show');
     onStatus('');
   }
@@ -372,17 +462,32 @@ var CloudarBackground = (function () {
     }
     if (imagePreview) imagePreview.classList.remove('show');
     saveSetting({ type: 'default' });
+    persist('default', null, '');
+    var bridge = CloudarNewTab.bridge();
+    if (bridge && bridge.clearWallpaperMedia) bridge.clearWallpaperMedia();
     onStatus('');
   }
 
   // --- restore ------------------------------------------------------------
-  function restore() {
+  // Order matters and is the whole fix:
+  //   1. what the *browser* has stored (QSettings + AppDataLocation) — this is
+  //      the only source that survives a restart;
+  //   2. the local IndexedDB blob, if the browser had nothing (a wallpaper the
+  //      browser refused to store still works while the profile lives);
+  //   3. the old localStorage descriptor, mapped onto a stored URL when possible.
+  function restoreFromBrowser() {
+    var state = CloudarNewTab.state();
+    if (state && state.wallpaper) return applyFromState(state.wallpaper);
+    return false;
+  }
+
+  function restoreFromIndexedDb() {
     var setting = loadSetting();
-    if (!setting || setting.type === 'default' || !setting.type) return;
+    if (!setting || setting.type === 'default' || !setting.type) return false;
 
     if (setting.type === 'color') {
       applyColor(setting.value);
-      return;
+      return true;
     }
     if (setting.type === 'web') {
       if (/\.(mp4|webm|ogg|ogv|mov|m4v)(\?.*)?$/i.test(setting.value || '')) {
@@ -390,17 +495,11 @@ var CloudarBackground = (function () {
       } else {
         applyImageUrl(setting.value);
       }
-      return;
+      return true;
     }
     if (setting.type === 'video') {
       getBlob(STORE_VIDEO, VIDEO_ID, function (err, blob) {
-        if (err || !blob) {
-          // The descriptor survived but the blob did not (storage cleared).
-          // Fall back to the default rather than leaving a black page.
-          onStatus('The saved video wallpaper is gone from storage; showing the default background.', true);
-          saveSetting({ type: 'default' });
-          return;
-        }
+        if (err || !blob) return;
         applyVideo(setObjectUrl('video', blob), !!setting.sound);
         if (videoPreview) {
           videoPreview.src = setObjectUrl('preview', blob);
@@ -408,15 +507,11 @@ var CloudarBackground = (function () {
           if (wrapper) wrapper.classList.add('show');
         }
       });
-      return;
+      return true;
     }
     if (setting.type === 'image') {
       getBlob(STORE_IMAGE, IMAGE_ID, function (err, blob) {
-        if (err || !blob) {
-          onStatus('The saved image wallpaper is gone from storage; showing the default background.', true);
-          saveSetting({ type: 'default' });
-          return;
-        }
+        if (err || !blob) return;
         var url = setObjectUrl('image', blob);
         applyImageUrl(url);
         if (imagePreview) {
@@ -424,8 +519,14 @@ var CloudarBackground = (function () {
           imagePreview.classList.add('show');
         }
       });
-      return;
+      return true;
     }
+    return false;
+  }
+
+  function restore() {
+    if (restoreFromBrowser()) return;
+    restoreFromIndexedDb();
   }
 
   return {
@@ -447,7 +548,16 @@ var CloudarBackground = (function () {
         }
       });
 
-      restore();
+      // Applying what the browser stored needs the channel, which is not open
+      // yet when this runs (app.js starts it on DOMContentLoaded). So: paint
+      // from local storage immediately, then repaint from the browser's copy as
+      // soon as the channel answers. The second paint is the one that survives
+      // restarts; the first only prevents a flash of the default background.
+      restoreFromIndexedDb();
+      CloudarNewTab.afterChannel(function () {
+        if (restoreFromBrowser())
+          onStatus('');
+      });
     },
 
     applyColor: setColor,

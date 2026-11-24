@@ -170,10 +170,26 @@ var CloudarCustomize = (function () {
         });
       }
 
-      // Reflect whatever is already applied.
-      var setting = CloudarBackground.describe();
-      if (setting.type === 'color') markActive(setting.value);
-      if (setting.type === 'web' && webInput) webInput.value = setting.value || '';
+      // Reflect whatever the *browser* has stored, which is the authoritative
+      // copy; the page's own localStorage is only a fast path while this tab is
+      // open. Without this the panel showed "no image" even when a wallpaper was
+      // loaded, because nothing ever read the browser's answer back.
+      CloudarNewTab.afterChannel(function () {
+        var state = CloudarNewTab.state() || {};
+        var wallpaper = state.wallpaper || { kind: 'default' };
+        if (wallpaper.kind === 'color' && wallpaper.value) {
+          markActive(wallpaper.value);
+        } else if (wallpaper.kind === 'web' && wallpaper.value) {
+          if (webInput) webInput.value = wallpaper.value;
+        } else if (wallpaper.kind === 'image' || wallpaper.kind === 'video') {
+          var size = CloudarBackground.formatBytes(wallpaper.bytes || 0);
+          setStatus((wallpaper.kind === 'video' ? 'Video' : 'Image') +
+                    ' wallpaper stored by the browser' +
+                    (size ? ' (' + size + ')' : '') + '.');
+        } else {
+          setStatus('');
+        }
+      });
 
       CloudarBackground.init(setStatus);
     }

@@ -6,6 +6,8 @@
 #include <QBuffer>
 #include <QFile>
 #include <QFileInfo>
+#include <QSettings>
+#include <QStandardPaths>
 #include <QUrlQuery>
 
 void LightSchemeHandler::registerScheme()
@@ -99,6 +101,35 @@ void LightSchemeHandler::serveFavicon(QWebEngineUrlRequestJob *job)
     serveBytes(job, data, mimeType);
 }
 
+void LightSchemeHandler::serveWallpaperMedia(QWebEngineUrlRequestJob *job, const QString &path)
+{
+    // Only the two names NewTabBridge ever writes are served. Anything else under
+    // /media/ is a 404, so a page cannot use this host to read arbitrary files by
+    // guessing names — the same reason the assets handler rejects "..".
+    const QString fileName = path.mid(path.lastIndexOf(QLatin1Char('/')) + 1);
+    if (fileName != QLatin1String("wallpaper.jpg")
+        && fileName != QLatin1String("wallpaper.mp4")) {
+        job->fail(QWebEngineUrlRequestJob::UrlNotFound);
+        return;
+    }
+
+    // Read the *setting*, not the directory listing: a stale file left on disk
+    // must not be served for a wallpaper the user has already replaced.
+    const QSettings settings;
+    const QString stored = settings.value(
+                QStringLiteral("browser/newTabWallpaper/file")).toString();
+    if (stored.isEmpty() || !QFileInfo::exists(stored)
+        || QFileInfo(stored).fileName() != fileName) {
+        job->fail(QWebEngineUrlRequestJob::UrlNotFound);
+        return;
+    }
+
+    const QByteArray mimeType = fileName.endsWith(QLatin1String(".mp4"))
+            ? QByteArrayLiteral("video/mp4")
+            : QByteArrayLiteral("image/jpeg");
+    serveResource(job, stored, mimeType);
+}
+
 void LightSchemeHandler::requestStarted(QWebEngineUrlRequestJob *job)
 {
     // Hosts are matched case-insensitively, so cloudar://Settings/ and
@@ -119,6 +150,12 @@ void LightSchemeHandler::requestStarted(QWebEngineUrlRequestJob *job)
         // cloudar://newtab/favicon?u=<page url>
         if (path == QLatin1String("/favicon")) {
             serveFavicon(job);
+            return;
+        }
+        // cloudar://newtab/media/wallpaper.jpg|.mp4 — survives restarts because
+        // it lives in AppDataLocation, not in the renderer's storage partition.
+        if (path.startsWith(QLatin1String("/media/"))) {
+            serveWallpaperMedia(job, path);
             return;
         }
         serveResource(job, ":/newtab/index.html", "text/html; charset=utf-8");

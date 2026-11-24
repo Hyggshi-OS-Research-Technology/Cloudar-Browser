@@ -252,6 +252,12 @@ void BrowserTabWidget::dismissPreview()
 
 void BrowserTabWidget::wireView(QWebEngineView *view)
 {
+    // Right-click menu. QtWebEngine's own default is a bare list (see
+    // PageContextMenu) and on some platforms it is absent entirely, so every tab,
+    // including the ones restored from a session, gets ours.
+    if (m_contextMenuFactory)
+        m_contextMenuFactory(view);
+
     connect(view, &QWebEngineView::iconChanged, this, [this, view](const QIcon &icon) {
         // Feed the favicon store first: it keys on the page URL, and the tab
         // strip's own icon handling below may replace a null icon with a
