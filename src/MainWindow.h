@@ -24,6 +24,7 @@
 #include "WebExtensionManager.h"
 #include "NativeBridge.h"
 #include "InternalBridge.h"
+#include "NewTabBridge.h"
 #include "SettingsBridge.h"
 #include "SpinnerWidget.h"
 #include "TitleBar.h"
@@ -111,6 +112,10 @@ private:
     // /permissions. Registered next to `native` on the same channel, which is
     // only ever attached to internal pages.
     InternalBridge *m_internalBridge = nullptr;
+    // Real favicons for internal pages, fed by BrowserTabWidget::wireView() and
+    // read by NewTabBridge / LightSchemeHandler.
+    FaviconStore *m_faviconStore = nullptr;
+    NewTabBridge *m_newTabBridge = nullptr;
     SettingsBridge *m_settingsBridge = nullptr;
     // Both are null on the classic chrome, which uses the OS window frame and
     // QMainWindow's own menu bar; everything that touches them checks first.

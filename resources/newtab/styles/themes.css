@@ -1,0 +1,126 @@
+/* ==========================================================================
+   themes.css — the two chromes, finally implemented for this page.
+
+   Every other internal page has had a `html.classic` block for a while; the New
+   Tab page only toggled the class and had no rules behind it, so choosing the
+   classic chrome still gave you the dark animated page with a blue gradient
+   logo. This file is that missing half.
+
+   The classic palette is deliberately the same one cloudar://settings and
+   cloudar://history use (Tahoma 12px, #e8e8e8 window, #fff panels, 1px #a0a0a0
+   borders, no radii, no shadows), because a dark glowing card inside a grey
+   2009 window reads as a bug.
+   ========================================================================== */
+
+html.classic {
+  --bg-a: #e8e8e8;
+  --bg-b: #e8e8e8;
+  --accent: #1a5fb4;
+  --accent-2: #1a5fb4;
+  --text: #1a1a1a;
+  --muted: #6b6b6b;
+  --panel-bg: #f4f4f4;
+  --panel-border: #a0a0a0;
+  --tile-bg: #ffffff;
+  --tile-bg-hover: #e8f0fb;
+  --tile-border: #a0a0a0;
+  --field-bg: #ffffff;
+  --field-border: #a0a0a0;
+  --radius-tile: 0;
+  --radius-field: 0;
+  --radius-panel: 0;
+  --font: Tahoma, "Segoe UI", Verdana, sans-serif;
+  --font-size: 12px;
+  --shadow: none;
+}
+
+html.classic body {
+  /* The drifting gradient and the floating blobs are animation, and this chrome
+     exists for machines where that cost is the problem. A flat window colour is
+     also what Chrome 0.2 actually looked like. */
+  background: #e8e8e8;
+  animation: none;
+}
+
+html.classic .blob { display: none; }
+
+html.classic .scrim {
+  background: rgba(0, 0, 0, 0.18);
+}
+
+html.classic .brand {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--text);
+  background: none;
+  -webkit-background-clip: initial;
+  background-clip: initial;
+  margin-bottom: 16px;
+}
+html.classic .brand img {
+  width: 20px;
+  height: 20px;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+html.classic .content {
+  animation: none;
+  opacity: 1;
+  transform: none;
+}
+
+html.classic .footer {
+  animation: none;
+  opacity: 1;
+}
+
+/* Windows 7 / XP era UI had no rounded window corners on anything. */
+html.classic .mini-dialog,
+html.classic .panel,
+html.classic .speed-tile,
+html.classic .tile,
+html.classic .speed-tile .favicon {
+  border-radius: 0;
+}
+
+html.classic .mini-dialog,
+html.classic .panel {
+  box-shadow: none;
+}
+
+/* Classic chrome keeps the OS-drawn look: buttons are grey gradient plates,
+   focus is a dotted rectangle, nothing glows. */
+html.classic button,
+html.classic input[type="text"],
+html.classic input[type="color"] {
+  border-radius: 0;
+}
+
+html.classic .mini-dialog .row button.action,
+html.classic .panel button.action {
+  background: linear-gradient(#fbfbfb, #e3e3e3);
+  border: 1px solid #a0a0a0;
+  color: #1a1a1a;
+  font-weight: 400;
+  text-shadow: none;
+}
+html.classic .mini-dialog .row button.action:hover,
+html.classic .panel button.action:hover {
+  background: linear-gradient(#f3f8fe, #d8e8fa);
+  border-color: #7aadea;
+  filter: none;
+}
+
+html.classic .panel button.secondary {
+  background: linear-gradient(#fbfbfb, #e3e3e3);
+  border: 1px solid #a0a0a0;
+  color: #1a1a1a;
+}
+
+/* Chrome 0.2 concentrated the speed dial inside the window rather than
+   spreading tiles across the full width. */
+html.classic .speed-tile .favicon {
+  border: 1px solid #c8c8c8;
+}

@@ -41,8 +41,10 @@ set(SOURCES
     src/DownloadManager.cpp
     src/ExtensionManager.cpp
     src/ExtensionsDialog.cpp
+    src/FaviconStore.cpp
     src/HistoryManager.cpp
     src/InternalBridge.cpp
+    src/NewTabBridge.cpp
     src/PermissionStore.cpp
     src/IdleEasterEgg.cpp
     src/Language.cpp
@@ -80,8 +82,10 @@ set(HEADERS
     src/DownloadManager.h
     src/ExtensionManager.h
     src/ExtensionsDialog.h
+    src/FaviconStore.h
     src/HistoryManager.h
     src/InternalBridge.h
+    src/NewTabBridge.h
     src/PermissionStore.h
     src/IdleEasterEgg.h
     src/Language.h

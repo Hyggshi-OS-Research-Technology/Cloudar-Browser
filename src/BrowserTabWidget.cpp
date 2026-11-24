@@ -1,4 +1,5 @@
 #include "BrowserTabWidget.h"
+#include "FaviconStore.h"
 #include "TabPreviewPopup.h"
 #include "WebExtensionManager.h"
 #include "ClassicTheme.h"
@@ -252,6 +253,12 @@ void BrowserTabWidget::dismissPreview()
 void BrowserTabWidget::wireView(QWebEngineView *view)
 {
     connect(view, &QWebEngineView::iconChanged, this, [this, view](const QIcon &icon) {
+        // Feed the favicon store first: it keys on the page URL, and the tab
+        // strip's own icon handling below may replace a null icon with a
+        // generated placeholder that would be wrong to cache as the site's icon.
+        if (m_favicons && !icon.isNull())
+            m_favicons->record(view->url(), icon);
+
         int idx = indexOf(view);
         if (idx >= 0) {
             const QIcon eff = icon.isNull() ? defaultFavicon(view->url()) : icon;

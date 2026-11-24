@@ -12,6 +12,8 @@
 #include "IdleEasterEgg.h"
 #include "InternalBridge.h"
 #include "PermissionStore.h"
+#include "FaviconStore.h"
+#include "NewTabBridge.h"
 
 #include <QApplication>
 #include <QMenuBar>
@@ -109,9 +111,17 @@ MainWindow::MainWindow(bool isIncognito, QWidget *parent)
     // depends on it.
     m_profile->settings()->setAttribute(QWebEngineSettings::AllowRunningInsecureContent, false);
 
-    m_profile->installUrlSchemeHandler("light", new LightSchemeHandler(this));
-    m_profile->installUrlSchemeHandler("browser", new LightSchemeHandler(this));
-    m_profile->installUrlSchemeHandler("cloudar", new LightSchemeHandler(this));
+    // Real favicons, recorded by BrowserTabWidget as Chromium decodes them and
+    // served back under cloudar://newtab/favicon. Created before the handlers
+    // because they need a pointer to it.
+    m_faviconStore = new FaviconStore(this);
+    // installUrlSchemeHandler() takes ownership of the handler, so each scheme
+    // gets its own instance; they share the one store.
+    for (const char *scheme : { "light", "browser", "cloudar" }) {
+        auto *handler = new LightSchemeHandler(this);
+        handler->setFaviconStore(m_faviconStore);
+        m_profile->installUrlSchemeHandler(QByteArray(scheme), handler);
+    }
 
     // AdBlock: install request interceptor on profile
     m_adBlockInterceptor = new AdBlockInterceptor(this);
@@ -141,6 +151,26 @@ MainWindow::MainWindow(bool isIncognito, QWidget *parent)
     m_internalBridge = new InternalBridge(m_bookmarkManager, m_historyManager,
                                           m_downloadManager, m_webExtensionManager, this);
     m_webChannel->registerObject("internalBridge", m_internalBridge);
+    // The New Tab page's own API: the real interface style for this run, the
+    // configured search engine, recent history and — the point of it — real
+    // favicons for speed-dial tiles instead of a coloured letter.
+    m_newTabBridge = new NewTabBridge(m_bookmarkManager, m_historyManager,
+                                      m_faviconStore, this);
+    m_webChannel->registerObject("newTabBridge", m_newTabBridge);
+    connect(m_newTabBridge, &NewTabBridge::navigationRequested, this,
+            [this](const QUrl &url) {
+                if (!m_tabs)
+                    return;
+                // Reuse an already-open internal page rather than stacking a
+                // second copy of it; ordinary URLs just load in the current tab.
+                const QString prefix = url.toString(QUrl::StripTrailingSlash);
+                if (url.scheme() == QLatin1String("cloudar")
+                    && m_tabs->focusOrOpenTab(prefix, url)) {
+                    return;
+                }
+                if (auto *view = m_tabs->currentView())
+                    view->setUrl(url);
+            });
     connect(m_nativeBridge, &NativeBridge::historyRequested, this, &MainWindow::showHistoryDialog);
     connect(m_nativeBridge, &NativeBridge::downloadsRequested, this,
             [this]() { m_downloadManager->showDialog(); });
@@ -163,6 +193,9 @@ MainWindow::MainWindow(bool isIncognito, QWidget *parent)
 
     m_tabs = new BrowserTabWidget(m_profile, m_webChannel, this);
     m_tabs->setWebExtensionManager(m_webExtensionManager);
+    // Every favicon Chromium decodes passes through here, which is what makes
+    // the New Tab speed dial show the real icon instead of a letter.
+    m_tabs->setFaviconStore(m_faviconStore);
 
     // chrome.tabs.query() backing data — a plain JSON snapshot of open tabs,
     // rebuilt on demand (not cached) since it's only read when an

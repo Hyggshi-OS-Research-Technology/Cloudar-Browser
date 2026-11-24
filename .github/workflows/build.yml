@@ -104,6 +104,15 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             libxcomposite1 libxdamage1 libxrandr2 libxtst6 libxcursor1
 
+      - name: Check New Tab assets and bridge surface
+        run: |
+          # Every script the New Tab page loads must be in the qrc, every
+          # `bridge.x()` call must exist in NewTabBridge, and the classic chrome
+          # must actually have rules (it had none on this page, which is the bug
+          # this check exists to prevent). Runs before the expensive Qt build so
+          # a typo costs seconds instead of twenty minutes.
+          node tools/check-newtab.js
+
       - name: Configure CMake
         run: cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release
 

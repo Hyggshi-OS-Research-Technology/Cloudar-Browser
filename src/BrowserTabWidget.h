@@ -18,6 +18,7 @@ class QTimer;
 class QToolButton;
 class TabPreviewPopup;
 class WebExtensionManager;
+class FaviconStore;
 
 // A QTabWidget where each tab hosts one QWebEngineView. All views share a
 // single QWebEngineProfile so cookies/cache/history stay consistent and
@@ -53,6 +54,10 @@ public:
     // chrome.*. Must be set before any tab is opened to cover the first tab
     // too — MainWindow does this right after constructing both objects.
     void setWebExtensionManager(WebExtensionManager *manager) { m_webExtensions = manager; }
+
+    // Optional. Every favicon Chromium decodes for a real page is handed to this
+    // store, which is how the New Tab speed dial can show actual site icons.
+    void setFaviconStore(FaviconStore *store) { m_favicons = store; }
 
     // --- hooks for chrome.tabs.* / chrome.scripting.executeScript, wired
     // into WebExtensionManager by MainWindow. All of these use the tab's
@@ -116,6 +121,7 @@ private:
     QWebEngineProfile *m_profile;
     QWebChannel *m_channel;
     WebExtensionManager *m_webExtensions = nullptr;
+    FaviconStore *m_favicons = nullptr;
     void wireView(QWebEngineView *view);
     void animateIn(QWidget *view);
 
