@@ -1,5 +1,6 @@
 #include "SplitView.h"
 #include "BrowserResources.h"
+#include "ClassicTheme.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFrame>
@@ -11,9 +12,11 @@ SplitPane::SplitPane(QWebEngineProfile *profile, const QUrl &url, QWidget *paren
     rootLayout->setContentsMargins(0, 0, 0, 0);
     rootLayout->setSpacing(0);
 
+    // 2009-sized bar in the classic chrome, roomier one in the modern chrome.
+    const bool classic = Theme::current() == Theme::ThemeStyle::Classic;
     QFrame *bar = new QFrame(this);
     bar->setObjectName("SplitPaneBar");
-    bar->setFixedHeight(42);
+    bar->setFixedHeight(classic ? 28 : 42);
     QHBoxLayout *barLayout = new QHBoxLayout(bar);
     barLayout->setContentsMargins(8, 5, 8, 5);
     barLayout->setSpacing(6);
@@ -21,17 +24,17 @@ SplitPane::SplitPane(QWebEngineProfile *profile, const QUrl &url, QWidget *paren
     m_backBtn = new QToolButton(bar);
     m_backBtn->setObjectName("SplitPaneButton");
     m_backBtn->setText(BrowserResources::getIcon("back"));
-    m_backBtn->setFixedSize(28, 28);
+    m_backBtn->setFixedSize(classic ? 22 : 28, classic ? 22 : 28);
 
     m_forwardBtn = new QToolButton(bar);
     m_forwardBtn->setObjectName("SplitPaneButton");
     m_forwardBtn->setText(BrowserResources::getIcon("forward"));
-    m_forwardBtn->setFixedSize(28, 28);
+    m_forwardBtn->setFixedSize(classic ? 22 : 28, classic ? 22 : 28);
 
     m_reloadBtn = new QToolButton(bar);
     m_reloadBtn->setObjectName("SplitPaneButton");
     m_reloadBtn->setText(BrowserResources::getIcon("reload"));
-    m_reloadBtn->setFixedSize(28, 28);
+    m_reloadBtn->setFixedSize(classic ? 22 : 28, classic ? 22 : 28);
 
     m_urlBar = new QLineEdit(bar);
     m_urlBar->setObjectName("SplitPaneUrlBar");

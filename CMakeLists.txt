@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(cloudar-browser VERSION 0.1.0 LANGUAGES CXX)
+project(cloudar-browser VERSION 0.2.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -33,6 +33,7 @@ set(SOURCES
     src/BrowserSidebar.cpp
     src/BrowserTabWidget.cpp
     src/ChromeExtensionAPI.cpp
+    src/ClassicTheme.cpp
     src/CrxInstaller.cpp
     src/DownloadManager.cpp
     src/ExtensionManager.cpp
@@ -42,6 +43,8 @@ set(SOURCES
     src/Language.cpp
     src/LightSchemeHandler.cpp
     src/MainWindow.cpp
+    src/MemorySaver.cpp
+    src/PerformanceProfile.cpp
     src/ReaderMode.cpp
     src/SessionManager.cpp
     src/SettingsBridge.cpp
@@ -67,6 +70,7 @@ set(HEADERS
     src/BrowserSidebar.h
     src/BrowserTabWidget.h
     src/ChromeExtensionAPI.h
+    src/ClassicTheme.h
     src/CrxInstaller.h
     src/DownloadManager.h
     src/ExtensionManager.h
@@ -76,6 +80,8 @@ set(HEADERS
     src/Language.h
     src/LightSchemeHandler.h
     src/MainWindow.h
+    src/MemorySaver.h
+    src/PerformanceProfile.h
     src/NativeBridge.h
     src/ReaderMode.h
     src/SessionManager.h

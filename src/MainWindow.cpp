@@ -16,6 +16,7 @@
 #include <QStatusBar>
 #include <QSizeGrip>
 #include <QAction>
+#include <QActionGroup>
 #include <QStandardPaths>
 #include <QDir>
 #include <QListWidget>
@@ -36,22 +37,38 @@
 #include <QSplitter>
 #include <QTimer>
 #include <QShowEvent>
+#include <QToolButton>
+#include <QTabBar>
+#include <QSysInfo>
 
 MainWindow::MainWindow(bool isIncognito, QWidget *parent)
     : QMainWindow(parent), m_isIncognito(isIncognito)
 {
     setWindowIcon(QIcon(":/icon.png"));
-    // Frameless: the window draws its own title bar (see buildTitleBar())
-    // so its color can stay in sync with ThemeManager's accent color —
-    // the native decoration a window manager draws can't be recolored
-    // portably from Qt.
-    setWindowFlag(Qt::FramelessWindowHint, true);
+
+    // Two chromes, two window models:
+    //
+    //   Modern  - frameless, so the title bar can be recolored with the accent
+    //             colour (window managers own the native decoration and give
+    //             Qt no portable way to tint it).
+    //   Classic - a normal decorated window, because Chrome 0.2/1.0 on 2009
+    //             Windows looked exactly like every other Win32 app: Aero/
+    //             Classic title bar, menu row, tab strip, toolbar, status bar.
+    //             Faking that inside a frameless window would only fight the
+    //             platform's own window manager.
+    const Theme::Metrics metrics = Theme::metrics();
+    setWindowFlag(Qt::FramelessWindowHint, metrics.frameless);
     if (m_isIncognito)
         setAttribute(Qt::WA_DeleteOnClose, true);
-    // A frameless window has no window-manager resize border. Listening at
-    // the application level keeps the edges usable over web content and
-    // toolbars as well as the otherwise empty window frame.
-    qApp->installEventFilter(this);
+    if (metrics.frameless) {
+        // A frameless window has no window-manager resize border. Listening at
+        // the application level keeps the edges usable over web content and
+        // toolbars as well as the otherwise empty window frame.
+        qApp->installEventFilter(this);
+    }
+    // Both chromes are painted by the application stylesheet
+    // (Theme::appStyleSheet); no per-window override is applied, so dialogs and
+    // menus keep whatever the platform style provides on top of it.
 
     if (m_isIncognito) {
         // Pure in-memory off-the-record profile: no history, no persistent disk cookies
@@ -74,9 +91,19 @@ MainWindow::MainWindow(bool isIncognito, QWidget *parent)
     m_profile->settings()->setAttribute(QWebEngineSettings::FullScreenSupportEnabled, true);
     m_profile->settings()->setAttribute(QWebEngineSettings::WebGLEnabled, true);
     m_profile->settings()->setAttribute(QWebEngineSettings::Accelerated2dCanvasEnabled, true);
+    // Internal pages (cloudar://) are served through LightSchemeHandler and are
+    // treated by Chromium as local content. The New Tab page lets the user point
+    // a wallpaper at a remote image URL, so local content must be allowed to
+    // reach the network — that part is by design.
     m_profile->settings()->setAttribute(QWebEngineSettings::LocalContentCanAccessRemoteUrls, true);
-    m_profile->settings()->setAttribute(QWebEngineSettings::LocalContentCanAccessFileUrls, true);
-    m_profile->settings()->setAttribute(QWebEngineSettings::AllowRunningInsecureContent, true);
+    // The opposite direction is not needed by anything in the browser and is a
+    // real risk: without this, a deliberately-crafted `cloudar://` page or a
+    // local file opened by the user cannot read arbitrary files from disk.
+    m_profile->settings()->setAttribute(QWebEngineSettings::LocalContentCanAccessFileUrls, false);
+    // Mixed content stays blocked. Allowing HTTP subresources inside an HTTPS
+    // page silently downgrades transport security, and nothing in the browser
+    // depends on it.
+    m_profile->settings()->setAttribute(QWebEngineSettings::AllowRunningInsecureContent, false);
 
     m_profile->installUrlSchemeHandler("light", new LightSchemeHandler(this));
     m_profile->installUrlSchemeHandler("browser", new LightSchemeHandler(this));
@@ -167,21 +194,41 @@ MainWindow::MainWindow(bool isIncognito, QWidget *parent)
             return true;
         });
 
+    // Memory Saver: the real implementation behind the settings page's
+    // Light/Medium/High/Ultra levels (see MemorySaver.h). It reacts to tab
+    // switches and periodically discards renderers that have been idle for
+    // longer than the configured threshold.
+    m_memorySaver = new MemorySaver(m_tabs, this);
+    connect(m_tabs, &BrowserTabWidget::currentTabChanged, m_memorySaver,
+            &MemorySaver::noteTabActivated);
+    connect(m_settingsBridge, &SettingsBridge::settingsChanged, m_memorySaver,
+            &MemorySaver::reloadSettings);
+
     connect(m_tabs, &BrowserTabWidget::urlChangedForCurrentTab, this, &MainWindow::updateAddressBar);
     connect(m_tabs, &BrowserTabWidget::urlChangedForCurrentTab, this, &MainWindow::updateBookmarkStar);
     connect(m_tabs, &BrowserTabWidget::titleChangedForCurrentTab, this, &MainWindow::updateWindowTitle);
     connect(m_tabs, &BrowserTabWidget::loadProgressForCurrentTab, this, &MainWindow::updateProgress);
     connect(m_tabs, &BrowserTabWidget::loadStartedForCurrentTab, this, [this]() {
-        m_spinner->start();
-        m_addressGlow->setEnabled(true);
-        m_addressGlowAnim->start();
+        if (m_spinner)
+            m_spinner->start();
+        if (m_addressGlow && m_addressGlowAnim) {
+            m_addressGlow->setEnabled(true);
+            m_addressGlowAnim->start();
+        }
+        if (statusBar() && Theme::current() == Theme::ThemeStyle::Classic)
+            statusBar()->showMessage(tr("Loading..."));
         updateNavigationState();
     });
-    connect(m_tabs, &BrowserTabWidget::loadFinishedForCurrentTab, this, [this](bool) {
-        m_spinner->stop();
-        m_addressGlowAnim->stop();
-        m_addressGlow->setBlurRadius(0);
-        m_addressGlow->setEnabled(false);
+    connect(m_tabs, &BrowserTabWidget::loadFinishedForCurrentTab, this, [this](bool ok) {
+        if (m_spinner)
+            m_spinner->stop();
+        if (m_addressGlow && m_addressGlowAnim) {
+            m_addressGlowAnim->stop();
+            m_addressGlow->setBlurRadius(0);
+            m_addressGlow->setEnabled(false);
+        }
+        if (statusBar() && Theme::current() == Theme::ThemeStyle::Classic)
+            statusBar()->showMessage(ok ? tr("Done") : tr("Failed to open page"), 3000);
         updateProgress(100);
         updateNavigationState();
     });
@@ -201,21 +248,43 @@ MainWindow::MainWindow(bool isIncognito, QWidget *parent)
     buildBookmarksBar();
     buildMenu();
     applySettings();
+    applyChromeStyle();
     applyTheme();
     connect(&ThemeManager::instance(), &ThemeManager::accentChanged, this,
             [this](const QColor &) { applyTheme(); });
 
-    // Size grip in a slim status bar — the only way left to resize once
-    // the window is frameless and the OS border is gone.
-    auto *grip = new QSizeGrip(this);
-    statusBar()->addPermanentWidget(grip);
-    statusBar()->setFixedHeight(16);
-    statusBar()->setSizeGripEnabled(false);
+    // Size grip in a slim status bar — the only way left to resize once the
+    // window is frameless and the OS border is gone. A decorated (classic)
+    // window keeps the platform's own resize border, so a grip there would be
+    // redundant chrome that Chrome 2009 never had.
+    const Theme::Metrics chromeMetrics = Theme::metrics();
+    if (chromeMetrics.frameless) {
+        auto *grip = new QSizeGrip(this);
+        statusBar()->addPermanentWidget(grip);
+        statusBar()->setFixedHeight(16);
+        statusBar()->setSizeGripEnabled(false);
+    } else {
+        statusBar()->setSizeGripEnabled(true);
+        statusBar()->setFixedHeight(20);
+        QSettings().setDefault("browser/bookmarkBarVisible", true);
+        statusBar()->showMessage(tr("Ready"));
+    }
 
     // AISidebar dock widget
     m_aiSidebar = new AISidebar(this, this);
     m_aiSidebar->hide();
     addDockWidget(Qt::RightDockWidgetArea, m_aiSidebar);
+
+    // Memory Saver feedback lives in the status bar on the classic chrome,
+    // which is the only persistent strip of text it has.
+    connect(m_memorySaver, &MemorySaver::statisticsChanged, this,
+            [this](int sleptTabs, qint64 freedBytes) {
+                const int mb = static_cast<int>(freedBytes / (1024 * 1024));
+                const QString msg = sleptTabs > 0
+                    ? tr("Memory Saver: %1 tab(s) sleeping, ~%2 MB released").arg(sleptTabs).arg(mb)
+                    : tr("Memory Saver: no tabs are sleeping");
+                statusBar()->showMessage(msg, 4000);
+            });
 
     // AdBlock: show blocked count in status bar
     connect(m_adBlockInterceptor, &AdBlockInterceptor::blockedCountChanged, this, [this](int count) {
@@ -236,6 +305,7 @@ MainWindow::MainWindow(bool isIncognito, QWidget *parent)
 void MainWindow::buildSidebar()
 {
     QSettings settings;
+    const bool classic = Theme::current() == Theme::ThemeStyle::Classic;
     m_browserSplitter = new QSplitter(Qt::Horizontal, this);
     m_browserSplitter->setChildrenCollapsible(false);
     m_browserSplitter->setHandleWidth(5);
@@ -257,7 +327,10 @@ void MainWindow::buildSidebar()
         }
     });
     setCentralWidget(m_browserSplitter);
-    setSidebarVisible(settings.value("browser/sidebarEnabled", true).toBool());
+    // Classic Chrome has one horizontal tab strip and no side panel, so the
+    // sidebar starts hidden there regardless of the modern-chrome preference.
+    setSidebarVisible(classic ? false
+                              : settings.value("browser/sidebarEnabled", true).toBool());
     if (m_sidebar->isVisible()) {
         const bool initExpanded = settings.value("browser/sidebarExpanded", false).toBool();
         m_sidebar->setExpanded(initExpanded);
@@ -365,6 +438,16 @@ void MainWindow::resizeFromGlobalPos(const QPoint &globalPos)
 
 void MainWindow::buildTitleBar()
 {
+    if (!Theme::metrics().frameless) {
+        // Classic chrome: the OS draws the title bar, so the menu row is the
+        // topmost thing we own. Using the real QMenuBar (rather than a
+        // hand-built container) is what makes the classic build look like a
+        // Win32 application instead of a skinned one.
+        m_titleBar = nullptr;
+        m_menuBar = menuBar();
+        return;
+    }
+
     // QMainWindow always puts its menu bar in the topmost row and any
     // TopToolBarArea toolbars in the row(s) below — and will happily pack
     // two toolbars into the *same* row if they fit, which is what was
@@ -400,27 +483,78 @@ void MainWindow::applyTheme()
     qApp->setStyleSheet(ThemeManager::instance().appStyleSheet());
     if (m_addressGlow)
         m_addressGlow->setColor(ThemeManager::instance().accentColor());
+
+    // Re-render the toolbar glyphs for the active chrome. This runs on every
+    // accent change and on every interface-style switch, and it has to handle
+    // the switch in *both* directions: the classic chrome uses painted icons,
+    // the modern chrome uses text arrows, so leaving the classic glyphs behind
+    // when going modern would show two different icon languages in one toolbar.
+    // Theme::icon() caches per style, so the repaint is not repeated needlessly.
+    const bool classic = Theme::current() == Theme::ThemeStyle::Classic;
+    if (!m_backAction)
+        return; // toolbar not built yet; buildToolbar() applies the style itself
+
+    const bool loading = m_tabs && m_tabs->currentView()
+                         && m_tabs->currentView()->page()->isLoading();
+    m_backAction->setIcon(classic ? Theme::icon("back") : QIcon());
+    m_forwardAction->setIcon(classic ? Theme::icon("forward") : QIcon());
+    m_reloadStopAction->setIcon(classic ? Theme::icon(loading ? "stop" : "reload") : QIcon());
+    m_reloadStopAction->setText(classic ? QString()
+                                        : (loading ? QStringLiteral("\u2715")   // x
+                                                   : QStringLiteral("\u27F3"))); // reload
+    if (m_homeAction) {
+        m_homeAction->setIcon(classic ? Theme::icon("home") : QIcon());
+        m_homeAction->setText(classic ? QString() : QStringLiteral("\u2302"));
+    }
+    if (m_bookmarkStarAction) {
+        const bool bookmarked = m_tabs && m_tabs->currentView()
+            && m_bookmarkManager->contains(m_tabs->currentView()->url().toString());
+        m_bookmarkStarAction->setIcon(classic ? Theme::icon(bookmarked ? "star-filled" : "star")
+                                              : QIcon());
+        m_bookmarkStarAction->setText(classic ? QString()
+                                              : QString::fromUtf8(bookmarked ? "\u2605" : "\u2606"));
+    }
+
+    // The two decorations that only exist in the classic omnibox.
+    if (m_classicPageIcon)
+        m_classicPageIcon->setIcon(Theme::icon("page", 16));
+    if (m_classicGoButton)
+        m_classicGoButton->setIcon(Theme::icon("go", 16));
+    if (m_classicPageIcon)
+        m_classicPageIcon->setVisible(classic);
+    if (m_classicGoButton)
+        m_classicGoButton->setVisible(classic);
 }
 
 void MainWindow::buildToolbar()
 {
-    auto *toolbar = addToolBar("Navigation");
-    toolbar->setMovable(false);
-    toolbar->setIconSize(QSize(20, 20));
+    const bool classic = Theme::current() == Theme::ThemeStyle::Classic;
 
-    m_backAction = toolbar->addAction("\u2190"); // back
+    auto *toolbar = addToolBar("Navigation");
+    m_navToolbar = toolbar;
+    toolbar->setObjectName("NavigationToolbar");
+    toolbar->setMovable(false);
+    toolbar->setFloatable(false);
+    toolbar->setIconSize(classic ? QSize(16, 16) : QSize(20, 20));
+    if (classic)
+        toolbar->setToolButtonStyle(Qt::ToolButtonIconOnly);
+
+    m_backAction = toolbar->addAction(classic ? Theme::icon("back") : QIcon(),
+                                      classic ? QString() : QString("\u2190")); // back
     m_backAction->setToolTip("Back");
     connect(m_backAction, &QAction::triggered, this, [this]() {
         if (auto *v = m_tabs->currentView()) v->back();
     });
 
-    m_forwardAction = toolbar->addAction("\u2192"); // forward
+    m_forwardAction = toolbar->addAction(classic ? Theme::icon("forward") : QIcon(),
+                                          classic ? QString() : QString("\u2192")); // forward
     m_forwardAction->setToolTip("Forward");
     connect(m_forwardAction, &QAction::triggered, this, [this]() {
         if (auto *v = m_tabs->currentView()) v->forward();
     });
 
-    m_reloadStopAction = toolbar->addAction("\u27F3"); // reload / stop while loading
+    m_reloadStopAction = toolbar->addAction(classic ? Theme::icon("reload") : QIcon(),
+                                             classic ? QString() : QString("\u27F3")); // reload / stop while loading
     m_reloadStopAction->setToolTip("Reload");
     connect(m_reloadStopAction, &QAction::triggered, this, [this]() {
         if (auto *v = m_tabs->currentView()) {
@@ -428,34 +562,61 @@ void MainWindow::buildToolbar()
         }
     });
 
+    // Classic Chrome kept Home, Reload and Stop as separate buttons to the left
+    // of the omnibox. The action is always created and only its visibility is
+    // the setting: creating it conditionally would leave the Options > Home
+    // button toggle with nothing to un-hide later in the session.
+    m_homeAction = toolbar->addAction(classic ? Theme::icon("home") : QIcon(),
+                                      classic ? QString() : QStringLiteral("\u2302"));
+    m_homeAction->setToolTip(tr("Home"));
+    connect(m_homeAction, &QAction::triggered, this, [this]() {
+        if (auto *v = m_tabs->currentView())
+            v->load(QUrl(SettingsDialog(this).homePage()));
+    });
+    m_homeAction->setVisible(QSettings().value("browser/showHomeButton", true).toBool());
+    if (classic)
+        toolbar->addSeparator();
+
     m_addressBar = new QLineEdit(toolbar);
-    m_addressBar->setPlaceholderText("Search or enter address");
+    // The object name is what the classic stylesheet targets for its 23 px,
+    // square-cornered, page-icon-inset omnibox.
+    m_addressBar->setObjectName(classic ? "ClassicOmnibox" : "Omnibox");
+    m_addressBar->setPlaceholderText(classic ? QString() : QString("Search or enter address"));
+    m_addressBar->setClearButtonEnabled(!classic);
     connect(m_addressBar, &QLineEdit::returnPressed, this, &MainWindow::navigateToAddressBarInput);
     toolbar->addWidget(m_addressBar);
+    if (classic)
+        buildClassicOmniboxDecor();
 
     // A restrained "breathing" accent around the address bar makes page
-    // loading visible even when the progress bar is near 0% or hidden.
-    // It is disabled outside loads, so normal typing has no graphics-effect
-    // compositing cost.
-    m_addressGlow = new QGraphicsDropShadowEffect(m_addressBar);
-    m_addressGlow->setOffset(0, 0);
-    m_addressGlow->setColor(ThemeManager::instance().accentColor());
-    m_addressGlow->setBlurRadius(0);
-    m_addressGlow->setEnabled(false);
-    m_addressBar->setGraphicsEffect(m_addressGlow);
-    m_addressGlowAnim = new QPropertyAnimation(m_addressGlow, "blurRadius", this);
-    m_addressGlowAnim->setDuration(950);
-    m_addressGlowAnim->setKeyValueAt(0.0, 2.0);
-    m_addressGlowAnim->setKeyValueAt(0.5, 16.0);
-    m_addressGlowAnim->setKeyValueAt(1.0, 2.0);
-    m_addressGlowAnim->setLoopCount(-1);
-    m_addressGlowAnim->setEasingCurve(QEasingCurve::InOutSine);
+    // loading visible even when the progress bar is near 0% or hidden. It is
+    // only ever enabled during a load, and it is skipped entirely on the
+    // classic chrome (Chrome 2009 had no such thing) and on the Legacy CPU
+    // tier, where any graphics effect goes through the software compositor.
+    if (!classic && PerformanceProfile::animationsEnabled()) {
+        m_addressGlow = new QGraphicsDropShadowEffect(m_addressBar);
+        m_addressGlow->setOffset(0, 0);
+        m_addressGlow->setColor(ThemeManager::instance().accentColor());
+        m_addressGlow->setBlurRadius(0);
+        m_addressGlow->setEnabled(false);
+        m_addressBar->setGraphicsEffect(m_addressGlow);
 
-    m_bookmarkStarAction = toolbar->addAction("\u2606"); // outline star; filled (\u2605) when current page is bookmarked
+        m_addressGlowAnim = new QPropertyAnimation(m_addressGlow, "blurRadius", this);
+        m_addressGlowAnim->setDuration(950);
+        m_addressGlowAnim->setKeyValueAt(0.0, 2.0);
+        m_addressGlowAnim->setKeyValueAt(0.5, 16.0);
+        m_addressGlowAnim->setKeyValueAt(1.0, 2.0);
+        m_addressGlowAnim->setLoopCount(-1);
+        m_addressGlowAnim->setEasingCurve(QEasingCurve::InOutSine);
+    }
+
+    m_bookmarkStarAction = toolbar->addAction(classic ? Theme::icon("star") : QIcon(),
+                                              classic ? QString() : QString("\u2606")); // outline star; filled when bookmarked
     m_bookmarkStarAction->setToolTip("Bookmark this page");
     connect(m_bookmarkStarAction, &QAction::triggered, this, &MainWindow::toggleBookmarkForCurrentPage);
 
-    auto *readerAction = toolbar->addAction("\u2637"); // reader/article glyph
+    auto *readerAction = toolbar->addAction(classic ? Theme::icon("reader") : QIcon(),
+                                            classic ? QString() : QString("\u2637")); // reader/article glyph
     readerAction->setToolTip("Reader mode");
     connect(readerAction, &QAction::triggered, this, [this]() {
         auto *v = m_tabs->currentView();
@@ -467,49 +628,53 @@ void MainWindow::buildToolbar()
         });
     });
 
-    m_spinner = new SpinnerWidget(toolbar);
-    toolbar->addWidget(m_spinner);
+    // Classic Chrome showed loading as a green progress sliver over the
+    // status bar rather than a spinner next to the omnibox.
+    if (!classic) {
+        m_spinner = new SpinnerWidget(toolbar);
+        toolbar->addWidget(m_spinner);
+    }
 
     m_progressBar = new QProgressBar(this);
     m_progressBar->setMaximumWidth(120);
     m_progressBar->setTextVisible(false);
     m_progressBar->setVisible(false);
-    toolbar->addWidget(m_progressBar);
+    if (!classic)
+        toolbar->addWidget(m_progressBar);
 
     m_progressAnim = new QPropertyAnimation(m_progressBar, "value", this);
-    m_progressAnim->setDuration(180);
+    m_progressAnim->setDuration(PerformanceProfile::animationsEnabled() ? 180 : 0);
     m_progressAnim->setEasingCurve(QEasingCurve::OutCubic);
 
-    // AI Sidebar toggle button (Ctrl+Shift+A)
-    m_aiSidebarAction = toolbar->addAction("AI"); // AI label for sidebar toggle
-    m_aiSidebarAction->setToolTip("AI Sidebar (Ctrl+Shift+A)");
-    m_aiSidebarAction->setCheckable(true);
-    m_aiSidebarAction->setShortcut(QKeySequence("Ctrl+Shift+A"));
-    connect(m_aiSidebarAction, &QAction::triggered, this, [this](bool checked) {
-        if (m_aiSidebar) {
-            m_aiSidebar->setVisible(checked);
-        }
-    });
+    if (classic && statusBar()) {
+        // Status-bar progress, as in the 2009 chrome.
+        m_progressBar->setMaximumWidth(140);
+        m_progressBar->setFixedHeight(10);
+        statusBar()->addPermanentWidget(m_progressBar, 0);
+    }
 
-    // SplitView toggle button (⊞)
-    m_splitViewAction = toolbar->addAction("\u29C9"); // ⧉ split view icon
-    m_splitViewAction->setToolTip("Toggle Split View");
-    m_splitViewAction->setCheckable(true);
-    connect(m_splitViewAction, &QAction::triggered, this, [this](bool checked) {
-        if (checked) {
-            if (!m_splitView) {
-                // Create split view the first time
-                QUrl currentUrl = m_tabs->currentView() ? m_tabs->currentView()->url() : QUrl("cloudar://newtab");
-                m_splitView = new SplitView(m_profile, currentUrl, QUrl("cloudar://newtab"));
-            }
-            m_splitView->show();
-            setCentralWidget(m_splitView);
-        } else {
-            if (m_splitView)
-                m_splitView->hide();
-            setCentralWidget(m_browserSplitter);
-        }
-    });
+    // The AI sidebar and split view are modern-chrome features: Chrome 2009
+    // had neither, so the classic toolbar stays true to its reference and
+    // leaves them out (they remain reachable from the View menu).
+    if (!classic) {
+        // AI Sidebar toggle button (Ctrl+Shift+A)
+        m_aiSidebarAction = toolbar->addAction("AI"); // AI label for sidebar toggle
+        m_aiSidebarAction->setToolTip("AI Sidebar (Ctrl+Shift+A)");
+        m_aiSidebarAction->setCheckable(true);
+        m_aiSidebarAction->setShortcut(QKeySequence("Ctrl+Shift+A"));
+        connect(m_aiSidebarAction, &QAction::triggered, this, [this](bool checked) {
+            if (m_aiSidebar)
+                m_aiSidebar->setVisible(checked);
+        });
+
+        // SplitView toggle button
+        m_splitViewAction = toolbar->addAction("\u29C9"); // split view icon
+        m_splitViewAction->setToolTip("Toggle Split View");
+        m_splitViewAction->setCheckable(true);
+        connect(m_splitViewAction, &QAction::triggered, this, [this](bool checked) {
+            toggleSplitView(checked);
+        });
+    }
 
     updateNavigationState();
 }
@@ -522,6 +687,8 @@ void MainWindow::buildBookmarksBar()
     addToolBarBreak(Qt::TopToolBarArea);
 
     auto *toolbar = addToolBar("Bookmarks");
+    m_bookmarkToolbar = toolbar;
+    toolbar->setObjectName("BookmarkToolbar");
     toolbar->setMovable(false);
     toolbar->setFloatable(false);
     toolbar->toggleViewAction()->setVisible(false); // don't let it show up in a right-click "toggle toolbar" menu
@@ -554,11 +721,28 @@ void MainWindow::toggleBookmarkForCurrentPage()
 void MainWindow::updateBookmarkStar(const QUrl &url)
 {
     const bool bookmarked = m_bookmarkManager->contains(url.toString());
-    m_bookmarkStarAction->setText(bookmarked ? "\u2605" : "\u2606");
+    if (Theme::current() == Theme::ThemeStyle::Classic) {
+        // The classic chrome uses painted glyphs, so the filled/outline state
+        // is expressed by swapping the icon rather than the button text.
+        m_bookmarkStarAction->setIcon(Theme::icon(bookmarked ? "star-filled" : "star"));
+        m_bookmarkStarAction->setText(QString());
+    } else {
+        m_bookmarkStarAction->setIcon(QIcon());
+        m_bookmarkStarAction->setText(bookmarked ? "\u2605" : "\u2606");
+    }
     m_bookmarkStarAction->setToolTip(bookmarked ? "Remove bookmark" : "Bookmark this page");
 }
 
 void MainWindow::buildMenu()
+{
+    if (Theme::current() == Theme::ThemeStyle::Classic) {
+        buildClassicMenu();
+        return;
+    }
+    buildModernMenu();
+}
+
+void MainWindow::buildModernMenu()
 {
     auto *menu = m_menuBar->addMenu("&Menu");
 
@@ -576,7 +760,7 @@ void MainWindow::buildMenu()
     m_sidebarAction = menu->addAction("Show Sidebar");
     m_sidebarAction->setCheckable(true);
     m_sidebarAction->setShortcut(QKeySequence("Ctrl+Shift+S"));
-    m_sidebarAction->setChecked(m_sidebar->isVisible());
+    m_sidebarAction->setChecked(m_sidebar && m_sidebar->isVisible());
     connect(m_sidebarAction, &QAction::toggled, this, &MainWindow::setSidebarVisible);
 
     auto *downloads = menu->addAction("Downloads");
@@ -584,6 +768,36 @@ void MainWindow::buildMenu()
 
     auto *history = menu->addAction("History");
     connect(history, &QAction::triggered, this, &MainWindow::showHistoryDialog);
+
+    // One shared handler for both chromes so the two menus cannot drift apart.
+    auto *themeMenu = menu->addMenu(tr("Interface Style"));
+    m_themeClassicAction = themeMenu->addAction(tr("Classic (Chrome 2009)"));
+    m_themeModernAction = themeMenu->addAction(tr("Modern (dark)"));
+    auto *styleGroup = new QActionGroup(this);
+    for (QAction *action : {m_themeClassicAction, m_themeModernAction}) {
+        action->setCheckable(true);
+        styleGroup->addAction(action);
+    }
+    // Checked state follows the *saved* preference, not the running style: a
+    // --modern launch must not make this menu claim the user chose modern.
+    m_themeModernAction->setChecked(Theme::savedStyle() == Theme::ThemeStyle::Modern);
+    m_themeClassicAction->setChecked(!m_themeModernAction->isChecked());
+
+    auto applyStyleChoice = [this](Theme::ThemeStyle style) {
+        // Saved only: the window model and menu bar cannot change in place.
+        Theme::setCurrent(style);
+        QMessageBox::information(
+            this, tr("Interface Style"),
+            tr("The %1 interface will be used the next time Cloudar Browser starts. "
+               "Use Tools \u25b8 Restart to switch now.")
+                .arg(style == Theme::ThemeStyle::Classic ? tr("classic") : tr("modern")));
+    };
+    connect(m_themeClassicAction, &QAction::triggered, this, [applyStyleChoice]() {
+        applyStyleChoice(Theme::ThemeStyle::Classic);
+    });
+    connect(m_themeModernAction, &QAction::triggered, this, [applyStyleChoice]() {
+        applyStyleChoice(Theme::ThemeStyle::Modern);
+    });
 
     auto *find = menu->addAction("Find in page");
     find->setShortcut(QKeySequence::Find);
@@ -600,6 +814,18 @@ void MainWindow::buildMenu()
     m_zoomResetAction->setShortcut(QKeySequence("Ctrl+0"));
     connect(m_zoomResetAction, &QAction::triggered, this, [this](){ setZoom(1.0); });
 
+    auto *toggleBookmarksBar = menu->addAction("Show Bookmarks Bar");
+    toggleBookmarksBar->setCheckable(true);
+    toggleBookmarksBar->setChecked(QSettings().value("browser/bookmarkBarVisible", true).toBool());
+    toggleBookmarksBar->setShortcut(QKeySequence("Ctrl+Shift+B"));
+    connect(toggleBookmarksBar, &QAction::toggled, this, [this](bool on) {
+        if (m_bookmarkToolbar) {
+            // Ctrl+Shift+B is a window-level shortcut, so it applies for this
+            // session only; the saved preference is the Settings switch.
+            m_bookmarkToolbar->setVisible(on);
+        }
+    });
+
     auto *extensions = menu->addAction("Extensions");
     connect(extensions, &QAction::triggered, this, &MainWindow::showExtensionsDialog);
 
@@ -614,15 +840,28 @@ void MainWindow::buildMenu()
 
 void MainWindow::setSidebarVisible(bool visible)
 {
+    if (!m_sidebar || !m_browserSplitter)
+        return;
+    // The classic chrome has exactly one tab surface, so a hidden side panel
+    // must not leave the browser without a visible tab strip to switch tabs.
+    const bool classic = Theme::current() == Theme::ThemeStyle::Classic;
+    if (classic && !visible)
+        m_tabs->setHorizontalTabBarVisible(true);
+
     m_sidebar->setVisible(visible);
     m_browserSplitter->handle(1)->setVisible(visible);
-    m_tabs->setHorizontalTabBarVisible(!visible);
+    if (!classic || visible)
+        m_tabs->setHorizontalTabBarVisible(!visible);
     if (m_sidebarAction && m_sidebarAction->isChecked() != visible) {
         m_sidebarAction->blockSignals(true);
         m_sidebarAction->setChecked(visible);
         m_sidebarAction->blockSignals(false);
     }
-    QSettings().setValue("browser/sidebarEnabled", visible);
+    // Only a user-driven toggle (the View menu, the settings page) should be
+    // persisted. The classic chrome force-hides the panel at startup, and that
+    // must not overwrite the preference the modern chrome will want back.
+    if (visible || Theme::current() != Theme::ThemeStyle::Classic || m_firstShowDone)
+        QSettings().setValue("browser/sidebarEnabled", visible);
 }
 
 void MainWindow::showEvent(QShowEvent *event)
@@ -703,7 +942,15 @@ void MainWindow::updateNavigationState()
     if (m_forwardAction) m_forwardAction->setEnabled(hasView && view->history()->canGoForward());
     if (m_reloadStopAction) {
         const bool loading = hasView && view->page()->isLoading();
-        m_reloadStopAction->setText(loading ? "\u2715" : "\u27F3");
+        if (Theme::current() == Theme::ThemeStyle::Classic) {
+            m_reloadStopAction->setIcon(Theme::icon(loading ? "stop" : "reload"));
+            m_reloadStopAction->setText(QString());
+        } else {
+            // Modern chrome: a text glyph, so any icon from a previous classic
+            // session must be cleared or both are drawn side by side.
+            m_reloadStopAction->setIcon(QIcon());
+            m_reloadStopAction->setText(loading ? "\u2715" : "\u27F3");
+        }
         m_reloadStopAction->setToolTip(loading ? "Stop" : "Reload");
     }
 }
@@ -875,7 +1122,8 @@ void MainWindow::updateWindowTitle(const QString &title)
     const QString prefix = m_isIncognito ? "🕶 Incognito - " : "";
     const QString full = title.isEmpty() ? (prefix + "Cloudar Browser") : (prefix + title + " - Cloudar Browser");
     setWindowTitle(full);
-    m_titleBar->setTitle(full);
+    if (m_titleBar)
+        m_titleBar->setTitle(full);
     if (!m_isIncognito && m_historyManager) {
         if (auto *v = m_tabs->currentView())
             m_historyManager->addVisit(title, v->url().toString());
@@ -884,6 +1132,27 @@ void MainWindow::updateWindowTitle(const QString &title)
 
 void MainWindow::updateProgress(int percent)
 {
+    if (Theme::current() == Theme::ThemeStyle::Classic) {
+        // Chrome 2009 had no progress control in the toolbar; it drew a thin
+        // green bar across the status bar. A determinate QProgressBar added
+        // permanently to the status bar is the closest faithful equivalent.
+        if (!m_progressBar)
+            return;
+        if (percent <= 0) {
+            m_progressBar->setVisible(false);
+            return;
+        }
+        if (!m_progressBar->isVisible() && statusBar()) {
+            if (!statusBar()->isVisible())
+                statusBar()->show();
+        }
+        m_progressBar->setVisible(true);
+        m_progressBar->setValue(percent);
+        if (percent >= 100)
+            QTimer::singleShot(400, m_progressBar, [this]() { m_progressBar->setVisible(false); });
+        return;
+    }
+
     if (percent <= 0) {
         m_progressBar->setVisible(false);
         return;
@@ -951,4 +1220,297 @@ void MainWindow::showExtensionsDialog()
 {
     ExtensionsDialog dlg(m_extensionManager, m_webExtensionManager, this);
     dlg.exec();
+}
+
+// ---------------------------------------------------------------------------
+// Classic chrome (Chrome 0.2 / 1.0, 2009)
+// ---------------------------------------------------------------------------
+
+void MainWindow::buildClassicMenu()
+{
+    // Chrome 2009 exposed its actions through a single "Control the current
+    // page" button plus a small wrench menu; this is the same content laid out
+    // as a conventional Win32 menu bar, which is what users of that era
+    // expect from a Windows application.
+    auto *fileMenu = m_menuBar->addMenu(tr("&File"));
+
+    auto *newTab = fileMenu->addAction(tr("New &tab"));
+    newTab->setShortcut(QKeySequence::AddTab);
+    connect(newTab, &QAction::triggered, this, [this]() { m_tabs->addNewTab(); });
+
+    auto *newWindow = fileMenu->addAction(tr("New &window"));
+    newWindow->setShortcut(QKeySequence("Ctrl+N"));
+    connect(newWindow, &QAction::triggered, this, [this]() {
+        auto *window = new MainWindow(false);
+        window->show();
+    });
+
+    auto *newIncognito = fileMenu->addAction(tr("New &incognito window"));
+    newIncognito->setShortcut(QKeySequence("Ctrl+Shift+N"));
+    connect(newIncognito, &QAction::triggered, this, [this]() {
+        auto *window = new MainWindow(true);
+        window->show();
+    });
+
+    fileMenu->addSeparator();
+
+    auto *openLocation = fileMenu->addAction(tr("Open &location"));
+    openLocation->setShortcut(QKeySequence("Ctrl+L"));
+    connect(openLocation, &QAction::triggered, this, [this]() {
+        m_addressBar->setFocus();
+        m_addressBar->selectAll();
+    });
+
+    auto *closeTab = fileMenu->addAction(tr("&Close tab"));
+    closeTab->setShortcut(QKeySequence::Close);
+    connect(closeTab, &QAction::triggered, this, [this]() {
+        m_tabs->closeTabAt(m_tabs->currentIndex());
+    });
+
+    fileMenu->addSeparator();
+    auto *quit = fileMenu->addAction(tr("E&xit"));
+    quit->setShortcut(QKeySequence::Quit);
+    connect(quit, &QAction::triggered, this, &QWidget::close);
+
+    auto *editMenu = m_menuBar->addMenu(tr("&Edit"));
+    // Shortcut only, no stored pointer: nothing outside this menu needs to
+    // enable/disable it, and a member that is never read is just another
+    // pointer that can dangle.
+    auto *find = editMenu->addAction(tr("&Find in page..."));
+    find->setShortcut(QKeySequence::Find);
+    connect(find, &QAction::triggered, this, &MainWindow::showFindBar);
+
+    auto *viewMenu = m_menuBar->addMenu(tr("&View"));
+    m_zoomInAction = viewMenu->addAction(tr("Zoom &in"));
+    m_zoomInAction->setShortcut(QKeySequence::ZoomIn);
+    connect(m_zoomInAction, &QAction::triggered, this,
+            [this]() { if (auto *v = m_tabs->currentView()) setZoom(v->zoomFactor() + .1); });
+    m_zoomOutAction = viewMenu->addAction(tr("Zoom &out"));
+    m_zoomOutAction->setShortcut(QKeySequence::ZoomOut);
+    connect(m_zoomOutAction, &QAction::triggered, this,
+            [this]() { if (auto *v = m_tabs->currentView()) setZoom(v->zoomFactor() - .1); });
+    m_zoomResetAction = viewMenu->addAction(tr("&Normal size"));
+    m_zoomResetAction->setShortcut(QKeySequence("Ctrl+0"));
+    connect(m_zoomResetAction, &QAction::triggered, this, [this]() { setZoom(1.0); });
+
+    viewMenu->addSeparator();
+    auto *alwaysShowBookmarks = viewMenu->addAction(tr("Always show &bookmarks bar"));
+    alwaysShowBookmarks->setCheckable(true);
+    alwaysShowBookmarks->setChecked(QSettings().value("browser/bookmarkBarVisible", true).toBool());
+    connect(alwaysShowBookmarks, &QAction::toggled, this, [this](bool on) {
+        QSettings().setValue("browser/bookmarkBarVisible", on);
+        if (m_bookmarkToolbar)
+            m_bookmarkToolbar->setVisible(on);
+    });
+    if (m_bookmarkToolbar)
+        m_bookmarkToolbar->setVisible(alwaysShowBookmarks->isChecked());
+
+    m_sidebarAction = viewMenu->addAction(tr("Show &side panel"));
+    m_sidebarAction->setCheckable(true);
+    m_sidebarAction->setShortcut(QKeySequence("Ctrl+Shift+S"));
+    m_sidebarAction->setChecked(m_sidebar && m_sidebar->isVisible());
+    connect(m_sidebarAction, &QAction::toggled, this, &MainWindow::setSidebarVisible);
+
+    // Modern-chrome features stay reachable from a menu even when their
+    // toolbar buttons are hidden for period accuracy.
+    viewMenu->addSeparator();
+    auto *splitAction = viewMenu->addAction(tr("Split view"));
+    splitAction->setCheckable(true);
+    // toggled (not triggered) so the lambda signature matches the bool-taking
+    // slot and the menu check state always mirrors the actual view.
+    connect(splitAction, &QAction::toggled, this, &MainWindow::toggleSplitView);
+
+    auto *aiAction = viewMenu->addAction(tr("AI assistant panel"));
+    aiAction->setCheckable(true);
+    aiAction->setShortcut(QKeySequence("Ctrl+Shift+A"));
+    connect(aiAction, &QAction::triggered, this, [this](bool on) {
+        if (m_aiSidebar) {
+            m_aiSidebar->setVisible(on);
+            if (m_aiSidebarAction)
+                m_aiSidebarAction->setChecked(on);
+        }
+    });
+
+    auto *historyMenu = m_menuBar->addMenu(tr("&History"));
+    auto *history = historyMenu->addAction(tr("&History..."));
+    history->setShortcut(QKeySequence("Ctrl+H"));
+    connect(history, &QAction::triggered, this, &MainWindow::showHistoryDialog);
+    auto *bookmarks = historyMenu->addAction(tr("&Bookmark manager"));
+    bookmarks->setShortcut(QKeySequence("Ctrl+B"));
+    connect(bookmarks, &QAction::triggered, this,
+            [this]() { m_tabs->focusOrOpenTab("cloudar://bookmarks", QUrl("cloudar://bookmarks/")); });
+    auto *downloads = historyMenu->addAction(tr("&Downloads"));
+    downloads->setShortcut(QKeySequence("Ctrl+J"));
+    connect(downloads, &QAction::triggered, this, [this]() { m_downloadManager->showDialog(); });
+
+    auto *toolsMenu = m_menuBar->addMenu(tr("&Tools"));
+    auto *extensions = toolsMenu->addAction(tr("&Extensions"));
+    connect(extensions, &QAction::triggered, this, &MainWindow::showExtensionsDialog);
+    auto *settings = toolsMenu->addAction(tr("&Options..."));
+    connect(settings, &QAction::triggered, this, &MainWindow::openSettingsPage);
+    auto *flags = toolsMenu->addAction(tr("&Under the hood"));
+    connect(flags, &QAction::triggered, this,
+            [this]() { m_tabs->focusOrOpenTab("cloudar://flags", QUrl("cloudar://flags/")); });
+    auto *restart = toolsMenu->addAction(tr("&Restart"));
+    connect(restart, &QAction::triggered, this, [this]() {
+        // Settings that change the Chromium command line only take effect on a
+        // new process, so a restart has to be one click away.
+        if (m_settingsBridge)
+            m_settingsBridge->relaunch();
+    });
+
+    toolsMenu->addSeparator();
+    auto *themeMenu = toolsMenu->addMenu(tr("&Appearance"));
+    m_themeClassicAction = themeMenu->addAction(tr("Classic (Chrome 2009)"));
+    m_themeModernAction = themeMenu->addAction(tr("Modern (dark)"));
+    auto *styleGroup = new QActionGroup(this);
+    for (QAction *action : {m_themeClassicAction, m_themeModernAction}) {
+        action->setCheckable(true);
+        styleGroup->addAction(action);
+    }
+    m_themeModernAction->setChecked(Theme::savedStyle() == Theme::ThemeStyle::Modern);
+    m_themeClassicAction->setChecked(!m_themeModernAction->isChecked());
+
+    auto applyStyleChoice = [this](Theme::ThemeStyle style) {
+        Theme::setCurrent(style);
+        // Window model, tab placement and menu contents all differ between the
+        // two chromes, so the honest answer is that the change lands on the next
+        // launch (or immediately after Tools > Restart).
+        QMessageBox::information(
+            this, tr("Interface Style"),
+            tr("The %1 interface will be used the next time Cloudar Browser starts. "
+               "Use Tools \u25b8 Restart to switch now.")
+                .arg(style == Theme::ThemeStyle::Classic ? tr("classic") : tr("modern")));
+    };
+    connect(m_themeClassicAction, &QAction::triggered, this, [applyStyleChoice]() {
+        applyStyleChoice(Theme::ThemeStyle::Classic);
+    });
+    connect(m_themeModernAction, &QAction::triggered, this, [applyStyleChoice]() {
+        applyStyleChoice(Theme::ThemeStyle::Modern);
+    });
+
+    auto *helpMenu = m_menuBar->addMenu(tr("&Help"));
+    auto *about = helpMenu->addAction(tr("&About Cloudar Browser"));
+    connect(about, &QAction::triggered, this,
+            [this]() { m_tabs->focusOrOpenTab("cloudar://about", QUrl("cloudar://about/")); });
+}
+
+void MainWindow::buildClassicOmniboxDecor()
+{
+    if (!m_addressBar)
+        return;
+
+    // Chrome 2009 put a small page/favicon glyph at the left inside edge of the
+    // address field and a green "go" arrow at the right edge when the field
+    // had focus. Both are child widgets of the QLineEdit so they scroll with
+    // it, and the stylesheet reserves the matching padding.
+    m_classicPageIcon = new QToolButton(m_addressBar);
+    m_classicPageIcon->setObjectName("ClassicPageIcon");
+    m_classicPageIcon->setIcon(Theme::icon("page", 16));
+    m_classicPageIcon->setIconSize(QSize(16, 16));
+    m_classicPageIcon->setFixedSize(18, 18);
+    m_classicPageIcon->setAutoRaise(true);
+    m_classicPageIcon->setFocusPolicy(Qt::NoFocus);
+    m_classicPageIcon->setCursor(Qt::ArrowCursor);
+    m_classicPageIcon->move(3, 2);
+    m_classicPageIcon->show();
+
+    m_classicGoButton = new QToolButton(m_addressBar);
+    m_classicGoButton->setObjectName("ClassicOmniboxGo");
+    m_classicGoButton->setIcon(Theme::icon("go", 16));
+    m_classicGoButton->setIconSize(QSize(14, 14));
+    m_classicGoButton->setFixedSize(18, 18);
+    m_classicGoButton->setAutoRaise(true);
+    m_classicGoButton->setFocusPolicy(Qt::NoFocus);
+    m_classicGoButton->setToolTip(tr("Go"));
+    connect(m_classicGoButton, &QToolButton::clicked,
+            this, &MainWindow::navigateToAddressBarInput);
+    m_classicGoButton->hide();
+
+    // "Go appears when you type" is exactly how the 2009 omnibox behaved.
+    // Both decorations are children of the omnibox and survive a live switch to
+    // the modern chrome, so every update re-checks the active style instead of
+    // assuming classic for the rest of the process.
+    connect(m_addressBar, &QLineEdit::textChanged, this, [this](const QString &text) {
+        if (!m_classicGoButton)
+            return;
+        const bool classic = Theme::current() == Theme::ThemeStyle::Classic;
+        m_classicGoButton->setVisible(classic && !text.isEmpty());
+        m_classicGoButton->move(m_addressBar->width() - 22, 2);
+    });
+    connect(m_addressBar, &QLineEdit::cursorPositionChanged, this, [this]() {
+        if (m_classicGoButton)
+            m_classicGoButton->move(m_addressBar->width() - 22, 2);
+    });
+}
+
+void MainWindow::applyChromeStyle()
+{
+    const Theme::Metrics metrics = Theme::metrics();
+    const bool classic = Theme::current() == Theme::ThemeStyle::Classic;
+
+    if (m_navToolbar)
+        m_navToolbar->setIconSize(classic ? QSize(16, 16) : QSize(20, 20));
+    if (m_menuBar)
+        m_menuBar->setFixedHeight(metrics.menuBarHeight);
+
+    // Classic Chrome has a permanent 20 px status bar: it is where link
+    // targets, loading state and the "Done" message appeared. The classic
+    // window relies on the OS border for resizing; the frameless modern window
+    // uses a slimmer strip that hosts the size grip instead.
+    if (statusBar()) {
+        statusBar()->setFixedHeight(classic ? 20 : 16);
+        statusBar()->setSizeGripEnabled(!classic);
+    }
+
+    if (m_tabs) {
+        // The classic chrome's tab strip is its only tab surface (fixed 24 px
+        // row); the modern one keeps Qt's natural height and lives beside the
+        // vertical sidebar.
+        m_tabs->tabBar()->setIconSize(QSize(16, 16));
+        m_tabs->tabBar()->setExpanding(false);
+        m_tabs->setDocumentMode(true);
+        if (classic) {
+            m_tabs->setHorizontalTabBarVisible(true);
+            m_tabs->tabBar()->setFixedHeight(metrics.tabHeight + 4);
+        } else {
+            m_tabs->tabBar()->setMinimumHeight(0);
+        }
+    }
+
+    if (m_bookmarkToolbar)
+        m_bookmarkToolbar->setVisible(QSettings().value("browser/bookmarkBarVisible", true).toBool());
+    if (m_homeAction)
+        m_homeAction->setVisible(QSettings().value("browser/showHomeButton", true).toBool());
+
+    // The settings page writes these two flags straight to QSettings, so the
+    // live window has to re-read them after a settingsChanged() signal.
+    if (m_settingsBridge) {
+        connect(m_settingsBridge, &SettingsBridge::settingsChanged, this, [this]() {
+            QSettings settings;
+            if (m_bookmarkToolbar)
+                m_bookmarkToolbar->setVisible(settings.value("browser/bookmarkBarVisible", true).toBool());
+            if (m_homeAction)
+                m_homeAction->setVisible(settings.value("browser/showHomeButton", true).toBool());
+        }, Qt::UniqueConnection);
+    }
+}
+
+void MainWindow::toggleSplitView(bool checked)
+{
+    if (checked) {
+        if (!m_splitView) {
+            const QUrl currentUrl = m_tabs->currentView() ? m_tabs->currentView()->url()
+                                                          : QUrl("cloudar://newtab");
+            m_splitView = new SplitView(m_profile, currentUrl, QUrl("cloudar://newtab"));
+        }
+        m_splitView->show();
+        setCentralWidget(m_splitView);
+    } else {
+        if (m_splitView)
+            m_splitView->hide();
+        setCentralWidget(m_browserSplitter);
+    }
+    if (m_splitViewAction && m_splitViewAction->isChecked() != checked)
+        m_splitViewAction->setChecked(checked);
 }

@@ -12,66 +12,200 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Build & Verify (Linux x86_64)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
+  linux:
+    name: Linux ${{ matrix.os }} / Qt ${{ matrix.qt }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The LTS distributions that actually ship Qt 6 WebEngine. Debian 11
+          # and Ubuntu 20.04 are intentionally absent: they have no
+          # qt6-webengine-dev, so they belong to the legacy branch, not here.
+          # See docs/PLATFORM_MATRIX.md.
+          - os: ubuntu-24.04
+            qt: distro
+            label: Ubuntu 24.04 LTS
+          - os: ubuntu-22.04
+            qt: distro
+            label: Ubuntu 22.04 LTS
+          - os: ubuntu-24.04
+            qt: 6.8.3
+            label: Ubuntu 24.04 + Qt 6.8 LTS (installer)
+          - os: ubuntu-24.04
+            qt: 6.10.0
+            label: Ubuntu 24.04 + Qt 6.10
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Qt6 & Build Dependencies
+      - name: Install base build tools
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             build-essential cmake ninja-build zlib1g-dev \
+            xvfb libgl1-mesa-dri libgl1 libegl1 libxkbcommon-x11-0 \
+            libnss3 libasound2t64 || sudo apt-get install -y --no-install-recommends \
+            libnss3 libasound2
+
+      - name: Install Qt 6 (distribution packages)
+        if: matrix.qt == 'distro'
+        run: |
+          sudo apt-get install -y --no-install-recommends \
             qt6-base-dev qt6-webengine-dev qt6-webengine-dev-tools \
-            libqt6webenginewidgets6 libqt6webchannel6-dev \
-            xvfb libgl1-mesa-dri libgl1 libegl1
+            libqt6webenginewidgets6 libqt6webchannel6-dev
+
+      - name: Install Qt ${{ matrix.qt }} (official installer)
+        if: matrix.qt != 'distro'
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ matrix.qt }}
+          modules: 'qtwebengine qtwebchannel'
+          cache: true
 
       - name: Configure CMake
-        run: |
-          cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release
+        run: cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release
 
       - name: Build with Ninja
-        run: |
-          ninja -C build -j$(nproc)
+        run: ninja -C build -j$(nproc)
 
-      - name: Verify Binary
+      - name: Verify binary
         run: |
           ls -lh build/cloudar-browser
           file build/cloudar-browser
 
-      - name: Headless Smoke Test
+      - name: Performance tier unit smoke (no display needed)
         run: |
-          export QTWEBENGINE_DISABLE_SANDBOX=1
-          export QTWEBENGINE_CHROMIUM_FLAGS="--no-sandbox --disable-gpu"
-          xvfb-run -a ./build/cloudar-browser --version
-          # Run GUI test for 8 seconds under xvfb, exit code 124 (timeout) is expected for GUI apps
-          timeout 8 xvfb-run -a ./build/cloudar-browser || [ $? -eq 124 ]
-          echo "Headless smoke test passed successfully."
+          # --version exercises PerformanceProfile::applyEnvironment(), the
+          # theme lookup and the CLI parser without creating a window.
+          ./build/cloudar-browser --version
+          CLOUDAR_PERF_TIER=legacy ./build/cloudar-browser --version
+          CLOUDAR_THEME=modern ./build/cloudar-browser --version
 
-      - name: Package Artifacts
+      - name: Headless smoke test (classic chrome)
+        run: |
+          # QTWEBENGINE_DISABLE_SANDBOX is a *CI runner* concession, not a
+          # product setting: GitHub's containers restrict the user namespace
+          # Chromium's sandbox needs, so the browser cannot start otherwise.
+          # Nothing in src/ ever sets this, and the shipped binary keeps the
+          # sandbox on (see docs/CPU_COMPATIBILITY.md).
+          export QTWEBENGINE_DISABLE_SANDBOX=1
+          export QT_QPA_PLATFORM=xcb
+          # The app must still be alive when the timeout fires (124). Exiting on
+          # its own -- even with status 0 -- means it never reached the event
+          # loop, which is a failure worth catching.
+          start=$SECONDS
+          set +e
+          timeout 12 xvfb-run -a ./build/cloudar-browser --classic
+          status=$?
+          set -e
+          if [ $status -ne 124 ]; then
+            echo "::error::classic chrome exited with $status after $((SECONDS-start))s (expected 124)"
+            exit 1
+          fi
+          echo "Classic chrome stayed up for 12s."
+
+      - name: Headless smoke test (modern chrome)
+        run: |
+          export QTWEBENGINE_DISABLE_SANDBOX=1   # CI runner only, see above
+          export QT_QPA_PLATFORM=xcb
+          set +e
+          timeout 12 xvfb-run -a ./build/cloudar-browser --modern
+          status=$?
+          set -e
+          if [ $status -ne 124 ]; then
+            echo "::error::modern chrome exited with $status (expected 124)"
+            exit 1
+          fi
+          echo "Modern chrome stayed up for 12s."
+
+      - name: Package artifacts
         run: |
           mkdir -p dist
           cp build/cloudar-browser dist/
           cp run_cpp.sh dist/
           chmod +x dist/run_cpp.sh dist/cloudar-browser
 
-      - name: Upload Build Artifact
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: cloudar-browser-linux-x86_64
+          name: cloudar-browser-${{ matrix.os }}-qt${{ matrix.qt }}
           path: dist/
           if-no-files-found: error
 
+  windows:
+    # Windows 8/8.1/7 are NOT in this matrix on purpose: Qt 6 cannot target
+    # them. See docs/PLATFORM_MATRIX.md for the legacy branch plan.
+    name: Windows ${{ matrix.os }} / Qt ${{ matrix.qt }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            qt: 6.8.3
+            label: Windows Server 2022 (Win10 API) + Qt 6.8 LTS
+          - os: windows-2025
+            qt: 6.10.0
+            label: Windows Server 2025 (Win11 API) + Qt 6.10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Qt ${{ matrix.qt }}
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ matrix.qt }}
+          arch: win64_msvc2022_64
+          modules: 'qtwebengine qtwebchannel'
+          cache: true
+
+      - name: Configure CMake
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Version smoke test
+        run: .\build\cloudar-browser.exe --version
+
+      - name: Deploy Qt runtime
+        run: |
+          windeployqt --release --no-translations --webenginewidgets build\cloudar-browser.exe
+
+      - name: Package artifact
+        run: |
+          mkdir dist
+          Copy-Item build\cloudar-browser.exe dist\
+          # run_cpp.sh is a bash helper for the Linux packages; it is useless on
+          # Windows and shipping it there only invites "how do I run this" issues.
+          Compress-Archive -Path dist\* -DestinationPath cloudar-windows-${{ matrix.qt }}.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloudar-windows-${{ matrix.qt }}
+          path: cloudar-windows-${{ matrix.qt }}.zip
+          if-no-files-found: error
+
+  release:
+    name: Attach artifacts to release
+    needs: [linux, windows]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            dist/cloudar-browser
-            dist/run_cpp.sh
+          files: artifacts/**/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

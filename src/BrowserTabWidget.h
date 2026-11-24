@@ -66,6 +66,12 @@ public:
     void runJavaScriptInTab(int index, const QString &code,
                              std::function<void(const QString &resultJson)> callback);
 
+    // --- Memory Saver support (see MemorySaver.h) -------------------------
+    // Replaces the tab's live QWebEngineView with a static placeholder that
+    // can be rebuilt cheaply, returning `true` if the tab was slept. The
+    // caller (MemorySaver) owns the policy; this only performs the swap.
+    bool sleepTab(int index);
+    bool isTabSlept(int index) const;
     QIcon tabIcon(int index) const;
     QPixmap tabThumbnail(int index) const;
     static QIcon defaultFavicon(const QUrl &url);
@@ -73,6 +79,7 @@ public:
     void showTabContextMenu(int index, const QPoint &globalPos);
     void reopenClosedTab();
     bool hasClosedTabs() const { return !m_closedTabUrls.isEmpty(); }
+    bool reopenTabAt(int index);
 
 signals:
     void urlChangedForCurrentTab(const QUrl &url);
@@ -118,6 +125,9 @@ private:
     TabPreviewPopup *m_previewPopup;
     QTimer *m_previewTimer;
     int m_hoveredTabIndex = -1;
+    // URL of every tab that Memory Saver has slept, keyed by tab index and
+    // dropped again when the tab is woken or closed.
+    QHash<int, QString> m_sleptUrls;
 
     void captureThumbnail(QWebEngineView *view);
     void showPreviewForTab(int index);

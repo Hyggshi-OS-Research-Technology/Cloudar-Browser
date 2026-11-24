@@ -32,8 +32,13 @@
 #include "YouTubeDownloader.h"
 #include "TorrentDownloader.h"
 #include "IdleEasterEgg.h"
+#include "MemorySaver.h"
+#include "PerformanceProfile.h"
+#include "ClassicTheme.h"
 
 class QSplitter;
+class QToolBar;
+class QToolButton;
 
 class MainWindow : public QMainWindow
 {
@@ -43,6 +48,7 @@ public:
 
     void openUrl(const QUrl &url);
     void setSidebarVisible(bool visible);
+    MemorySaver *memorySaver() const { return m_memorySaver; }
     bool isIncognito() const { return m_isIncognito; }
 
 protected:
@@ -91,7 +97,6 @@ private:
     // during buildSidebar(). Initialise explicitly so startup cannot inspect
     // an indeterminate QAction pointer.
     QAction *m_sidebarAction = nullptr;
-    QAction *m_findAction;
     QAction *m_zoomInAction;
     QAction *m_zoomOutAction;
     QAction *m_zoomResetAction;
@@ -100,8 +105,10 @@ private:
     QWebChannel *m_webChannel;
     NativeBridge *m_nativeBridge;
     SettingsBridge *m_settingsBridge;
-    TitleBar *m_titleBar;
-    QMenuBar *m_menuBar; // owned manually (not via menuBar()) so it can be nested below m_titleBar
+    // Both are null on the classic chrome, which uses the OS window frame and
+    // QMainWindow's own menu bar; everything that touches them checks first.
+    TitleBar *m_titleBar = nullptr;
+    QMenuBar *m_menuBar = nullptr; // owned manually (not via menuBar()) so it can be nested below m_titleBar
     Qt::Edges m_resizeEdges;
     QPoint m_resizeStartGlobal;
     QRect m_resizeStartGeometry;
@@ -115,12 +122,25 @@ private:
     AISidebar *m_aiSidebar = nullptr;
     QAction *m_aiSidebarAction = nullptr;
     SplitView *m_splitView = nullptr;
+    MemorySaver *m_memorySaver = nullptr;
+    QToolButton *m_classicPageIcon = nullptr;   // blue page glyph inside the omnibox
+    QToolButton *m_classicGoButton = nullptr;   // the 2009 "go" arrow
+    QAction *m_homeAction = nullptr;
+    QAction *m_themeClassicAction = nullptr;
+    QAction *m_themeModernAction = nullptr;
     QAction *m_splitViewAction = nullptr;
     YouTubeDownloaderBridge *m_youtubeBridge = nullptr;
     TorrentDownloaderBridge *m_torrentBridge = nullptr;
     IdleEasterEgg *m_idleEasterEgg = nullptr;
 
     void buildTitleBar();  // frameless window chrome: title bar row + real menu bar, stacked as one unit
+    void applyChromeStyle();      // swaps frameless/modern for the classic windowed chrome
+    void buildClassicOmniboxDecor(); // page icon + go button inside the address field
+    QToolBar *m_navToolbar = nullptr;
+    QToolBar *m_bookmarkToolbar = nullptr;
+    void toggleSplitView(bool checked);
+    void buildModernMenu();       // menu contents for the modern chrome
+    void buildClassicMenu();      // Chrome 2009-style Page/Tools menus
     void buildToolbar();
     void buildSidebar();
     void buildBookmarksBar(); // second toolbar row, directly below the nav toolbar

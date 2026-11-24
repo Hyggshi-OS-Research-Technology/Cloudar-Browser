@@ -1,4 +1,11 @@
-# RAM Monitoring for Cloudar Browser™
+# RAM Monitoring
+
+> **Status in 0.2.0:** the C++ browser does **not** have a live RAM readout in
+> the status bar. The document below describes the *legacy* Python prototype
+> (`legacy/performance_manager.py`), which did. It is kept because the
+> `/proc/<pid>/status` approach described here is the reference for the feature
+> planned for the native build — see the note at the end.
+
 
 ## Overview
 
@@ -151,3 +158,33 @@ Possible improvements:
 - [x] Create documentation
 </task_progress>
 </write_to_file>
+
+---
+
+## Status in the native build (0.2.0)
+
+What exists today:
+
+- [`MemorySaver`](../src/MemorySaver.h) discards idle background renderers and
+  reports **how many tabs are sleeping** plus an **estimate** of the memory they
+  held. The estimate is deliberately conservative and labelled as an estimate in
+  the UI, because QtWebEngine exposes no per-tab RSS.
+- The per-tab "Memory usage: N MB" figures that used to appear on the sidebar and
+  tab hover cards were removed in 0.2.0. They were computed as
+  `120 + (qHash(url) % 65)` — not a measurement of anything — and were
+  misleading users into thinking tabs were expensive or cheap when they were
+  not.
+
+What is missing, and why:
+
+| Wanted | Blocker |
+|:---|:---|
+| Whole-browser RSS | Straightforward: read `VmRSS` from `/proc/self/status` on Linux, `GetProcessMemoryInfo` on Windows, `task_info` on macOS. Not implemented yet. |
+| Per-tab RSS | Chromium's renderer processes are children of the browser process but are not mapped to tabs by any public QtWebEngine API. Doing this properly means walking the process tree (`/proc/*/stat` parent links) plus the `--renderer-client-id` argument Chromium passes to each renderer, then correlating that with `QWebEnginePage` — private, version-specific, and fragile across Qt releases. |
+| Accurate "freed N MB" | Same problem, in reverse: after tearing a renderer down, the OS may not return the pages immediately, so even a correct before/after delta overstates what a user gets back. |
+
+If you want to contribute this, the honest design is: a `ProcessMemory` helper
+that sums **browser + all descendant renderer processes**, exposed as
+"Cloudar is using N MB", with **no** per-tab attribution. That is measurable,
+stable across Qt versions, and does not pretend to precision the platform does
+not offer.

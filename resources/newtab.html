@@ -511,19 +511,19 @@
     </form>
 
     <div class="tiles">
-      <div class="tile" data-action="history">
+      <div class="tile" data-action="history" data-target="cloudar://history/">
         <div class="icon">&#128337;</div>
         <div class="label">History</div>
       </div>
-      <div class="tile" data-action="downloads">
+      <div class="tile" data-action="downloads" data-target="cloudar://downloads/">
         <div class="icon">&#8681;</div>
         <div class="label">Downloads</div>
       </div>
-      <div class="tile" data-action="extensions">
+      <div class="tile" data-action="extensions" data-target="cloudar://extensions/">
         <div class="icon">&#129513;</div>
         <div class="label">Extensions</div>
       </div>
-      <div class="tile" data-action="settings">
+      <div class="tile" data-action="settings" data-target="cloudar://settings/">
         <div class="icon">&#9881;</div>
         <div class="label">Settings</div>
       </div>
@@ -587,19 +587,34 @@
   <script src="qrc:/qtwebchannel/qwebchannel.js"></script>
   <script>
     var native = null;
+    // Read the active chrome style before anything renders, so the classic
+    // New Tab page does not flash the animated modern background first.
+    (function flagChromeStyle() {
+      try {
+        var saved = localStorage.getItem('cloudar.chromeStyle');
+        if (saved === 'classic') document.documentElement.classList.add('classic');
+      } catch (e) { /* private mode without storage: keep the modern look */ }
+    })();
     if (window.qt && window.qt.webChannelTransport) {
       new QWebChannel(qt.webChannelTransport, function(channel) {
         native = channel.objects.native;
       });
     }
+    // Tiles carry a data-target URL as well as a data-action. The native bridge
+    // only exists when the page was loaded with a QWebChannel attached, so the
+    // fallback matters: without it, a tile click on a page that was opened some
+    // other way would silently do nothing.
     document.querySelectorAll('.tile').forEach(function (tile) {
       tile.addEventListener('click', function () {
-        if (!native) return;
-        var action = tile.getAttribute('data-action');
-        if (action === 'history') native.openHistory();
-        else if (action === 'downloads') native.openDownloads();
-        else if (action === 'extensions') native.openExtensions();
-        else if (action === 'settings') native.openSettings();
+        var target = tile.getAttribute('data-target');
+        if (native) {
+          var action = tile.getAttribute('data-action');
+          if (action === 'history') { native.openHistory(); return; }
+          if (action === 'downloads') { native.openDownloads(); return; }
+          if (action === 'extensions') { native.openExtensions(); return; }
+          if (action === 'settings') { native.openSettings(); return; }
+        }
+        if (target) window.location.href = target;
       });
     });
 
