@@ -1,0 +1,41 @@
+name: CI debug windows log (temporary)
+
+on:
+  push:
+    branches: ["arena/3cab4054-cloudar-browser"]
+  workflow_dispatch:
+
+jobs:
+  win:
+    name: Windows build log tail
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: 6.8.3
+          arch: win64_msvc2022_64
+          modules: 'qtwebengine qtwebchannel qtpositioning'
+          cache: true
+      - name: zlib
+        shell: pwsh
+        run: vcpkg install zlib:x64-windows
+      - name: Configure
+        shell: pwsh
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=x64-windows
+      - name: Build and dump tail
+        shell: pwsh
+        run: |
+          $out = cmake --build build --config Release 2>&1 | Out-String
+          $lines = $out -split "`r?`n" | Where-Object { $_ -match 'error|Error|FAILED' } | Select-Object -Last 8
+          if ($lines.Count -eq 0) {
+            $lines = ($out -split "`r?`n") | Select-Object -Last 8
+          }
+          foreach ($l in $lines) {
+            $t = $l.Trim() -replace '%','%25'
+            Write-Output "::error title=win::$t"
+          }
