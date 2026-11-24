@@ -139,7 +139,7 @@ int physicalCoreCount(int logical, bool smt)
         return logical;
     if (!smt)
         return logical;
-    return std::max(1, logical / 2);
+    return (std::max)(1, logical / 2);
 }
 
 PerformanceProfile::CpuInfo detectCpu()
@@ -147,7 +147,9 @@ PerformanceProfile::CpuInfo detectCpu()
     PerformanceProfile::CpuInfo info;
     info.vendor = cpuVendor();
     info.brand = cpuBrandString();
-    info.logicalCores = std::max(1, QThread::idealThreadCount());
+    // Parenthesised: <windows.h> defines a `max` macro, which turns
+    // std::max(1, n) into a syntax error under MSVC.
+    info.logicalCores = (std::max)(1, QThread::idealThreadCount());
     info.ramMb = totalRamMb();
     info.is64Bit = (sizeof(void *) == 8);
 
