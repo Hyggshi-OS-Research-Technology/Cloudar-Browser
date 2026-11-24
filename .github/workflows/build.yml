@@ -76,6 +76,14 @@ jobs:
           if ! sudo apt-get install -y --no-install-recommends libqt6opengl6-dev; then
             echo "libqt6opengl6-dev not needed on this release (expected on 24.04)"
           fi
+          # QtWebEngine renders through a separate helper process. On Ubuntu
+          # 22.04 that binary lives in libqt6webenginecore6-bin, which
+          # qt6-webengine-dev does not pull in, so the browser aborted with
+          # "Could not find QtWebEngineProcess" the moment it created a page.
+          # 24.04 ships it inside the core package and has no such package name.
+          if ! sudo apt-get install -y --no-install-recommends libqt6webenginecore6-bin; then
+            echo "libqt6webenginecore6-bin not needed on this release (expected on 24.04)"
+          fi
 
       - name: Install Qt ${{ matrix.qt }} (official installer)
         if: matrix.qt != 'distro'
@@ -113,23 +121,37 @@ jobs:
           # sandbox on (see docs/CPU_COMPATIBILITY.md).
           export QTWEBENGINE_DISABLE_SANDBOX=1
           export QT_QPA_PLATFORM=xcb
-          # Xvfb has no GPU. Ubuntu 22.04 ships an older Mesa whose llvmpipe
-          # path QtWebEngine 6.2 cannot initialise, and Chromium aborts with
-          # SIGABRT inside QtWebEngineCore instead of falling back. Forcing
-          # software GL is what a headless runner should be doing anyway; it is
-          # a CI setting, not a product default.
+          # Xvfb has no GPU, so ask for software GL. This is a CI setting for a
+          # machine without a graphics device, not a product default.
           export LIBGL_ALWAYS_SOFTWARE=1
           export QT_OPENGL=software
+          # QtWebEngine renders in a helper process. Running the binary straight
+          # from the build tree, Qt looks for that helper relative to its own
+          # installation; naming it explicitly removes the guesswork and turns a
+          # missing package into a readable message instead of exit 134
+          # (SIGABRT from qFatal("Could not find QtWebEngineProcess")).
+          helper="$(find /usr -name QtWebEngineProcess -type f 2>/dev/null | head -n 1)"
+          if [ -z "$helper" ]; then
+            echo "::error::QtWebEngineProcess not found - install libqt6webenginecore6-bin"
+            exit 1
+          fi
+          echo "QtWebEngineProcess: $helper"
+          export QTWEBENGINEPROCESS_PATH="$helper"
           # The app must still be alive when the timeout fires (124). Exiting on
           # its own -- even with status 0 -- means it never reached the event
           # loop, which is a failure worth catching.
           start=$SECONDS
           set +e
-          timeout 12 xvfb-run -a ./build/cloudar-browser --classic
+          timeout 12 xvfb-run -a ./build/cloudar-browser --classic > smoke-classic.log 2>&1
           status=$?
           set -e
           if [ $status -ne 124 ]; then
             echo "::error::classic chrome exited with $status after $((SECONDS-start))s (expected 124)"
+            # The reason is in the log, and CI logs are not always readable from
+            # where this is being debugged -- surface the last lines verbatim.
+            tail -n 15 smoke-classic.log | while IFS= read -r line; do
+              echo "::error title=classic::$line"
+            done
             exit 1
           fi
           echo "Classic chrome stayed up for 12s."
@@ -140,12 +162,21 @@ jobs:
           export QT_QPA_PLATFORM=xcb
           export LIBGL_ALWAYS_SOFTWARE=1         # Xvfb has no GPU, see above
           export QT_OPENGL=software
+          helper="$(find /usr -name QtWebEngineProcess -type f 2>/dev/null | head -n 1)"
+          if [ -z "$helper" ]; then
+            echo "::error::QtWebEngineProcess not found - install libqt6webenginecore6-bin"
+            exit 1
+          fi
+          export QTWEBENGINEPROCESS_PATH="$helper"
           set +e
-          timeout 12 xvfb-run -a ./build/cloudar-browser --modern
+          timeout 12 xvfb-run -a ./build/cloudar-browser --modern > smoke-modern.log 2>&1
           status=$?
           set -e
           if [ $status -ne 124 ]; then
             echo "::error::modern chrome exited with $status (expected 124)"
+            tail -n 15 smoke-modern.log | while IFS= read -r line; do
+              echo "::error title=modern::$line"
+            done
             exit 1
           fi
           echo "Modern chrome stayed up for 12s."
