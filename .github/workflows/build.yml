@@ -113,6 +113,13 @@ jobs:
           # sandbox on (see docs/CPU_COMPATIBILITY.md).
           export QTWEBENGINE_DISABLE_SANDBOX=1
           export QT_QPA_PLATFORM=xcb
+          # Xvfb has no GPU. Ubuntu 22.04 ships an older Mesa whose llvmpipe
+          # path QtWebEngine 6.2 cannot initialise, and Chromium aborts with
+          # SIGABRT inside QtWebEngineCore instead of falling back. Forcing
+          # software GL is what a headless runner should be doing anyway; it is
+          # a CI setting, not a product default.
+          export LIBGL_ALWAYS_SOFTWARE=1
+          export QT_OPENGL=software
           # The app must still be alive when the timeout fires (124). Exiting on
           # its own -- even with status 0 -- means it never reached the event
           # loop, which is a failure worth catching.
@@ -131,6 +138,8 @@ jobs:
         run: |
           export QTWEBENGINE_DISABLE_SANDBOX=1   # CI runner only, see above
           export QT_QPA_PLATFORM=xcb
+          export LIBGL_ALWAYS_SOFTWARE=1         # Xvfb has no GPU, see above
+          export QT_OPENGL=software
           set +e
           timeout 12 xvfb-run -a ./build/cloudar-browser --modern
           status=$?
