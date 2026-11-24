@@ -74,6 +74,12 @@ public:
     bool isTabSlept(int index) const;
     QIcon tabIcon(int index) const;
     QPixmap tabThumbnail(int index) const;
+
+    // The hover card is a top-level window, so it survives its parent being
+    // hidden or moved into a split view. Any caller that changes what is on
+    // screen (the split-view toggle, window close) has to dismiss it or it
+    // stays floating over unrelated content.
+    void hidePreview() { dismissPreview(); }
     static QIcon defaultFavicon(const QUrl &url);
 
     void showTabContextMenu(int index, const QPoint &globalPos);
@@ -131,7 +137,7 @@ private:
 
     void captureThumbnail(QWebEngineView *view);
     void showPreviewForTab(int index);
-    void hidePreview();
+    void dismissPreview();
 
     // --- "+" new-tab button, drawn right after the last tab in the tab
     // strip (Chrome/Firefox-style) instead of floating in the toolbar. ---

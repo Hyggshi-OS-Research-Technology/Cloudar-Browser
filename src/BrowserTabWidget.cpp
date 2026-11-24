@@ -49,7 +49,7 @@ BrowserTabWidget::BrowserTabWidget(QWebEngineProfile *profile, QWebChannel *chan
     connect(tabBar(), &QTabBar::customContextMenuRequested, this, [this](const QPoint &pos) {
         int idx = tabBar()->tabAt(pos);
         if (idx >= 0) {
-            hidePreview();
+            dismissPreview();
             showTabContextMenu(idx, tabBar()->mapToGlobal(pos));
         }
     });
@@ -131,7 +131,7 @@ bool BrowserTabWidget::eventFilter(QObject *watched, QEvent *event)
             int idx = tabBar()->tabAt(mouseEvent->pos());
             if (idx != m_hoveredTabIndex) {
                 m_hoveredTabIndex = idx;
-                hidePreview();
+                dismissPreview();
                 m_previewTimer->stop();
                 if (idx >= 0)
                     m_previewTimer->start(kHoverDelayMs);
@@ -139,7 +139,7 @@ bool BrowserTabWidget::eventFilter(QObject *watched, QEvent *event)
         } else if (event->type() == QEvent::Leave) {
             m_hoveredTabIndex = -1;
             m_previewTimer->stop();
-            hidePreview();
+            dismissPreview();
         } else if (event->type() == QEvent::Resize ||
                    event->type() == QEvent::LayoutRequest ||
                    event->type() == QEvent::Show ||
@@ -244,7 +244,7 @@ void BrowserTabWidget::showPreviewForTab(int index)
     m_previewPopup->fadeIn();
 }
 
-void BrowserTabWidget::hidePreview()
+void BrowserTabWidget::dismissPreview()
 {
     m_previewPopup->fadeOut();
 }
@@ -416,7 +416,7 @@ void BrowserTabWidget::closeTabAt(int index)
     if (index == m_hoveredTabIndex) {
         m_hoveredTabIndex = -1;
         m_previewTimer->stop();
-        hidePreview();
+        dismissPreview();
     }
 
     // Sleeping tabs are tracked by index, so every index above the closed

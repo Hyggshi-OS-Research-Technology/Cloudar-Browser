@@ -18,6 +18,11 @@ public:
     QWebEngineView* getWebView() const { return m_webView; }
     void navigateToUrl(const QString &text);
 
+signals:
+    // Emitted when the user moves into this pane, so SplitView can remember
+    // which side keyboard shortcuts should act on.
+    void focusGained();
+
 private slots:
     void onUrlChanged(const QUrl &url);
     void onReturnPressed();
@@ -38,6 +43,11 @@ public:
 
     SplitPane* leftPane() const { return m_leftPane; }
     SplitPane* rightPane() const { return m_rightPane; }
+
+    // The pane that has focus, falling back to the left one. MainWindow uses
+    // this so Back/Forward/Reload/zoom act on the pane the user was last in
+    // rather than always on the tab widget that the split view replaced.
+    SplitPane *activePane() const;
 
 private:
     QSplitter *m_splitter = nullptr;

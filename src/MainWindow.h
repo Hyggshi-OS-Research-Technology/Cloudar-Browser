@@ -23,6 +23,7 @@
 #include "ExtensionManager.h"
 #include "WebExtensionManager.h"
 #include "NativeBridge.h"
+#include "InternalBridge.h"
 #include "SettingsBridge.h"
 #include "SpinnerWidget.h"
 #include "TitleBar.h"
@@ -106,6 +107,10 @@ private:
     WebExtensionManager *m_webExtensionManager = nullptr; // real, manifest.json-based Chrome-style extensions
     QWebChannel *m_webChannel = nullptr;
     NativeBridge *m_nativeBridge = nullptr;
+    // Backs cloudar://bookmarks, /history, /downloads, /extensions and
+    // /permissions. Registered next to `native` on the same channel, which is
+    // only ever attached to internal pages.
+    InternalBridge *m_internalBridge = nullptr;
     SettingsBridge *m_settingsBridge = nullptr;
     // Both are null on the classic chrome, which uses the OS window frame and
     // QMainWindow's own menu bar; everything that touches them checks first.
@@ -130,7 +135,8 @@ private:
     QAction *m_homeAction = nullptr;
     QAction *m_themeClassicAction = nullptr;
     QAction *m_themeModernAction = nullptr;
-    QAction *m_splitViewAction = nullptr;
+    QAction *m_splitViewAction = nullptr;     // toolbar button (modern chrome only)
+    QAction *m_splitViewMenuAction = nullptr; // View > Split view, both chromes
     YouTubeDownloaderBridge *m_youtubeBridge = nullptr;
     TorrentDownloaderBridge *m_torrentBridge = nullptr;
     IdleEasterEgg *m_idleEasterEgg = nullptr;
@@ -141,6 +147,14 @@ private:
     QToolBar *m_navToolbar = nullptr;
     QToolBar *m_bookmarkToolbar = nullptr;
     void toggleSplitView(bool checked);
+    // The QWebEngineView navigation should act on: the split view's focused
+    // pane while it is up, otherwise the tab widget's current tab. Returns null
+    // when there is nothing to act on, so every caller can bail out the same way.
+    QWebEngineView *activeView() const;
+    // One message for both menu builders: they must not disagree about where
+    // the restart entry lives, which is exactly how the modern chrome ended up
+    // pointing at a Tools menu it does not have.
+    void announceStyleChange(Theme::ThemeStyle style);
     void buildModernMenu();       // menu contents for the modern chrome
     void buildClassicMenu();      // Chrome 2009-style Page/Tools menus
     void buildToolbar();

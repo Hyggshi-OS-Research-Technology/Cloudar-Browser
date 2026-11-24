@@ -10,6 +10,8 @@
 #include "YouTubeDownloader.h"
 #include "TorrentDownloader.h"
 #include "IdleEasterEgg.h"
+#include "InternalBridge.h"
+#include "PermissionStore.h"
 
 #include <QApplication>
 #include <QMenuBar>
@@ -39,6 +41,7 @@
 #include <QShowEvent>
 #include <QToolButton>
 #include <QTabBar>
+#include <QSignalBlocker>
 #include <QSysInfo>
 
 MainWindow::MainWindow(bool isIncognito, QWidget *parent)
@@ -129,6 +132,14 @@ MainWindow::MainWindow(bool isIncognito, QWidget *parent)
     m_webChannel = new QWebChannel(this);
     m_nativeBridge = new NativeBridge(this);
     m_webChannel->registerObject("native", m_nativeBridge);
+    // The five "manager" internal pages (bookmarks, history, downloads,
+    // extensions, permissions) all call into a QWebChannel object named
+    // `internalBridge`; it existed in the pages but not in the browser, so each
+    // of them rendered its empty state forever. Same channel as `native`, and
+    // for the same reason: BrowserTabWidget only attaches it to cloudar:// pages.
+    m_internalBridge = new InternalBridge(m_bookmarkManager, m_historyManager,
+                                          m_downloadManager, m_webExtensionManager, this);
+    m_webChannel->registerObject("internalBridge", m_internalBridge);
     connect(m_nativeBridge, &NativeBridge::historyRequested, this, &MainWindow::showHistoryDialog);
     connect(m_nativeBridge, &NativeBridge::downloadsRequested, this,
             [this]() { m_downloadManager->showDialog(); });
@@ -544,21 +555,21 @@ void MainWindow::buildToolbar()
                                       classic ? QString() : QString("\u2190")); // back
     m_backAction->setToolTip("Back");
     connect(m_backAction, &QAction::triggered, this, [this]() {
-        if (auto *v = m_tabs->currentView()) v->back();
+        if (auto *v = activeView()) v->back();
     });
 
     m_forwardAction = toolbar->addAction(classic ? Theme::icon("forward") : QIcon(),
                                           classic ? QString() : QString("\u2192")); // forward
     m_forwardAction->setToolTip("Forward");
     connect(m_forwardAction, &QAction::triggered, this, [this]() {
-        if (auto *v = m_tabs->currentView()) v->forward();
+        if (auto *v = activeView()) v->forward();
     });
 
     m_reloadStopAction = toolbar->addAction(classic ? Theme::icon("reload") : QIcon(),
                                              classic ? QString() : QString("\u27F3")); // reload / stop while loading
     m_reloadStopAction->setToolTip("Reload");
     connect(m_reloadStopAction, &QAction::triggered, this, [this]() {
-        if (auto *v = m_tabs->currentView()) {
+        if (auto *v = activeView()) {
             if (v->page()->isLoading()) v->stop(); else v->reload();
         }
     });
@@ -571,7 +582,7 @@ void MainWindow::buildToolbar()
                                       classic ? QString() : QStringLiteral("\u2302"));
     m_homeAction->setToolTip(tr("Home"));
     connect(m_homeAction, &QAction::triggered, this, [this]() {
-        if (auto *v = m_tabs->currentView())
+        if (auto *v = activeView())
             v->load(QUrl(SettingsDialog(this).homePage()));
     });
     m_homeAction->setVisible(QSettings().value("browser/showHomeButton", true).toBool());
@@ -620,7 +631,7 @@ void MainWindow::buildToolbar()
                                             classic ? QString() : QString("\u2637")); // reader/article glyph
     readerAction->setToolTip("Reader mode");
     connect(readerAction, &QAction::triggered, this, [this]() {
-        auto *v = m_tabs->currentView();
+        auto *v = activeView();
         if (!v)
             return;
         v->page()->runJavaScript(ReaderMode::toggleScript(), [this](const QVariant &result) {
@@ -697,7 +708,7 @@ void MainWindow::buildBookmarksBar()
 
     m_bookmarkBar = new BookmarkBar(m_bookmarkManager, toolbar);
     connect(m_bookmarkBar, &BookmarkBar::bookmarkActivated, this, [this](const QUrl &url) {
-        if (auto *v = m_tabs->currentView())
+        if (auto *v = activeView())
             v->load(url);
     });
     toolbar->addWidget(m_bookmarkBar);
@@ -705,7 +716,7 @@ void MainWindow::buildBookmarksBar()
 
 void MainWindow::toggleBookmarkForCurrentPage()
 {
-    auto *v = m_tabs->currentView();
+    auto *v = activeView();
     if (!v)
         return;
 
@@ -741,6 +752,19 @@ void MainWindow::buildMenu()
         return;
     }
     buildModernMenu();
+}
+
+void MainWindow::announceStyleChange(Theme::ThemeStyle style)
+{
+    // The restart entry differs per chrome (Tools > Restart on classic, Menu >
+    // Restart on modern), so name the one the user can actually see.
+    const bool classic = Theme::current() == Theme::ThemeStyle::Classic;
+    const QString where = classic ? tr("Tools \u25b8 Restart") : tr("Menu \u25b8 Restart");
+    QMessageBox::information(
+        this, tr("Interface Style"),
+        tr("The %1 interface will be used the next time Cloudar Browser starts. "
+           "Use %2 to switch now.")
+            .arg(style == Theme::ThemeStyle::Classic ? tr("classic") : tr("modern"), where));
 }
 
 void MainWindow::buildModernMenu()
@@ -787,11 +811,7 @@ void MainWindow::buildModernMenu()
     auto applyStyleChoice = [this](Theme::ThemeStyle style) {
         // Saved only: the window model and menu bar cannot change in place.
         Theme::setCurrent(style);
-        QMessageBox::information(
-            this, tr("Interface Style"),
-            tr("The %1 interface will be used the next time Cloudar Browser starts. "
-               "Use Tools \u25b8 Restart to switch now.")
-                .arg(style == Theme::ThemeStyle::Classic ? tr("classic") : tr("modern")));
+        announceStyleChange(style);
     };
     connect(m_themeClassicAction, &QAction::triggered, this, [applyStyleChoice]() {
         applyStyleChoice(Theme::ThemeStyle::Classic);
@@ -807,10 +827,10 @@ void MainWindow::buildModernMenu()
     auto *zoom = menu->addMenu("Zoom");
     m_zoomInAction = zoom->addAction("Zoom In");
     m_zoomInAction->setShortcut(QKeySequence::ZoomIn);
-    connect(m_zoomInAction, &QAction::triggered, this, [this](){ if (auto *v = m_tabs->currentView()) setZoom(v->zoomFactor() + .1); });
+    connect(m_zoomInAction, &QAction::triggered, this, [this](){ if (auto *v = activeView()) setZoom(v->zoomFactor() + .1); });
     m_zoomOutAction = zoom->addAction("Zoom Out");
     m_zoomOutAction->setShortcut(QKeySequence::ZoomOut);
-    connect(m_zoomOutAction, &QAction::triggered, this, [this](){ if (auto *v = m_tabs->currentView()) setZoom(v->zoomFactor() - .1); });
+    connect(m_zoomOutAction, &QAction::triggered, this, [this](){ if (auto *v = activeView()) setZoom(v->zoomFactor() - .1); });
     m_zoomResetAction = zoom->addAction("Actual Size");
     m_zoomResetAction->setShortcut(QKeySequence("Ctrl+0"));
     connect(m_zoomResetAction, &QAction::triggered, this, [this](){ setZoom(1.0); });
@@ -830,12 +850,33 @@ void MainWindow::buildModernMenu()
     auto *extensions = menu->addAction("Extensions");
     connect(extensions, &QAction::triggered, this, &MainWindow::showExtensionsDialog);
 
+    // Split view was only reachable from the toolbar button, which does not
+    // exist on the classic chrome — the feature was there, with no way to ask
+    // for it. One action, shared by both chromes' menus and the toolbar.
+    menu->addSeparator();
+    m_splitViewMenuAction = menu->addAction(tr("Split View"));
+    m_splitViewMenuAction->setCheckable(true);
+    m_splitViewMenuAction->setShortcut(QKeySequence("Ctrl+Shift+D"));
+    connect(m_splitViewMenuAction, &QAction::toggled, this, &MainWindow::toggleSplitView);
+
     menu->addSeparator();
 
     auto *settings = menu->addAction("Settings");
     connect(settings, &QAction::triggered, this, &MainWindow::openSettingsPage);
 
+    // The interface-style handler tells the user to "Use Tools ▸ Restart to
+    // switch now", but the modern menu is a single Menu and never had that
+    // entry — so the advertised escape hatch did not exist and picking a
+    // different chrome looked like it had done nothing at all.
+    auto *restart = menu->addAction(tr("Restart"));
+    restart->setShortcut(QKeySequence("Ctrl+Shift+R"));
+    connect(restart, &QAction::triggered, this, [this]() {
+        if (m_settingsBridge)
+            m_settingsBridge->relaunch();
+    });
+
     auto *quit = menu->addAction("Quit");
+    quit->setShortcut(QKeySequence::Quit);
     connect(quit, &QAction::triggered, this, &QWidget::close);
 }
 
@@ -958,7 +999,7 @@ void MainWindow::updateNavigationState()
 
 void MainWindow::showFindBar()
 {
-    auto *view = m_tabs->currentView();
+    auto *view = activeView();
     if (!view) return;
     bool accepted = false;
     const QString text = QInputDialog::getText(this, "Find in page", "Find:", QLineEdit::Normal, {}, &accepted);
@@ -968,7 +1009,7 @@ void MainWindow::showFindBar()
 
 void MainWindow::setZoom(qreal zoom)
 {
-    if (auto *view = m_tabs->currentView()) {
+    if (auto *view = activeView()) {
         view->setZoomFactor(qBound<qreal>(0.25, zoom, 5.0));
         statusBar()->showMessage(QString("Zoom: %1%").arg(qRound(view->zoomFactor() * 100)), 1500);
     }
@@ -996,10 +1037,14 @@ QString MainWindow::permissionName(QWebEnginePermission::PermissionType type) co
 void MainWindow::requestPermission(const QWebEnginePermission &permission)
 {
     if (!permission.isValid()) return;
-    QSettings settings;
     const QUrl origin = permission.origin();
-    const QString key = QString("permissions/%1/%2").arg(origin.host(), QString::number(int(permission.permissionType())));
-    const QString saved = settings.value(key).toString();
+    // Decisions are keyed by capability name, not by the engine's numeric enum:
+    // the numbers differ between Qt 6.2 and 6.7+, and the cloudar://permissions
+    // page has to be able to read and edit exactly what this code writes.
+    const QString capability = PermissionStore::capabilityForEngineType(int(permission.permissionType()));
+    const QString saved = capability.isEmpty()
+        ? QString()
+        : PermissionStore::decisionFor(origin.host(), capability);
     if (saved == "allow") {
         permission.grant();
         return;
@@ -1018,7 +1063,11 @@ void MainWindow::requestPermission(const QWebEnginePermission &permission)
         question.exec();
         const bool granted = question.clickedButton() == allow;
         Q_UNUSED(deny);
-        settings.setValue(key, granted ? "allow" : "deny");
+        // Editable afterwards in cloudar://permissions, which is why the
+        // capability has to be a name: that page has no way to know which Qt
+        // version's enum produced a number.
+        if (!capability.isEmpty())
+            PermissionStore::setDecision(origin.host(), capability, granted ? "allow" : "deny");
         if (granted) permission.grant(); else permission.deny();
     }
 }
@@ -1041,9 +1090,10 @@ QString MainWindow::featureName(QWebEnginePage::Feature feature) const
 void MainWindow::handleFeaturePermission(const QUrl &origin, QWebEnginePage::Feature feature, QWebEnginePage *page)
 {
     if (!page) return;
-    QSettings settings;
-    const QString key = QString("permissions/%1/%2").arg(origin.host(), QString::number(int(feature)));
-    const QString saved = settings.value(key).toString();
+    const QString capability = PermissionStore::capabilityForEngineType(int(feature));
+    const QString saved = capability.isEmpty()
+        ? QString()
+        : PermissionStore::decisionFor(origin.host(), capability);
     if (saved == "allow") {
         page->setFeaturePermission(origin, feature, QWebEnginePage::PermissionGrantedByUser);
         return;
@@ -1062,7 +1112,8 @@ void MainWindow::handleFeaturePermission(const QUrl &origin, QWebEnginePage::Fea
         question.exec();
         const bool granted = question.clickedButton() == allow;
         Q_UNUSED(deny);
-        settings.setValue(key, granted ? "allow" : "deny");
+        if (!capability.isEmpty())
+            PermissionStore::setDecision(origin.host(), capability, granted ? "allow" : "deny");
         page->setFeaturePermission(origin, feature,
             granted ? QWebEnginePage::PermissionGrantedByUser : QWebEnginePage::PermissionDeniedByUser);
     }
@@ -1081,7 +1132,7 @@ void MainWindow::openUrl(const QUrl &url)
 {
     if (m_tabs->count() == 0)
         m_tabs->addNewTab(url);
-    else if (auto *v = m_tabs->currentView())
+    else if (auto *v = activeView())
         v->load(url);
 }
 
@@ -1105,7 +1156,7 @@ void MainWindow::navigateToAddressBarInput()
         url = QUrl(tmpl.replace("%s", QUrl::toPercentEncoding(text)));
     }
 
-    if (auto *v = m_tabs->currentView()) {
+    if (auto *v = activeView()) {
         v->load(url);
         if (!m_isIncognito && m_historyManager)
             m_historyManager->addVisit(text, url.toString());
@@ -1285,11 +1336,11 @@ void MainWindow::buildClassicMenu()
     m_zoomInAction = viewMenu->addAction(tr("Zoom &in"));
     m_zoomInAction->setShortcut(QKeySequence::ZoomIn);
     connect(m_zoomInAction, &QAction::triggered, this,
-            [this]() { if (auto *v = m_tabs->currentView()) setZoom(v->zoomFactor() + .1); });
+            [this]() { if (auto *v = activeView()) setZoom(v->zoomFactor() + .1); });
     m_zoomOutAction = viewMenu->addAction(tr("Zoom &out"));
     m_zoomOutAction->setShortcut(QKeySequence::ZoomOut);
     connect(m_zoomOutAction, &QAction::triggered, this,
-            [this]() { if (auto *v = m_tabs->currentView()) setZoom(v->zoomFactor() - .1); });
+            [this]() { if (auto *v = activeView()) setZoom(v->zoomFactor() - .1); });
     m_zoomResetAction = viewMenu->addAction(tr("&Normal size"));
     m_zoomResetAction->setShortcut(QKeySequence("Ctrl+0"));
     connect(m_zoomResetAction, &QAction::triggered, this, [this]() { setZoom(1.0); });
@@ -1315,8 +1366,10 @@ void MainWindow::buildClassicMenu()
     // Modern-chrome features stay reachable from a menu even when their
     // toolbar buttons are hidden for period accuracy.
     viewMenu->addSeparator();
-    auto *splitAction = viewMenu->addAction(tr("Split view"));
+    m_splitViewMenuAction = viewMenu->addAction(tr("Sp&lit view"));
+    auto *splitAction = m_splitViewMenuAction;
     splitAction->setCheckable(true);
+    splitAction->setShortcut(QKeySequence("Ctrl+Shift+D"));
     // toggled (not triggered) so the lambda signature matches the bool-taking
     // slot and the menu check state always mirrors the actual view.
     connect(splitAction, &QAction::toggled, this, &MainWindow::toggleSplitView);
@@ -1376,12 +1429,8 @@ void MainWindow::buildClassicMenu()
         Theme::setCurrent(style);
         // Window model, tab placement and menu contents all differ between the
         // two chromes, so the honest answer is that the change lands on the next
-        // launch (or immediately after Tools > Restart).
-        QMessageBox::information(
-            this, tr("Interface Style"),
-            tr("The %1 interface will be used the next time Cloudar Browser starts. "
-               "Use Tools \u25b8 Restart to switch now.")
-                .arg(style == Theme::ThemeStyle::Classic ? tr("classic") : tr("modern")));
+        // launch (or immediately after the restart entry in the menu).
+        announceStyleChange(style);
     };
     connect(m_themeClassicAction, &QAction::triggered, this, [applyStyleChoice]() {
         applyStyleChoice(Theme::ThemeStyle::Classic);
@@ -1497,21 +1546,63 @@ void MainWindow::applyChromeStyle()
     }
 }
 
+QWebEngineView *MainWindow::activeView() const
+{
+    // While the split view is central, the tab widget is detached and has no
+    // meaningful "current" view on screen; Back, Reload and zoom have to follow
+    // what the user is actually looking at.
+    if (m_splitView && m_splitView->isVisible()) {
+        if (SplitPane *pane = m_splitView->activePane())
+            return pane->getWebView();
+        return nullptr;
+    }
+    return m_tabs ? m_tabs->currentView() : nullptr;
+}
+
 void MainWindow::toggleSplitView(bool checked)
 {
+    // QMainWindow::setCentralWidget() *deletes* the widget it replaces
+    // (qmainwindow.cpp: `centralWidget()->hide(); centralWidget()->deleteLater();`).
+    // Calling it to swap the panes in and out therefore destroyed m_browserSplitter
+    // — and with it the tab widget and every renderer — the first time split view
+    // was enabled, so turning it off again called setCentralWidget() on a dangling
+    // pointer and took the whole process down.
+    //
+    // takeCentralWidget() detaches the current widget and hands ownership back to
+    // us, which is what makes the swap reversible.
+    if (m_tabs)
+        m_tabs->hidePreview();
+
     if (checked) {
         if (!m_splitView) {
-            const QUrl currentUrl = m_tabs->currentView() ? m_tabs->currentView()->url()
-                                                          : QUrl("cloudar://newtab");
-            m_splitView = new SplitView(m_profile, currentUrl, QUrl("cloudar://newtab"));
+            const QUrl currentUrl = m_tabs && m_tabs->currentView()
+                                        ? m_tabs->currentView()->url()
+                                        : QUrl("cloudar://newtab");
+            // Parented to the window, not adopted by setCentralWidget(): the
+            // widget has to outlive being swapped out.
+            m_splitView = new SplitView(m_profile, currentUrl, QUrl("cloudar://newtab"), this);
         }
+        if (QWidget *previous = takeCentralWidget())
+            previous->hide();
         m_splitView->show();
         setCentralWidget(m_splitView);
     } else {
-        if (m_splitView)
-            m_splitView->hide();
-        setCentralWidget(m_browserSplitter);
+        // Whatever is central right now is the split view; detach it so the
+        // swap back to the tab widget is a hand-off rather than a deletion.
+        if (QWidget *previous = takeCentralWidget())
+            previous->hide();
+        if (m_browserSplitter) {
+            m_browserSplitter->show();
+            setCentralWidget(m_browserSplitter);
+        }
     }
-    if (m_splitViewAction && m_splitViewAction->isChecked() != checked)
-        m_splitViewAction->setChecked(checked);
+    // The toolbar button and the View menu item are two separate QActions, so
+    // whichever one was not used has to be brought in line — without re-entering
+    // this slot, which is why the signal is blocked.
+    for (QAction *action : {m_splitViewAction, m_splitViewMenuAction}) {
+        if (!action || action->isChecked() == checked)
+            continue;
+        QSignalBlocker blocker(action);
+        action->setChecked(checked);
+    }
 }

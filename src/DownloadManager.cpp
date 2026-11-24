@@ -21,6 +21,19 @@ QString defaultDownloadDir()
     const QString standard = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
     return standard.isEmpty() ? (QDir::homePath() + "/Downloads") : standard;
 }
+
+QString describe(const DownloadRecord &record)
+{
+    if (record.cancelled)
+        return QStringLiteral("Cancelled: %1").arg(record.filename);
+    if (record.completed)
+        return QStringLiteral("Done: %1").arg(record.filename);
+    if (record.paused)
+        return QStringLiteral("Paused: %1 (%2%)").arg(record.filename).arg(record.progress);
+    if (record.progress > 0)
+        return QStringLiteral("Downloading: %1 (%2%)").arg(record.filename).arg(record.progress);
+    return QStringLiteral("Downloading: %1").arg(record.filename);
+}
 }
 
 DownloadManager::DownloadManager(QWidget *parentWidget, QObject *parent)
@@ -45,25 +58,65 @@ void DownloadManager::ensureDialog()
     hint->setStyleSheet("color: #8b93a7; font-size: 11px;");
     layout->addWidget(hint);
 
-    connect(m_list, &QListWidget::itemDoubleClicked, this, [](QListWidgetItem *item) {
+    connect(m_list, &QListWidget::itemDoubleClicked, this, [this](QListWidgetItem *item) {
         const QString path = item->data(Qt::UserRole).toString();
         if (!path.isEmpty())
             QDesktopServices::openUrl(QUrl::fromLocalFile(QFileInfo(path).absolutePath()));
     });
+
+    // The dialog can be closed without destroying it, so it has to be brought
+    // up to date whenever it is shown again.
+    syncList();
 }
 
 void DownloadManager::showDialog()
 {
     ensureDialog();
+    syncList();
     m_dialog->show();
     m_dialog->raise();
     m_dialog->activateWindow();
 }
 
+int DownloadManager::indexOfRequest(const QWebEngineDownloadRequest *request) const
+{
+    for (int i = 0; i < m_records.size(); ++i) {
+        if (m_records[i].request == request)
+            return i;
+    }
+    return -1;
+}
+
+int DownloadManager::indexOfFile(const QString &filename) const
+{
+    for (int i = 0; i < m_records.size(); ++i) {
+        if (m_records[i].filename == filename)
+            return i;
+    }
+    return -1;
+}
+
+DownloadRecord *DownloadManager::recordForFile(const QString &filename)
+{
+    const int index = indexOfFile(filename);
+    return index < 0 ? nullptr : &m_records[index];
+}
+
+void DownloadManager::syncList()
+{
+    if (!m_list)
+        return;
+    m_list->clear();
+    for (const DownloadRecord &record : m_records) {
+        auto *item = new QListWidgetItem(describe(record));
+        item->setData(Qt::UserRole, record.path);
+        m_list->addItem(item);
+    }
+    emit changed();
+}
+
 void DownloadManager::handleDownloadRequested(QWebEngineDownloadRequest *download)
 {
-    ensureDialog();
-
     QSettings settings;
     const QString downloadsDir = settings.value(kDownloadDirKey, defaultDownloadDir()).toString();
     QDir().mkpath(downloadsDir);
@@ -92,33 +145,127 @@ void DownloadManager::handleDownloadRequested(QWebEngineDownloadRequest *downloa
     download->setDownloadDirectory(info.absolutePath());
     download->setDownloadFileName(info.fileName());
 
-    auto *item = new QListWidgetItem(QString("Downloading: %1").arg(info.fileName()));
-    item->setData(Qt::UserRole, finalPath);
-    m_list->addItem(item);
+    DownloadRecord record;
+    record.filename = info.fileName();
+    record.path = info.absoluteFilePath();
+    record.request = download;
+    m_records.append(record);
+
+    // `download` outlives this handler but not necessarily the window, so the
+    // pointer in the record is a QPointer and every use re-checks it.
+    connect(download, &QWebEngineDownloadRequest::receivedBytesChanged, this,
+            [this, download]() {
+                if (!download)
+                    return;
+                // Matched by pointer, not by name: setDownloadFileName() renames
+                // the request, so downloadFileName() and the record's filename
+                // can disagree.
+                const int row = indexOfRequest(download);
+                DownloadRecord *rec = row < 0 ? nullptr : &m_records[row];
+                if (!rec)
+                    return;
+                const qint64 total = download->totalBytes();
+                rec->progress = total > 0
+                    ? int((download->receivedBytes() * 100) / total)
+                    : 0;
+                if (m_list)
+                    syncList();
+            });
 
     connect(download, &QWebEngineDownloadRequest::stateChanged, this,
-            [this, item, finalPath, download](QWebEngineDownloadRequest::DownloadState state) {
-                const QFileInfo info(finalPath);
+            [this, download](QWebEngineDownloadRequest::DownloadState state) {
+                // Matched by pointer, not by name: setDownloadFileName() renames
+                // the request, so downloadFileName() and the record's filename
+                // can disagree.
+                const int row = indexOfRequest(download);
+                DownloadRecord *rec = row < 0 ? nullptr : &m_records[row];
+                if (!rec)
+                    return;
                 switch (state) {
                 case QWebEngineDownloadRequest::DownloadCompleted:
-                    item->setText(QString("Done: %1").arg(info.fileName()));
+                    rec->completed = true;
+                    rec->progress = 100;
+                    rec->paused = false;
+                    rec->request = nullptr;
                     // Show the user what just landed instead of leaving
                     // them to go find it themselves.
-                    QDesktopServices::openUrl(QUrl::fromLocalFile(info.absolutePath()));
+                    QDesktopServices::openUrl(
+                        QUrl::fromLocalFile(QFileInfo(rec->path).absolutePath()));
                     showDialog();
                     break;
                 case QWebEngineDownloadRequest::DownloadCancelled:
-                    item->setText(QString("Cancelled: %1").arg(info.fileName()));
+                    rec->cancelled = true;
+                    rec->paused = false;
+                    rec->request = nullptr;
                     break;
                 case QWebEngineDownloadRequest::DownloadInterrupted:
-                    item->setText(QString("Failed: %1 (%2)")
-                                      .arg(info.fileName(), download->interruptReasonString()));
+                    rec->cancelled = true; // "interrupted" and "cancelled" differ
+                    rec->paused = false;   // only in the reason, which the native
+                    rec->request = nullptr;// list does not print either
                     break;
                 default:
+                    rec->paused = (state == QWebEngineDownloadRequest::DownloadPaused);
                     break;
                 }
+                if (m_list)
+                    syncList();
             });
 
     download->accept();
+    syncList();
     showDialog();
+}
+
+void DownloadManager::openDownload(const QString &filename)
+{
+    const int index = indexOfFile(filename);
+    if (index < 0)
+        return;
+    const DownloadRecord &record = m_records[index];
+    if (!record.completed)
+        return;
+    QDesktopServices::openUrl(QUrl::fromLocalFile(record.path));
+}
+
+void DownloadManager::showInFolder(const QString &filename)
+{
+    const int index = indexOfFile(filename);
+    if (index < 0)
+        return;
+    QDesktopServices::openUrl(
+        QUrl::fromLocalFile(QFileInfo(m_records[index].path).absolutePath()));
+}
+
+void DownloadManager::pauseDownload(const QString &filename)
+{
+    DownloadRecord *record = recordForFile(filename);
+    if (!record || !record->request || record->completed || record->cancelled)
+        return;
+    record->request->pause();
+    record->paused = true;
+    if (m_list)
+        syncList();
+}
+
+void DownloadManager::resumeDownload(const QString &filename)
+{
+    DownloadRecord *record = recordForFile(filename);
+    if (!record || !record->request || record->completed || record->cancelled)
+        return;
+    record->request->resume();
+    record->paused = false;
+    if (m_list)
+        syncList();
+}
+
+void DownloadManager::cancelDownload(const QString &filename)
+{
+    DownloadRecord *record = recordForFile(filename);
+    if (!record || !record->request)
+        return;
+    record->request->cancel();
+    record->cancelled = true;
+    record->paused = false;
+    if (m_list)
+        syncList();
 }

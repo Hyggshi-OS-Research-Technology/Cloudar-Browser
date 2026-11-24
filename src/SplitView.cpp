@@ -5,6 +5,8 @@
 #include <QHBoxLayout>
 #include <QFrame>
 #include <QWebEnginePage>
+#include <QApplication>
+#include <QFocusEvent>
 
 SplitPane::SplitPane(QWebEngineProfile *profile, const QUrl &url, QWidget *parent)
     : QWidget(parent) {
@@ -64,6 +66,15 @@ SplitPane::SplitPane(QWebEngineProfile *profile, const QUrl &url, QWidget *paren
     connect(m_reloadBtn, &QToolButton::clicked, m_webView, &QWebEngineView::reload);
     connect(m_urlBar, &QLineEdit::returnPressed, this, &SplitPane::onReturnPressed);
     connect(m_webView, &QWebEngineView::urlChanged, this, &SplitPane::onUrlChanged);
+
+    // Keyboard shortcuts configured as QAction shortcuts belong to the main
+    // window, which routes them to the tab widget — which is hidden while the
+    // split view is up. Forwarding focus changes up lets the window know which
+    // pane a shortcut should apply to.
+    connect(qApp, &QApplication::focusChanged, this, [this](QWidget *, QWidget *now) {
+        if (now && (now == this || isAncestorOf(now)))
+            emit focusGained();
+    });
 }
 
 void SplitPane::onUrlChanged(const QUrl &url) {
@@ -85,6 +96,17 @@ void SplitPane::navigateToUrl(const QString &text) {
         url = QUrl(QString("https://www.google.com/search?q=%1").arg(QUrl::toPercentEncoding(text)));
     }
     m_webView->setUrl(url);
+}
+
+SplitPane *SplitView::activePane() const
+{
+    for (SplitPane *pane : {m_leftPane, m_rightPane}) {
+        if (pane && pane->hasFocus())
+            return pane;
+    }
+    // Nothing focused yet (the view was just switched to), or focus sits on the
+    // splitter handle itself: the left pane is the one the user was reading.
+    return m_leftPane;
 }
 
 SplitView::SplitView(QWebEngineProfile *profile, const QUrl &url1, const QUrl &url2, QWidget *parent)

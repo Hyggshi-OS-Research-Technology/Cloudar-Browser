@@ -3,10 +3,16 @@
 #include <QObject>
 #include <QString>
 #include <QVector>
+#include <QStringList>
 
 struct BookmarkEntry {
     QString title;
     QString url;
+    // Optional folder name, "" = unfiled. cloudar://bookmarks groups by this
+    // and lets the user create/delete folders; the bookmarks bar ignores it
+    // and keeps showing every bookmark in file order, which is what the
+    // toolbar has always done.
+    QString folder;
 };
 
 // Simple flat-file (TSV) bookmark store, mirroring HistoryManager's pattern
@@ -20,7 +26,12 @@ class BookmarkManager : public QObject
 public:
     explicit BookmarkManager(QObject *parent = nullptr);
 
-    void add(const QString &title, const QString &url);
+    void add(const QString &title, const QString &url, const QString &folder = QString());
+    void addFolder(const QString &name);
+    // `withBookmarks` decides whether the folder's bookmarks are deleted along
+    // with it or moved back to "unfiled". The page asks the user which.
+    void removeFolder(const QString &name, bool withBookmarks);
+    QStringList folders() const;
     void removeAt(int index);
     void rename(int index, const QString &newTitle);
     void move(int fromIndex, int toIndex);
@@ -36,6 +47,7 @@ signals:
     void changed();
 
 private:
+    QStringList m_folders;
     QString storagePath() const;
     void load();
     void save() const;

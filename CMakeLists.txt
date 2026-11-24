@@ -42,6 +42,8 @@ set(SOURCES
     src/ExtensionManager.cpp
     src/ExtensionsDialog.cpp
     src/HistoryManager.cpp
+    src/InternalBridge.cpp
+    src/PermissionStore.cpp
     src/IdleEasterEgg.cpp
     src/Language.cpp
     src/LightSchemeHandler.cpp
@@ -79,6 +81,8 @@ set(HEADERS
     src/ExtensionManager.h
     src/ExtensionsDialog.h
     src/HistoryManager.h
+    src/InternalBridge.h
+    src/PermissionStore.h
     src/IdleEasterEgg.h
     src/Language.h
     src/LightSchemeHandler.h
