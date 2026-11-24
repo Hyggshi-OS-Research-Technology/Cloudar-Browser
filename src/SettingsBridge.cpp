@@ -7,9 +7,10 @@
 #include "ClassicTheme.h"
 
 #include <QWebEngineProfile>
-// qWebEngineChromiumVersion() lives in qtwebenginecoreglobal.h; <QWebEngineCore>
-// pulls it in on every Qt 6 version, including the 6.5 LTS build.
-#include <QWebEngineCore>
+// qWebEngineChromiumVersion() is declared in qtwebenginecoreglobal.h. There is
+// no <QWebEngineCore> convenience header, so the module's own header is included
+// by path.
+#include <QtWebEngineCore/qtwebenginecoreglobal.h>
 #include <QWebEngineCookieStore>
 #include <QSettings>
 #include <QColorDialog>
@@ -109,10 +110,10 @@ QString SettingsBridge::getAll() const
     obj["platform"] = QSysInfo::prettyProductName();
     obj["arch"] = QSysInfo::currentCpuArchitecture();
     obj["qtVersion"] = QString::fromLatin1(qVersion());
-    // qWebEngineChromiumVersion() is a free function in QtWebEngineCore's
-    // namespace, not a QWebEngineProfile static. It is also a compile-time
-    // constant of the engine build, not something the running profile reports.
-    obj["chromiumVersion"] = QString::fromLatin1(qWebEngineChromiumVersion());
+    // A free function returning QString, not a QWebEngineProfile static: it
+    // reports the Chromium version this build of QtWebEngine was compiled
+    // against, which is what the About page claims.
+    obj["chromiumVersion"] = qWebEngineChromiumVersion();
 
     return QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
 }
