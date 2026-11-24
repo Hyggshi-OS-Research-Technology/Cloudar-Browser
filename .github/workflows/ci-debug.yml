@@ -6,71 +6,66 @@ on:
   workflow_dispatch:
 
 jobs:
+  win:
+    name: Windows build errors
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: 6.8.3
+          arch: win64_msvc2022_64
+          modules: 'qtwebengine qtwebchannel qtpositioning'
+          cache: true
+      - name: zlib
+        shell: pwsh
+        run: vcpkg install zlib:x64-windows
+      - name: Configure
+        shell: pwsh
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=x64-windows
+      - name: Build and annotate
+        shell: pwsh
+        run: |
+          cmake --build build --config Release 2>&1 | Tee-Object -FilePath build.log | Out-Null
+          $lines = Select-String -Path build.log -Pattern 'error C[0-9]+|error LNK|fatal error' | Select-Object -First 10
+          foreach ($l in $lines) {
+            $t = $l.Line.Trim() -replace '%','%25'
+            Write-Output "::error title=win::$t"
+          }
+          if ($lines.Count -gt 0) { exit 1 }
+
   cfg22:
-    name: Configure ubuntu-22.04 distro
+    name: Ubuntu 22.04 configure
     runs-on: ubuntu-22.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Base tools
-        shell: bash
+      - name: Base
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             build-essential cmake ninja-build zlib1g-dev \
             libgl-dev libglu1-mesa-dev libxkbcommon-dev libxkbcommon-x11-dev
-      - name: Qt distro (build.yml list)
-        shell: bash
+      - name: Qt
         run: |
           set +e
           sudo apt-get install -y --no-install-recommends \
             qt6-base-dev qt6-base-dev-tools qt6-opengl-dev \
             qt6-webengine-dev qt6-webengine-dev-tools \
             libqt6webenginewidgets6 libqt6webchannel6-dev > apt.log 2>&1
-          echo "apt exit=$?"
-          grep -E "E: |Unable to locate|has no installation candidate" apt.log | head -6 | while IFS= read -r l; do
+          echo "apt=$?"
+          grep -E "^E: |Unable to locate|no installation candidate" apt.log | head -6 | while IFS= read -r l; do
             echo "::error title=apt::$l"
           done
-          apt-cache search qt6-opengl 2>/dev/null | head -5
-          apt-cache policy qt6-opengl-dev 2>/dev/null | head -5
-
-  crash:
-    name: Backtrace ubuntu-24.04 distro
-    runs-on: ubuntu-24.04
-    timeout-minutes: 35
-    steps:
-      - uses: actions/checkout@v4
-      - name: Base tools
-        shell: bash
+      - name: Configure
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential cmake ninja-build zlib1g-dev gdb \
-            libgl-dev libglu1-mesa-dev libxkbcommon-dev libxkbcommon-x11-dev \
-            xvfb libgl1-mesa-dri libgl1 libegl1 libxkbcommon-x11-0 \
-            libnss3 libasound2t64 libqt6webenginewidgets6
-      - name: Qt distro
-        shell: bash
-        run: |
-          sudo apt-get install -y --no-install-recommends \
-            qt6-base-dev qt6-base-dev-tools \
-            qt6-webengine-dev qt6-webengine-dev-tools libqt6webchannel6-dev
-      - name: Build
-        shell: bash
-        run: |
-          cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
-          ninja -C build -j4
-      - name: Run under gdb and annotate the backtrace
-        shell: bash
-        run: |
-          export QTWEBENGINE_DISABLE_SANDBOX=1
-          export QT_QPA_PLATFORM=xcb
           set +e
-          timeout 40 xvfb-run -a gdb -batch \
-            -ex "run --classic" -ex "bt 25" -ex "info registers rip" \
-            ./build/cloudar-browser > gdb.log 2>&1
-          echo "gdb exit=$?"
-          grep -E "^#[0-9]+ |SIGSEGV|SIGABRT|Program received" gdb.log | head -10 | while IFS= read -r l; do
-            l="${l//'%'/'%25'}"
-            echo "::error title=bt::$l"
+          cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release > cfg.log 2>&1
+          echo "cfg=$?"
+          grep -nE "Could not find|Expected Config|missing:|CMake Error|not found" cfg.log | head -10 | while IFS= read -r l; do
+            echo "::error title=cfg::$l"
           done
