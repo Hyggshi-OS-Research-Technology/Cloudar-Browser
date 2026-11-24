@@ -4,6 +4,7 @@
 #include <QStandardPaths>
 #include <QIcon>
 #include <QSettings>
+#include <cstdio>
 
 #include "MainWindow.h"
 #include "LightSchemeHandler.h"
@@ -32,6 +33,38 @@ int main(int argc, char *argv[])
     // usable; it cannot widen the engine's own floor. That distinction is
     // documented rather than silently papered over with --no-sandbox.
 
+    // --help and --version must work without a display. They are answered
+    // before QApplication exists: constructing a QApplication with no X11 /
+    // Wayland session aborts the process (SIGABRT), which is exactly what
+    // `cloudar-browser --version` did on a headless CI runner.
+    // A hand-rolled scan rather than QCommandLineParser: the parser's help and
+    // version handling routes through QCoreApplication, which does not exist
+    // yet at this point.
+    for (int i = 1; i < argc; ++i) {
+        const QByteArray arg(argv[i]);
+        if (arg == "-v" || arg == "--version") {
+            fputs("Cloudar Browser " CLOUDAR_VERSION "\n", stdout);
+            return 0;
+        }
+        if (arg == "-h" || arg == "--help" || arg == "--help-all") {
+            fputs("Cloudar Browser " CLOUDAR_VERSION "\n"
+                  "A Qt6/QtWebEngine browser with a Chrome 2009 classic interface.\n\n"
+                  "Usage: cloudar-browser [options] [url]\n\n"
+                  "Options:\n"
+                  "  -h, --help              Show this help.\n"
+                  "  -v, --version           Show the version.\n"
+                  "  -i, --incognito         Start with a private, in-memory window.\n"
+                  "      --classic           Force the classic (Chrome 2009) interface.\n"
+                  "      --modern            Force the modern dark interface.\n"
+                  "      --perf-tier <tier>  auto | legacy | low | balanced | high.\n"
+                  "\n"
+                  "Either interface switch applies to this launch only; the saved\n"
+                  "preference lives in Settings -> Appearance -> Interface style.\n",
+                  stdout);
+            return 0;
+        }
+    }
+
     // Must run before QApplication is constructed.
     LightSchemeHandler::registerScheme();
 
@@ -39,7 +72,7 @@ int main(int argc, char *argv[])
     app.setWindowIcon(QIcon(":/icon.png"));
     QApplication::setApplicationName("Cloudar Browser");
     QApplication::setOrganizationName("Cloudar");
-    QApplication::setApplicationVersion("0.2.0");
+    QApplication::setApplicationVersion(QStringLiteral(CLOUDAR_VERSION));
 
     // Second pass over the performance profile: the first one ran before
     // QApplication existed, so it could only apply defaults and environment

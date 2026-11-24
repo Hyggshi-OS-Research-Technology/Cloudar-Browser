@@ -21,6 +21,9 @@ find_package(Qt6 REQUIRED COMPONENTS
     WebChannel
 )
 
+# CrxInstaller uses zlib directly for raw-DEFLATE. On Windows there is no
+# system zlib, so the Windows build job installs one via vcpkg; everywhere else
+# CMake's FindZLIB picks up the distro package.
 find_package(ZLIB REQUIRED)
 
 set(SOURCES
@@ -105,8 +108,11 @@ add_executable(cloudar-browser
     resources/resources.qrc
 )
 
+# The version is defined in exactly one place: the project() line above. Both
+# --version and QApplication::applicationVersion() read it from here.
 target_compile_definitions(cloudar-browser PRIVATE
     CLOUDAR_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+    CLOUDAR_VERSION="${PROJECT_VERSION}"
 )
 
 target_include_directories(cloudar-browser PRIVATE

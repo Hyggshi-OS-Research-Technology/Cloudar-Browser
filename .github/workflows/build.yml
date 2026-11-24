@@ -60,7 +60,14 @@ jobs:
       - name: Install Qt 6 (distribution packages)
         if: matrix.qt == 'distro'
         run: |
+          # Qt6Gui's CMake config requires Qt6OpenGL, which Ubuntu 22.04 ships
+          # in a separate package (it was folded into qt6-base-dev in 24.04).
+          # Installing it unconditionally keeps one package list for both.
           sudo apt-get install -y --no-install-recommends \
+            qt6-base-dev qt6-base-dev-tools qt6-opengl-dev \
+            qt6-webengine-dev qt6-webengine-dev-tools \
+            libqt6webenginewidgets6 libqt6webchannel6-dev \
+          || sudo apt-get install -y --no-install-recommends \
             qt6-base-dev qt6-webengine-dev qt6-webengine-dev-tools \
             libqt6webenginewidgets6 libqt6webchannel6-dev
 
@@ -175,8 +182,17 @@ jobs:
           modules: 'qtwebengine qtwebchannel qtpositioning'
           cache: true
 
+      - name: Provide zlib (vcpkg)
+        # Windows has no system zlib, and CrxInstaller needs it to inflate CRX
+        # payloads. vcpkg is preinstalled on the GitHub Windows images and is
+        # the supported way to get a CMake-config-compatible zlib here.
+        run: vcpkg install zlib:x64-windows
+
       - name: Configure CMake
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+        run: >
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+          -DVCPKG_TARGET_TRIPLET=x64-windows
 
       - name: Build
         run: cmake --build build --config Release

@@ -212,9 +212,12 @@ void SettingsBridge::clearBrowsingData(bool history, bool cache, bool cookies)
 
 QString SettingsBridge::appVersion() const
 {
-    // Single source of truth is main.cpp's setApplicationVersion(); reading it
-    // back here keeps the About page from lying after a version bump.
-    return QCoreApplication::applicationVersion();
+    // Single source of truth is QApplication::applicationVersion(), which main()
+    // sets from the CMake project version. The compile-time fallback only
+    // matters if a SettingsBridge is ever constructed before that call, and it
+    // keeps the About page from rendering a blank version.
+    const QString version = QCoreApplication::applicationVersion();
+    return version.isEmpty() ? QStringLiteral(CLOUDAR_VERSION) : version;
 }
 
 bool SettingsBridge::isSidebarEnabled() const
