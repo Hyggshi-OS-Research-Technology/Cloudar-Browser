@@ -1,0 +1,64 @@
+name: CI debug (temporary)
+
+on:
+  push:
+    branches: ["arena/3cab4054-cloudar-browser"]
+  workflow_dispatch:
+
+jobs:
+  probe:
+    name: Probe ${{ matrix.os }} / ${{ matrix.qt }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            qt: distro
+          - os: windows-2022
+            qt: 6.8.3
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install base tools
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends build-essential cmake ninja-build zlib1g-dev
+          fi
+
+      - name: Install Qt (distro)
+        if: matrix.qt == 'distro'
+        shell: bash
+        run: |
+          sudo apt-get install -y --no-install-recommends \
+            qt6-base-dev qt6-webengine-dev qt6-webengine-dev-tools \
+            libqt6webenginewidgets6 libqt6webchannel6-dev 2>&1 | tail -20
+
+      - name: Install Qt (installer)
+        if: matrix.qt != 'distro'
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ matrix.qt }}
+          arch: win64_msvc2022_64
+          modules: 'qtwebengine qtwebchannel'
+          cache: true
+
+      - name: Configure and report every line
+        shell: bash
+        run: |
+          set +e
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release > cfg.log 2>&1
+          rc=$?
+          echo "cmake exit=$rc"
+          if [ $rc -ne 0 ]; then
+            while IFS= read -r line; do
+              line="${line//'%'/'%25'}"
+              line="${line//$'\r'/}"
+              echo "::error title=configure::${line}"
+            done < cfg.log
+            exit 1
+          fi
+          echo "configure OK"
