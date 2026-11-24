@@ -26,7 +26,8 @@ void PageContextMenu::showAt(const QPoint &pos)
     if (!m_view || !m_view->page())
         return;
 
-    QWebEngineContextMenuRequest *request = m_view->page()->lastContextMenuRequest();
+    // lastContextMenuRequest() lives on the *view* in Qt 6, not on the page.
+    QWebEngineContextMenuRequest *request = m_view->lastContextMenuRequest();
     QMenu menu(m_view);
 
     // Icons are drawn by ClassicTheme::icon() in whichever chrome is active, so
@@ -59,13 +60,15 @@ void PageContextMenu::showAt(const QPoint &pos)
         if (!chosen)
             return;
         if (chosen == openHere) {
-            m_view->setUrl(link);
+            m_view->page()->triggerAction(QWebEnginePage::OpenLinkInThisWindow);
         } else if (chosen == openNewTab) {
-            emit openInNewTab(link);
+            m_view->page()->triggerAction(QWebEnginePage::OpenLinkInNewTab);
         } else if (chosen == openNewWindow) {
+            // No engine action opens a separate *window*, only a tab, so this is
+            // the one link item that goes through MainWindow.
             emit openInNewWindow(link);
         } else if (chosen == copyLink) {
-            QApplication::clipboard()->setText(link.toString());
+            m_view->page()->triggerAction(QWebEnginePage::CopyLinkToClipboard);
         }
         return;
     }
@@ -86,14 +89,16 @@ void PageContextMenu::showAt(const QPoint &pos)
         if (chosen == openMedia) {
             emit openInNewTab(media);
         } else if (chosen == copyMediaUrl) {
-            QApplication::clipboard()->setText(media.toString());
+            // The engine knows whether this is image or video and which of the
+            // two clipboard flavours applies; no need to guess from the URL.
+            m_view->page()->triggerAction(onImage
+                    ? QWebEnginePage::CopyImageUrlToClipboard
+                    : QWebEnginePage::CopyMediaUrlToClipboard);
         } else if (chosen == saveMedia) {
-            // A file dialog and QFile::copy would only work for file:// media;
-            // for http(s) the page's own download machinery already handles it,
-            // so trigger that rather than reimplementing it badly here.
-            m_view->page()->download(media,
-                                     QString(),
-                                     QWebEnginePage::DownloadAttributePolicy::DownloadAllowed);
+            // Qt 6 has no DownloadAttributePolicy overload: it is
+            // download(QUrl, filename), and an empty filename lets the profile's
+            // download handler (DownloadManager) choose one.
+            m_view->page()->download(media, QString());
         }
         return;
     }
