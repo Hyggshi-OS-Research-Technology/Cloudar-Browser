@@ -6,42 +6,10 @@ on:
   workflow_dispatch:
 
 jobs:
-  win:
-    name: Windows build errors
-    runs-on: windows-2022
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v4
-      - uses: jurplel/install-qt-action@v4
-        with:
-          version: 6.8.3
-          arch: win64_msvc2022_64
-          modules: 'qtwebengine qtwebchannel qtpositioning'
-          cache: true
-      - name: zlib
-        shell: pwsh
-        run: vcpkg install zlib:x64-windows
-      - name: Configure
-        shell: pwsh
-        run: |
-          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release `
-            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
-            -DVCPKG_TARGET_TRIPLET=x64-windows
-      - name: Build and annotate
-        shell: pwsh
-        run: |
-          cmake --build build --config Release 2>&1 | Tee-Object -FilePath build.log | Out-Null
-          $lines = Select-String -Path build.log -Pattern 'error C[0-9]+|error LNK|fatal error' | Select-Object -First 10
-          foreach ($l in $lines) {
-            $t = $l.Line.Trim() -replace '%','%25'
-            Write-Output "::error title=win::$t"
-          }
-          if ($lines.Count -gt 0) { exit 1 }
-
   cfg22:
-    name: Ubuntu 22.04 configure
+    name: Ubuntu 22.04 exact CI packages
     runs-on: ubuntu-22.04
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - name: Base
@@ -49,18 +17,23 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             build-essential cmake ninja-build zlib1g-dev \
-            libgl-dev libglu1-mesa-dev libxkbcommon-dev libxkbcommon-x11-dev
-      - name: Qt
+            libgl-dev libglu1-mesa-dev libxkbcommon-dev libxkbcommon-x11-dev \
+            libfontconfig1-dev libfreetype6-dev libdbus-1-dev
+      - name: Qt (exact build.yml logic)
         run: |
           set +e
           sudo apt-get install -y --no-install-recommends \
             qt6-base-dev qt6-base-dev-tools qt6-opengl-dev \
             qt6-webengine-dev qt6-webengine-dev-tools \
-            libqt6webenginewidgets6 libqt6webchannel6-dev > apt.log 2>&1
-          echo "apt=$?"
-          grep -E "^E: |Unable to locate|no installation candidate" apt.log | head -6 | while IFS= read -r l; do
-            echo "::error title=apt::$l"
-          done
+            libqt6webenginewidgets6 libqt6webchannel6-dev > apt1.log 2>&1
+          echo "superset apt=$?"
+          sudo apt-get install -y --no-install-recommends \
+            qt6-base-dev qt6-webengine-dev qt6-webengine-dev-tools \
+            libqt6webenginewidgets6 libqt6webchannel6-dev > apt2.log 2>&1
+          echo "fallback apt=$?"
+          echo "--- Qt6OpenGL present? ---"
+          ls /usr/lib/x86_64-linux-gnu/cmake/ | grep -i opengl | head
+          dpkg -l | grep -i "qt6-opengl\|libqt6opengl" | head -3
       - name: Configure
         run: |
           set +e
