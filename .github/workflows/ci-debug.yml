@@ -9,24 +9,31 @@ jobs:
   probe:
     name: Probe ${{ matrix.os }} / ${{ matrix.qt }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: ubuntu-24.04
             qt: distro
+          - os: ubuntu-22.04
+            qt: distro
           - os: windows-2022
             qt: 6.8.3
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install base tools
+      - name: Install base tools (exact CI list)
         shell: bash
         run: |
           if [ "$RUNNER_OS" = "Linux" ]; then
             sudo apt-get update
-            sudo apt-get install -y --no-install-recommends build-essential cmake ninja-build zlib1g-dev
+            sudo apt-get install -y --no-install-recommends \
+              build-essential cmake ninja-build zlib1g-dev \
+              xvfb libgl1-mesa-dri libgl1 libegl1 libxkbcommon-x11-0 \
+              libnss3 libasound2t64 || sudo apt-get install -y --no-install-recommends \
+              libnss3 libasound2
           fi
 
       - name: Install Qt (distro)
@@ -35,7 +42,7 @@ jobs:
         run: |
           sudo apt-get install -y --no-install-recommends \
             qt6-base-dev qt6-webengine-dev qt6-webengine-dev-tools \
-            libqt6webenginewidgets6 libqt6webchannel6-dev 2>&1 | tail -20
+            libqt6webenginewidgets6 libqt6webchannel6-dev 2>&1 | tail -25
 
       - name: Install Qt (installer)
         if: matrix.qt != 'distro'
@@ -46,22 +53,29 @@ jobs:
           modules: 'qtwebengine qtwebchannel'
           cache: true
 
-      - name: Configure and report every line
+      - name: Inventory Qt
+        shell: bash
+        run: |
+          echo "Qt6_DIR=$Qt6_DIR"
+          echo "QT_ROOT_DIR=$QT_ROOT_DIR"
+          echo "CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH"
+          for root in "$Qt6_DIR" "$QT_ROOT_DIR" "$CMAKE_PREFIX_PATH"; do
+            [ -n "$root" ] || continue
+            echo "--- under $root"
+            find "$root" -maxdepth 6 -name 'Qt6WebEngineWidgetsConfig.cmake' 2>/dev/null | head -3
+            find "$root" -maxdepth 4 -type d -name 'QtWebEngine*' 2>/dev/null | head -5
+          done
+
+      - name: Configure with Ninja (exact CI command)
         shell: bash
         run: |
           set +e
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release > cfg.log 2>&1
+          cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release > cfg.log 2>&1
           rc=$?
           echo "cmake exit=$rc"
-          if [ $rc -ne 0 ]; then
-            # Only the tail matters, and annotations are capped at 10 per step.
-            tail -n 10 cfg.log | while IFS= read -r line; do
-              line="${line//'%'/'%25'}"
-              line="${line//$'\r'/}"
-              echo "::error title=configure::${line}"
-            done
-            echo "--- full tail ---"
-            tail -n 40 cfg.log
-            exit 1
-          fi
-          echo "configure OK"
+          tail -n 10 cfg.log | while IFS= read -r line; do
+            line="${line//'%'/'%25'}"; line="${line//$'\r'/}"
+            echo "::error title=configure::${line}"
+          done
+          echo "--- tail ---"; tail -n 30 cfg.log
+          exit $rc
