@@ -60,9 +60,10 @@ jobs:
       - name: Install Qt 6 (distribution packages)
         if: matrix.qt == 'distro'
         run: |
-          # Qt6Gui's CMake config requires Qt6OpenGL, which Ubuntu 22.04 ships
-          # in a separate package (it was folded into qt6-base-dev in 24.04).
-          # Installing it unconditionally keeps one package list for both.
+          # Ubuntu 22.04 ships Qt6OpenGL as a separate package, and Qt6Gui's
+          # CMake config requires it there. Ubuntu 24.04 folded it into
+          # qt6-base-dev and has no qt6-opengl-dev, so apt would abort the whole
+          # install. Try the superset first, fall back to the plain set.
           sudo apt-get install -y --no-install-recommends \
             qt6-base-dev qt6-base-dev-tools qt6-opengl-dev \
             qt6-webengine-dev qt6-webengine-dev-tools \
