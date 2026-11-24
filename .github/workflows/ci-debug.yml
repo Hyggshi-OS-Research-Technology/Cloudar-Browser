@@ -73,9 +73,11 @@ jobs:
           cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release > cfg.log 2>&1
           rc=$?
           echo "cmake exit=$rc"
-          tail -n 10 cfg.log | while IFS= read -r line; do
+          # Only the diagnostic lines, so the 10-annotation budget is not
+          # spent on compiler-detection noise.
+          grep -nE "Could not find|Expected Config|missing:|dependency|Qt6[A-Za-z]*Config|error:|CMake Error|reason given|Target \"" cfg.log \
+            | head -10 | while IFS= read -r line; do
             line="${line//'%'/'%25'}"; line="${line//$'\r'/}"
-            echo "::error title=configure::${line}"
+            echo "::error title=cfg::${line}"
           done
-          echo "--- tail ---"; tail -n 30 cfg.log
           exit $rc
