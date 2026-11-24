@@ -53,9 +53,14 @@ jobs:
             build-essential cmake ninja-build zlib1g-dev \
             libgl-dev libglu1-mesa-dev libxkbcommon-dev libxkbcommon-x11-dev \
             libfontconfig1-dev libfreetype6-dev libdbus-1-dev \
-            xvfb libgl1-mesa-dri libgl1 libegl1 libxkbcommon-x11-0 \
-            libnss3 libasound2t64 || sudo apt-get install -y --no-install-recommends \
-            libnss3 libasound2
+            xvfb libgl1-mesa-dri libgl1 libegl1 libxkbcommon-x11-0 libnss3
+          # libasound2 was renamed to libasound2t64 in 24.04. Installing both in
+          # one apt command made the *whole* line fail on 22.04 (unknown
+          # package), and the old `|| fallback` then left the job without even
+          # libgl-dev -- which is why configure reported OpenGL missing on
+          # 22.04 and fine on 24.04.
+          sudo apt-get install -y --no-install-recommends libasound2t64 \
+          || sudo apt-get install -y --no-install-recommends libasound2
 
       - name: Install Qt 6 (distribution packages)
         if: matrix.qt == 'distro'
