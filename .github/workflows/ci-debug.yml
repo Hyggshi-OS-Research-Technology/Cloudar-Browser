@@ -1,0 +1,70 @@
+name: CI debug (temporary)
+
+on:
+  push:
+    branches: ["arena/3cab4054-cloudar-browser"]
+  workflow_dispatch:
+
+jobs:
+  cfg:
+    name: Configure ${{ matrix.os }} / ${{ matrix.qt }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            qt: distro
+          - os: windows-2022
+            qt: 6.8.3
+            arch: win64_msvc2022_64
+          - os: windows-2025
+            qt: 6.10.0
+            arch: win64_msvc2022_64
+          - os: ubuntu-24.04
+            qt: 6.8.3
+            arch: linux_gcc_64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Base tools
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build zlib1g-dev \
+            libgl-dev libglu1-mesa-dev libxkbcommon-dev libxkbcommon-x11-dev \
+            libfontconfig1-dev libfreetype6-dev libdbus-1-dev
+
+      - name: Qt distro
+        if: matrix.qt == 'distro'
+        shell: bash
+        run: |
+          sudo apt-get install -y --no-install-recommends \
+            qt6-base-dev qt6-webengine-dev qt6-webengine-dev-tools \
+            libqt6webenginewidgets6 libqt6webchannel6-dev
+
+      - name: Qt installer
+        if: matrix.qt != 'distro'
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ matrix.qt }}
+          arch: ${{ matrix.arch }}
+          modules: 'qtwebengine qtwebchannel qtpositioning'
+          cache: true
+
+      - name: Configure
+        shell: bash
+        run: |
+          set +e
+          cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release > cfg.log 2>&1
+          rc=$?
+          grep -nE "Could not find|Expected Config|Qt6[A-Za-z]*_DIR|missing:|error:|CMake Error|not found" cfg.log \
+            | head -10 | while IFS= read -r line; do
+            line="${line//'%'/'%25'}"; line="${line//$'\r'/}"
+            echo "::error title=cfg::${line}"
+          done
+          exit $rc
