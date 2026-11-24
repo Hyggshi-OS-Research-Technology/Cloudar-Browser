@@ -93,6 +93,17 @@ jobs:
           modules: 'qtwebengine qtwebchannel qtpositioning'
           cache: true
 
+      - name: Install QtWebEngine runtime dependencies (installer Qt only)
+        if: matrix.qt != 'distro'
+        run: |
+          # The official Qt build links none of these, but QtWebEngine dlopen()s
+          # them at run time for its own sandbox and X11 integration. The distro
+          # qt6-webengine-dev package declares them as dependencies; the
+          # installer tarball cannot, so install them here. libasound2 is left to
+          # the base-tools step above, which already picks the right name.
+          sudo apt-get install -y --no-install-recommends \
+            libxcomposite1 libxdamage1 libxrandr2 libxtst6 libxcursor1
+
       - name: Configure CMake
         run: cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release
 
@@ -130,9 +141,13 @@ jobs:
           # installation; naming it explicitly removes the guesswork and turns a
           # missing package into a readable message instead of exit 134
           # (SIGABRT from qFatal("Could not find QtWebEngineProcess")).
-          helper="$(find /usr -name QtWebEngineProcess -type f 2>/dev/null | head -n 1)"
+          #
+          # Both Qt layouts have to be covered: the distro Qt puts it under /usr,
+          # while the official installer puts it in the Qt tree that the
+          # install-qt-action exports as Qt6_DIR.
+          helper="$(find "$Qt6_DIR/.." "$QT_ROOT_DIR" /usr -name QtWebEngineProcess -type f 2>/dev/null | head -n 1)"
           if [ -z "$helper" ]; then
-            echo "::error::QtWebEngineProcess not found - install libqt6webenginecore6-bin"
+            echo "::error::QtWebEngineProcess not found - install libqt6webenginecore6-bin (distro Qt)"
             exit 1
           fi
           echo "QtWebEngineProcess: $helper"
@@ -162,11 +177,12 @@ jobs:
           export QT_QPA_PLATFORM=xcb
           export LIBGL_ALWAYS_SOFTWARE=1         # Xvfb has no GPU, see above
           export QT_OPENGL=software
-          helper="$(find /usr -name QtWebEngineProcess -type f 2>/dev/null | head -n 1)"
+          helper="$(find "$Qt6_DIR/.." "$QT_ROOT_DIR" /usr -name QtWebEngineProcess -type f 2>/dev/null | head -n 1)"
           if [ -z "$helper" ]; then
-            echo "::error::QtWebEngineProcess not found - install libqt6webenginecore6-bin"
+            echo "::error::QtWebEngineProcess not found - install libqt6webenginecore6-bin (distro Qt)"
             exit 1
           fi
+          echo "QtWebEngineProcess: $helper"
           export QTWEBENGINEPROCESS_PATH="$helper"
           set +e
           timeout 12 xvfb-run -a ./build/cloudar-browser --modern > smoke-modern.log 2>&1
