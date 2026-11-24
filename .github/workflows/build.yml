@@ -44,11 +44,11 @@ jobs:
       - name: Install base build tools
         run: |
           sudo apt-get update
-          # libgl-dev is not optional: Qt6Gui's CMake config calls
-          # find_package(WrapOpenGL) and configure fails on Ubuntu 22.04
-          # without the OpenGL *development* headers. libxkbcommon-dev is the
-          # same story for Qt6Gui's XKB check. The runtime libraries below are
-          # for the smoke tests, not for linking.
+          # None of the *-dev packages below are optional on Ubuntu 22.04:
+          # Qt6Gui's CMake config calls find_package(WrapOpenGL) and checks for
+          # XKB, fontconfig/freetype and dbus, so without the development
+          # headers configure fails before a single line is compiled. The
+          # runtime libraries at the end are for the smoke tests, not linking.
           sudo apt-get install -y --no-install-recommends \
             build-essential cmake ninja-build zlib1g-dev \
             libgl-dev libglu1-mesa-dev libxkbcommon-dev libxkbcommon-x11-dev \
