@@ -8,6 +8,112 @@
 #include <QMenu>
 #include <QWindow>
 #include <QIcon>
+#include <QPainter>
+#include <QPen>
+#include <QPixmap>
+
+namespace {
+
+// Three dots, drawn. The first version used the text character U+22EE, which
+// rendered small and pale in the title bar — and would have been a missing-glyph
+// box on any system whose UI font lacks it. Painting them keeps the size, the
+// spacing and the colour under our control and cannot depend on a font at all.
+QIcon makeMenuGlyph(const QColor &color, int size)
+{
+    // Drawn at 3x and scaled down by QIcon so the dots stay round on HiDPI.
+    constexpr int kScale = 3;
+    QPixmap pix(size * kScale, size * kScale);
+    pix.fill(Qt::transparent);
+
+    QPainter p(&pix);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    p.setPen(Qt::NoPen);
+    p.setBrush(color);
+
+    const qreal s = size * kScale;
+    // Chrome's dots are roughly 2 px across in an 18 px box, with a 5 px pitch.
+    // The first version used a 3 px box and a 4.3 px pitch, which at title-bar
+    // scale read as a faint smudge rather than a button.
+    const qreal radius = s * 0.115;
+    const qreal cx = s / 2.0;
+    const qreal first = s * 0.24;
+    const qreal step = s * 0.26;
+    for (int i = 0; i < 3; ++i)
+        p.drawEllipse(QPointF(cx, first + step * i), radius, radius);
+    p.end();
+
+    QPixmap disabled(pix.size());
+    disabled.fill(Qt::transparent);
+    {
+        QPainter dp(&disabled);
+        dp.setRenderHint(QPainter::Antialiasing, true);
+        dp.setPen(Qt::NoPen);
+        dp.setBrush(QColor(color.red(), color.green(), color.blue(), 90));
+        for (int i = 0; i < 3; ++i)
+            dp.drawEllipse(QPointF(cx, first + step * i), radius, radius);
+    }
+
+    QIcon icon;
+    icon.addPixmap(pix, QIcon::Normal);
+    icon.addPixmap(disabled, QIcon::Disabled);
+    return icon;
+}
+
+// The window buttons were text characters too: a minus, a square and a
+// multiplication sign. They are simple shapes, so painting them removes the font
+// dependency and the odd baseline that made the box glyph sit too low.
+void paintWindowShape(QPainter &p, const QString &shape, int size)
+{
+    const qreal s = size;
+    const qreal c = s / 2.0;
+    const qreal arm = s * 0.22;
+
+    QPen pen = p.pen();
+    pen.setWidthF(qMax(1.0, s * 0.055));
+    pen.setCapStyle(Qt::RoundCap);
+    p.setPen(pen);
+    p.setBrush(Qt::NoBrush);
+
+    if (shape == QLatin1String("min")) {
+        p.drawLine(QPointF(c - arm, c), QPointF(c + arm, c));
+    } else if (shape == QLatin1String("max")) {
+        const qreal r = arm * 0.85;
+        p.drawRect(QRectF(c - r, c - r, r * 2, r * 2));
+    } else { // close
+        p.drawLine(QPointF(c - arm, c - arm), QPointF(c + arm, c + arm));
+        p.drawLine(QPointF(c + arm, c - arm), QPointF(c - arm, c + arm));
+    }
+}
+
+QPixmap renderWindowGlyph(const QString &shape, const QColor &color, int size)
+{
+    constexpr int kScale = 3;
+    QPixmap pix(size * kScale, size * kScale);
+    pix.fill(Qt::transparent);
+
+    QPainter p(&pix);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    p.setPen(color);
+    paintWindowShape(p, shape, size * kScale);
+    p.end();
+    return pix;
+}
+
+QIcon makeWindowGlyph(const QString &shape, const QColor &color, int size,
+                      const QColor &activeColor = QColor())
+{
+    QIcon icon;
+    icon.addPixmap(renderWindowGlyph(shape, color, size), QIcon::Normal);
+
+    // The close button turns red on hover and needs a white glyph there, while
+    // the others keep their normal colour. QIcon::Active is the mode QToolButton
+    // uses under the mouse, so the two states can differ.
+    if (activeColor.isValid())
+        icon.addPixmap(renderWindowGlyph(shape, activeColor, size), QIcon::Active);
+    return icon;
+}
+
+} // namespace
 
 TitleBar::TitleBar(QWidget *parent) : QWidget(parent)
 {
@@ -34,7 +140,7 @@ TitleBar::TitleBar(QWidget *parent) : QWidget(parent)
     // "checked" look, which is how Chrome behaves.
     m_menuButton = new QToolButton(this);
     m_menuButton->setObjectName("TitleBarMenuButton");
-    m_menuButton->setText(QString::fromUtf8("\xE2\x8B\xAE")); // ⋮
+    m_menuButton->setIconSize(QSize(20, 20));
     m_menuButton->setToolTip(tr("Customise and control Cloudar Browser"));
     m_menuButton->setAutoRaise(true);
     m_menuButton->setFixedSize(30, 26);
@@ -42,18 +148,22 @@ TitleBar::TitleBar(QWidget *parent) : QWidget(parent)
     m_menuButton->setPopupMode(QToolButton::InstantPopup);
     layout->addWidget(m_menuButton);
 
-    auto makeButton = [this](const QString &text) {
+    auto makeButton = [this](const QString &shape) {
         auto *btn = new QToolButton(this);
-        btn->setText(text);
+        btn->setObjectName("TitleBarWindowButton");
+        // The shape name rides along as a property so applyTheme() can repaint
+        // the glyph in the new accent-derived colour.
+        btn->setProperty("glyphShape", shape);
+        btn->setIconSize(QSize(12, 12));
         btn->setAutoRaise(true);
         btn->setFixedSize(30, 26);
         btn->setCursor(Qt::ArrowCursor);
         return btn;
     };
 
-    m_minBtn = makeButton(QString::fromUtf8("\xE2\x88\x92"));   // −
-    m_maxBtn = makeButton(QString::fromUtf8("\xE2\x96\xA1"));   // □
-    m_closeBtn = makeButton(QString::fromUtf8("\xE2\x9C\x95")); // ✕
+    m_minBtn = makeButton(QStringLiteral("min"));
+    m_maxBtn = makeButton(QStringLiteral("max"));
+    m_closeBtn = makeButton(QStringLiteral("close"));
     m_closeBtn->setObjectName("TitleBarCloseButton");
 
     connect(m_minBtn, &QToolButton::clicked, this, &TitleBar::minimizeRequested);
@@ -92,11 +202,22 @@ void TitleBar::applyTheme(const QColor &accent)
         "#TitleBar QToolButton { color: %2; border: none; border-radius: 4px; font-weight: bold; }"
         "#TitleBar QToolButton:hover { background: %3; }"
         "#TitleBarCloseButton:hover { background: #e5484d; color: white; }"
-        // The three-dot glyph is a text character, so it needs a font that
-        // actually has U+22EE; without this it renders as a box on some systems.
-        "#TitleBarMenuButton { font-size: 17px; font-weight: normal; padding-bottom: 6px; }"
         "#TitleBarMenuButton::menu-indicator { image: none; width: 0px; }"
     ).arg(accent.name(), text.name(), hover.name()));
+
+    // Every glyph here is painted, so all of them have to be regenerated when
+    // the accent — and therefore the readable text colour — changes.
+    if (m_menuButton)
+        m_menuButton->setIcon(makeMenuGlyph(text, 20));
+    for (QToolButton *btn : {m_minBtn, m_maxBtn, m_closeBtn}) {
+        if (!btn)
+            continue;
+        // Only the close button changes colour on hover (red background), so
+        // only it needs a second, white pixmap for the Active mode.
+        const QColor activeColor = (btn == m_closeBtn) ? QColor(Qt::white) : QColor();
+        btn->setIcon(makeWindowGlyph(btn->property("glyphShape").toString(),
+                                     text, 12, activeColor));
+    }
 }
 
 void TitleBar::mousePressEvent(QMouseEvent *event)
