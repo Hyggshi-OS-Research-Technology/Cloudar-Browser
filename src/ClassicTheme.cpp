@@ -40,12 +40,38 @@ QPixmap makePixmap(int size)
     return pix;
 }
 
-void paintArrow(QPainter &p, const QColor &color, qreal cx, qreal cy, qreal w, qreal h)
+// A filled triangle whose *apex* points in `direction`.
+//
+// The previous version always built an upward triangle: apex at the top, base
+// along the bottom, with no way to say otherwise. Every caller wanted a
+// horizontal arrow, so Back rendered as a stray upward spike next to an open
+// arc (looking like a "C"), Forward as a disconnected hook, and the omnibox "go"
+// arrow as a blob. Direction is a parameter now, and the geometry is symmetric
+// around (cx, cy) so the call sites only have to give a centre.
+enum class ArrowDir { Left, Right, Up };
+
+void paintArrow(QPainter &p, const QColor &color, qreal cx, qreal cy,
+                qreal w, qreal h, ArrowDir dir = ArrowDir::Right)
 {
     QPolygonF tri;
-    tri << QPointF(cx, cy - h / 2)
-        << QPointF(cx + w / 2, cy + h / 2)
-        << QPointF(cx - w / 2, cy + h / 2);
+    switch (dir) {
+    case ArrowDir::Left:
+        tri << QPointF(cx - w / 2, cy)
+            << QPointF(cx + w / 2, cy - h / 2)
+            << QPointF(cx + w / 2, cy + h / 2);
+        break;
+    case ArrowDir::Up:
+        tri << QPointF(cx, cy - h / 2)
+            << QPointF(cx + w / 2, cy + h / 2)
+            << QPointF(cx - w / 2, cy + h / 2);
+        break;
+    case ArrowDir::Right:
+    default:
+        tri << QPointF(cx + w / 2, cy)
+            << QPointF(cx - w / 2, cy - h / 2)
+            << QPointF(cx - w / 2, cy + h / 2);
+        break;
+    }
     p.setBrush(color);
     p.setPen(Qt::NoPen);
     p.drawPolygon(tri);
@@ -53,66 +79,131 @@ void paintArrow(QPainter &p, const QColor &color, qreal cx, qreal cy, qreal w, q
 
 // --- Classic Chrome 2009 glyphs ------------------------------------------
 
+// The shape of the bug, because it took three attempts to get right:
+//
+// The original Back/Forward were an arc plus a small triangle. Three things
+// were wrong at once —
+//   - paintArrow() only ever built an *upward* triangle, so the "arrow" pointed
+//     the wrong way no matter which button it belonged to;
+//   - the arc left its gap on the far side from the head, which is why Back
+//     read as a letter "C" with a lump beside it in the user's screenshot;
+//   - at 16 px, a 70%-of-the-box ring leaves a 4 px mouth, which is not enough
+//     for any arrowhead to be recognisable after downsampling.
+//
+// Chrome 1.0's own toolbar used these rings, but rendered them at 20 px from a
+// hand-tuned bitmap. Drawing at 16 px programmatically, a shafted arrow is the
+// only version that survives. That is the trade recorded here.
+
+void paintNavArrow(QPainter &p, const QColor &c, int s, bool forward)
+{
+    // A shafted arrow, not a ring with a head attached.
+    //
+    // Chrome 1.0 used the ring, and this file tried to: three revisions of it
+    // (arc + detached head, arc + head in the mouth, wider mouth) all rendered at
+    // 16 px as a circle with a nib — at that size an 8 px ring leaves no room to
+    // make a 5 px arrowhead read as an arrow, and the user's screenshot showed
+    // exactly that: Back looked like a letter "C" with a lump.
+    //
+    // The renderer is size-agnostic; the *artwork* has to be. A 0.52-wide head
+    // on a shaft is unambiguous from 12 px up, which is what this needs to be.
+    const qreal centre = s / 2.0;
+    const qreal headW = s * 0.52;   // along the direction of travel
+    const qreal headH = s * 0.60;   // across it
+    const qreal shaft = qMax(1.5, s * 0.15);
+
+    const qreal tip = forward ? centre + s * 0.36 : centre - s * 0.36;
+    const qreal neck = forward ? centre + s * 0.10 : centre - s * 0.10;
+    const qreal tail = forward ? centre - s * 0.34 : centre + s * 0.34;
+
+    QPen pen(c, shaft);
+    pen.setCapStyle(Qt::FlatCap);
+    p.setPen(pen);
+    p.drawLine(QPointF(neck, centre), QPointF(tail, centre));
+
+    QPolygonF head;
+    head << QPointF(tip, centre)
+         << QPointF(neck, centre - headH / 2)
+         << QPointF(neck, centre + headH / 2);
+    p.setPen(Qt::NoPen);
+    p.setBrush(c);
+    p.drawPolygon(head);
+}
+
 void paintClassicBack(QPainter &p, const QColor &c, int s)
 {
-    QPen pen(c, 1.6);
-    pen.setCapStyle(Qt::RoundCap);
-    pen.setJoinStyle(Qt::RoundJoin);
-    p.setPen(pen);
-    p.setBrush(Qt::NoBrush);
-    const qreal cy = s * 0.52;
-    p.drawArc(QRectF(s * 0.34, s * 0.26, s * 0.44, s * 0.44), 35 * 16, 250 * 16);
-    paintArrow(p, c, s * 0.31, cy, s * 0.26, s * 0.24);
+    paintNavArrow(p, c, s, false);
 }
 
 void paintClassicForward(QPainter &p, const QColor &c, int s)
 {
-    QPen pen(c, 1.6);
-    pen.setCapStyle(Qt::RoundCap);
-    pen.setJoinStyle(Qt::RoundJoin);
-    p.setPen(pen);
-    p.setBrush(Qt::NoBrush);
-    const qreal cy = s * 0.52;
-    p.drawArc(QRectF(s * 0.22, s * 0.26, s * 0.44, s * 0.44), 295 * 16, 250 * 16);
-    paintArrow(p, c, s * 0.69, cy, s * 0.26, s * 0.24);
+    paintNavArrow(p, c, s, true);
 }
 
 void paintClassicReload(QPainter &p, const QColor &c, int s)
 {
-    QPen pen(c, 1.7);
-    pen.setCapStyle(Qt::RoundCap);
+    // Same lesson as Back/Forward: a nearly-closed 8 px ring is a blob. The head
+    // is anchored to the point where the arc ends, sized against the line weight
+    // rather than the icon box, so it reads as one continuous circular arrow.
+    const qreal centre = s / 2.0;
+    const qreal radius = s * 0.28;
+    const QRectF ring(centre - radius, centre - radius, radius * 2, radius * 2);
+
+    const qreal weight = qMax(1.5, s * 0.12);
+    QPen pen(c, weight);
+    pen.setCapStyle(Qt::FlatCap);
     p.setPen(pen);
     p.setBrush(Qt::NoBrush);
-    // Open circle with a gap at the top-right, plus a short arrow head —
-    // this is the same "reload" shape Chrome used before it adopted the
-    // Material circular arrow.
-    p.drawArc(QRectF(s * 0.2, s * 0.2, s * 0.6, s * 0.6), 120 * 16, 285 * 16);
-    QPolygonF head;
-    head << QPointF(s * 0.62, s * 0.14)
-         << QPointF(s * 0.80, s * 0.24)
-         << QPointF(s * 0.62, s * 0.32);
-    p.setBrush(c);
+    // Gap at the top (90..130 deg), sweeping clockwise from 130 all the way
+    // round to 90, so the head lands at 12 o'clock pointing right.
+    p.drawArc(ring, 130 * 16, -320 * 16);
+
+    // Head sits on the tangent at the top of the ring: apex slightly ahead of
+    // the endpoint, base straddling it. Sized from `weight`, not from `s`, so it
+    // cannot swamp the ring the way a 0.46*s triangle did.
+    const QPointF end(centre, centre - radius);
+    // Head diameter ~ 4x the stroke weight: big enough to read at 16 px, small
+    // enough to stay a head on the ring rather than a sail above it. Measured by
+    // rendering the four candidates at act size and picking the one that still
+    // looked like an arrow after downsampling.
+    const qreal reach = weight * 2.2;
+    const qreal spread = weight * 1.3;
+    QPolygonF arrow;
+    arrow << QPointF(end.x() + reach, end.y())
+          << QPointF(end.x() - reach * 0.35, end.y() - spread)
+          << QPointF(end.x() - reach * 0.35, end.y() + spread);
     p.setPen(Qt::NoPen);
-    p.drawPolygon(head);
+    p.setBrush(c);
+    p.drawPolygon(arrow);
 }
 
 void paintClassicHome(QPainter &p, const QColor &c, int s)
 {
-    QPen pen(c, 1.5);
-    pen.setJoinStyle(Qt::RoundJoin);
+    // One closed outline: roof and walls drawn as a single path.
+    //
+    // The previous version drew the roof as a *polyline* (so the bottom of the
+    // roof was never closed) and then drew the body as a separate rectangle
+    // whose top edge cut straight across the roof. That is why the house
+    // appeared to have lost its roof: two open shapes crossing each other
+    // rather than one house.
+    QPen pen(c, qMax(1.3, s * 0.095));
+    pen.setJoinStyle(Qt::MiterJoin);
+    pen.setCapStyle(Qt::FlatCap);
     p.setPen(pen);
     p.setBrush(Qt::NoBrush);
-    QPolygonF roof;
-    roof << QPointF(s * 0.5, s * 0.16)
-         << QPointF(s * 0.86, s * 0.46)
-         << QPointF(s * 0.14, s * 0.46);
-    p.drawPolyline(roof);
-    QPolygonF body;
-    body << QPointF(s * 0.24, s * 0.44)
-         << QPointF(s * 0.76, s * 0.44)
-         << QPointF(s * 0.76, s * 0.84)
-         << QPointF(s * 0.24, s * 0.84);
-    p.drawPolygon(body);
+
+    QPainterPath house;
+    house.moveTo(s * 0.50, s * 0.15);          // apex
+    house.lineTo(s * 0.84, s * 0.45);          // right eaves
+    house.lineTo(s * 0.76, s * 0.45);          // step in under the eave
+    house.lineTo(s * 0.76, s * 0.84);          // right wall down
+    house.lineTo(s * 0.24, s * 0.84);          // floor
+    house.lineTo(s * 0.24, s * 0.45);          // left wall up
+    house.lineTo(s * 0.16, s * 0.45);          // step out under the eave
+    house.closeSubpath();                      // back to the apex: roof closed
+    p.drawPath(house);
+
+    // The doorway, which is what makes it read as a house rather than a pentagon.
+    p.drawRect(QRectF(s * 0.43, s * 0.60, s * 0.14, s * 0.24));
 }
 
 void paintClassicStar(QPainter &p, const QColor &c, int s, bool filled)
@@ -169,8 +260,8 @@ void paintClassicGo(QPainter &p, const QColor &c, int s)
     pen.setCapStyle(Qt::RoundCap);
     p.setPen(pen);
     p.setBrush(Qt::NoBrush);
-    p.drawLine(QPointF(s * 0.24, s * 0.5), QPointF(s * 0.68, s * 0.5));
-    paintArrow(p, c, s * 0.70, s * 0.5, s * 0.28, s * 0.28);
+    p.drawLine(QPointF(s * 0.22, s * 0.5), QPointF(s * 0.58, s * 0.5));
+    paintArrow(p, c, s * 0.72, s * 0.5, s * 0.30, s * 0.30, ArrowDir::Right);
 }
 
 void paintClassicMenu(QPainter &p, const QColor &c, int s)
