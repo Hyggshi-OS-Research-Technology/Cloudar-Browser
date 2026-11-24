@@ -42,6 +42,7 @@
 #include <QToolButton>
 #include <QTabBar>
 #include <QSignalBlocker>
+#include <QMenu>
 #include <QSysInfo>
 
 MainWindow::MainWindow(bool isIncognito, QWidget *parent)
@@ -460,25 +461,20 @@ void MainWindow::buildTitleBar()
         return;
     }
 
-    // QMainWindow always puts its menu bar in the topmost row and any
-    // TopToolBarArea toolbars in the row(s) below — and will happily pack
-    // two toolbars into the *same* row if they fit, which is what was
-    // squashing the title bar and the nav toolbar together. Neither
-    // behavior is something addToolBar()/menuBar() lets you override, so
-    // the title bar can't be one more toolbar: it has to occupy the menu
-    // row itself, stacked above a real QMenuBar we build by hand.
+    // QMainWindow always puts its menu widget in the topmost row and any
+    // TopToolBarArea toolbars in the row(s) below — and will happily pack two
+    // toolbars into the *same* row if they fit, which is what was squashing the
+    // title bar and the nav toolbar together. That is why the title bar is
+    // installed with setMenuWidget() instead of being one more toolbar.
     m_titleBar = new TitleBar(this);
 
-    m_menuBar = new QMenuBar(this);
-
-    auto *topContainer = new QWidget(this);
-    auto *topLayout = new QVBoxLayout(topContainer);
-    topLayout->setContentsMargins(0, 0, 0, 0);
-    topLayout->setSpacing(0);
-    topLayout->addWidget(m_titleBar);
-    topLayout->addWidget(m_menuBar);
-
-    setMenuWidget(topContainer);
+    // No QMenuBar in this chrome. Windows 11 Chrome has no menu bar row at all
+    // — the whole menu is the three-dot button in the title bar. Shipping a
+    // menu bar row just to hold one entry also cost a full 24 px band above the
+    // toolbar for the word "Menu". m_menuBar stays null, and buildModernMenu()
+    // attaches its QMenu to the title bar instead.
+    m_menuBar = nullptr;
+    setMenuWidget(m_titleBar);
 
     connect(m_titleBar, &TitleBar::minimizeRequested, this, &QWidget::showMinimized);
     connect(m_titleBar, &TitleBar::maximizeRestoreRequested, this, [this]() {
@@ -756,10 +752,11 @@ void MainWindow::buildMenu()
 
 void MainWindow::announceStyleChange(Theme::ThemeStyle style)
 {
-    // The restart entry differs per chrome (Tools > Restart on classic, Menu >
-    // Restart on modern), so name the one the user can actually see.
+    // The restart entry differs per chrome — Tools on the classic menu bar, the
+    // three-dot menu on the modern one — so name the one the user can see.
     const bool classic = Theme::current() == Theme::ThemeStyle::Classic;
-    const QString where = classic ? tr("Tools \u25b8 Restart") : tr("Menu \u25b8 Restart");
+    const QString where = classic ? tr("Tools \u25b8 Restart")
+                                  : tr("the \u22ee menu \u25b8 Restart");
     QMessageBox::information(
         this, tr("Interface Style"),
         tr("The %1 interface will be used the next time Cloudar Browser starts. "
@@ -769,7 +766,13 @@ void MainWindow::announceStyleChange(Theme::ThemeStyle style)
 
 void MainWindow::buildModernMenu()
 {
-    auto *menu = m_menuBar->addMenu("&Menu");
+    // A free-standing QMenu attached to the title bar's three-dot button. It is
+    // parented to the window so the QAction objects inside it (shortcuts, check
+    // states) live as long as the window does, exactly as a menu-bar-owned menu
+    // would.
+    auto *menu = new QMenu(this);
+    if (m_titleBar)
+        m_titleBar->setMenu(menu);
 
     auto *newTab = menu->addAction("New Tab");
     newTab->setShortcut(QKeySequence::AddTab);
@@ -1284,6 +1287,8 @@ void MainWindow::buildClassicMenu()
     // page" button plus a small wrench menu; this is the same content laid out
     // as a conventional Win32 menu bar, which is what users of that era
     // expect from a Windows application.
+    if (!m_menuBar)
+        m_menuBar = menuBar(); // the decorated window has a real menu bar
     auto *fileMenu = m_menuBar->addMenu(tr("&File"));
 
     auto *newTab = fileMenu->addAction(tr("New &tab"));
