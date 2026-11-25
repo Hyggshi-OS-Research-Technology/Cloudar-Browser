@@ -166,6 +166,21 @@ be edited) and `MIN_ZOOM`/`MAX_ZOOM`/`MAX_FOCUS` in `scripts/background.js`
 pairs disagree, so the slider can never offer a zoom the browser silently
 changes.
 
+### Which layer is showing
+
+`scripts/background.js` has one answer to "what is the background right now":
+`surface()` returns `'image'`, `'video'`, `'color'` or `'default'` from the
+classes on `<body>`. Three places used to read the class list themselves — the
+transform code, the frame editor's button, and the panel — and they drifted.
+
+Every function that changes those classes calls `announceSurface()`, which fires
+`cloudar:wallpaper-changed`. That exists because of a real bug: the **Adjust the
+frame** button was greyed out over a wallpaper that was plainly visible. It asked
+`isFramable()` at init and on `cloudar:wallpaper-applied` only, and a wallpaper
+restored from IndexedDB arrives *asynchronously*, after init — so the button kept
+a decision made before the wallpaper existed. Gate 7 now fails the build if a
+function toggles `image-bg` / `video-bg` / `custom-bg` without announcing it.
+
 ### Remote wallpaper URLs
 
 `cloudar://` is registered as a **secure** scheme, so Chromium treats it as a
@@ -177,6 +192,13 @@ secure origin. That has two consequences the panel has to handle out loud:
   the URL with `Image`/`video` first, so a typo, a 404 or a blocked host produces
   an error message and leaves the current background untouched — instead of
   claiming success over an unchanged screen.
+* The field takes a **file** address, not a page. An address with no media
+  extension is rejected before any request is made, with a message naming what it
+  actually is: `https://youtu.be/…` and other YouTube links get their own
+  explanation. Playback from YouTube would need an embedded player — a
+  `QWebEngine` view in the browser process — and `cloudar://` pages cannot embed
+  one, so the honest answer is to say so rather than report "could not be
+  loaded".
 
 Storage failures are shown in the panel with the real `DOMException` name —
 `QuotaExceededError` in particular is a normal outcome for video and the user

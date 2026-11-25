@@ -14,6 +14,12 @@
   --text: #e8ecf5;
   --muted: #8b93a7;
   --panel-bg: rgba(20, 23, 31, 0.98);
+  /* Opaque underlay for surfaces that carry text. --panel-bg keeps a hint of
+     translucency for the glassy look; on top of a bright photo, 2% of the photo
+     showing through is still enough to read it behind the labels, which is what a
+     screenshot showed. The panel paints --panel-solid and gets its blur from the
+     surface below instead of from its own alpha. */
+  --panel-solid: #14171f;
   --panel-border: rgba(255, 255, 255, 0.08);
   --tile-bg: rgba(255, 255, 255, 0.05);
   --tile-bg-hover: rgba(255, 255, 255, 0.09);

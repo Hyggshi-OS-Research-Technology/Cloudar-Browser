@@ -61,10 +61,18 @@ var CloudarCustomize = (function () {
 
       buildSwatches();
 
+      // Opening the panel is a page-wide state, not a panel-local class: two
+      // window-anchored buttons (sound, pause) have to move out from under it.
+      function setPanelOpen(isOpen) {
+        if (!panel) return;
+        panel.classList.toggle('open', isOpen);
+        document.body.classList.toggle('panel-open', isOpen);
+      }
+
       var open = document.getElementById('customizeBtn');
       var close = document.getElementById('closePanel');
-      if (open && panel) open.addEventListener('click', function () { panel.classList.add('open'); });
-      if (close && panel) close.addEventListener('click', function () { panel.classList.remove('open'); });
+      if (open && panel) open.addEventListener('click', function () { setPanelOpen(true); });
+      if (close && panel) close.addEventListener('click', function () { setPanelOpen(false); });
 
       // --- background media from this device -------------------------------
       var fileInput = document.getElementById('imageFile');
@@ -121,10 +129,10 @@ var CloudarCustomize = (function () {
       document.addEventListener('cloudar:framing-open', function () {
         if (!panel) return;
         panelWasOpen = panel.classList.contains('open');
-        if (panelWasOpen) panel.classList.remove('open');
+        if (panelWasOpen) setPanelOpen(false);
       });
       document.addEventListener('cloudar:framing-close', function () {
-        if (panel && panelWasOpen) panel.classList.add('open');
+        if (panel && panelWasOpen) setPanelOpen(true);
         panelWasOpen = false;
       });
 

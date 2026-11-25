@@ -110,7 +110,8 @@
       <label for="imageFile">Background image or video (from this device)</label>
       <input type="file" id="imageFile" accept="image/*,video/mp4,video/webm,video/ogg,video/*">
       <div class="hint">Images (PNG, JPG, WebP) or videos (MP4, WebM for a live wallpaper).
-        Stored in this page's IndexedDB, not in localStorage.</div>
+        Saved by the browser in its own data folder, so it survives a restart and
+        survives clearing browsing data.</div>
       <div class="preview" id="imagePreview"></div>
       <div class="video-preview-wrapper" id="videoPreviewWrapper">
         <video id="videoPreview" muted loop autoplay playsinline></video>
@@ -127,8 +128,14 @@
     </section>
 
     <section>
-      <label for="webImageUrl">Background media from the web (image or video URL)</label>
-      <input type="text" id="webImageUrl" placeholder="https://example.com/photo.jpg or video.mp4" autocomplete="off">
+      <label for="webImageUrl">Background media from the web</label>
+      <!-- "image or video URL" read as "any video link", so a YouTube share link
+           went in and came back as "could not be loaded". This field loads a
+           file, not a page, and the label and hint now say so before the click. -->
+      <input type="text" id="webImageUrl" placeholder="https://example.com/photo.jpg" autocomplete="off">
+      <div class="hint">A direct link to the file itself, ending in .jpg, .png, .webp,
+        .mp4 or .webm. A page address — including YouTube — will not work here:
+        this field loads a file, and YouTube playback needs an embedded player.</div>
       <button class="action" id="applyWebImage" type="button">Use this media</button>
     </section>
 
