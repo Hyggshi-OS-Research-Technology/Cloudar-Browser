@@ -103,6 +103,13 @@ QString SettingsBridge::getAll() const
     // differ whenever the user has picked a style but not restarted, or launched
     // with --classic/--modern.
     obj["uiStyle"] = uiStyle();
+    obj["colorMode"] = ThemeManager::instance().colorModeKey();
+    obj["colorModeDark"] = ThemeManager::instance().prefersDark();
+    obj["colorModeQueryable"] = colorSchemeQueryable();
+    obj["colorModeSystemDark"] = ThemeManager::systemPrefersDark();
+    // The classic chrome is a fixed 2009 palette, so the setting exists but does
+    // nothing there. Reported rather than silently ignored.
+    obj["colorModeApplies"] = Theme::current() == Theme::ThemeStyle::Modern;
     obj["uiStyleRunning"] = Theme::keyFor(Theme::current());
     obj["showHomeButton"] = settings.value("browser/showHomeButton", true).toBool();
     obj["restartRequired"] = restartRequired();
@@ -441,6 +448,27 @@ void SettingsBridge::setUiStyle(const QString &style)
     // stylesheet alone would leave a half-classic window, so the change lands on
     // the next launch and restartRequired() tells the settings page to say so.
     Theme::setCurrent(parsed);
+    emit settingsChanged();
+}
+
+bool SettingsBridge::colorSchemeQueryable() const
+{
+    return ThemeManager::systemColorSchemeQueryable();
+}
+
+void SettingsBridge::setColorMode(const QString &mode)
+{
+    const QString key = mode.trimmed().toLower();
+    ColorMode parsed = ColorMode::System;
+    if (key == "light")
+        parsed = ColorMode::Light;
+    else if (key == "dark")
+        parsed = ColorMode::Dark;
+    else if (key != "system")
+        return;   // an unknown value is not a mode; do not guess
+
+    ThemeManager::instance().setColorMode(parsed);
+    // colorModeChanged repaints every window; this signal is only for the page.
     emit settingsChanged();
 }
 

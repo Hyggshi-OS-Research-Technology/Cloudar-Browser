@@ -369,6 +369,38 @@ MainWindow::MainWindow(bool isIncognito, QWidget *parent)
     applyTheme();
     connect(&ThemeManager::instance(), &ThemeManager::accentChanged, this,
             [this](const QColor &) { applyTheme(); });
+    // Light/dark is the one appearance setting that can apply without a restart:
+    // it changes colours, not the window model, so every window repaints at once
+    // instead of asking the user to relaunch. The classic chrome ignores it by
+    // design (see ColorMode in ThemeManager.h) and applyTheme() early-returns
+    // there, which is why the settings page says so next to the control.
+    connect(&ThemeManager::instance(), &ThemeManager::colorModeChanged, this,
+            [this](bool dark) {
+                applyTheme();
+                // Pages already open have to follow too, without a reload: a
+                // settings tab that stays dark inside a light window is the
+                // half-applied look this project treats as a bug. Same channel
+                // and same value BrowserTabWidget::wireView writes on load.
+                if (m_tabs && Theme::current() == Theme::ThemeStyle::Modern) {
+                    const QString js = QStringLiteral(
+                        "try{localStorage.setItem('cloudar.colorMode','%1');"
+                        "document.documentElement.setAttribute('data-color-mode','%1');"
+                        "}catch(e){}")
+                        .arg(dark ? QStringLiteral("dark") : QStringLiteral("light"));
+                    for (int i = 0; i < m_tabs->count(); ++i) {
+                        auto *view = qobject_cast<QWebEngineView *>(m_tabs->widget(i));
+                        if (!view || !view->page())
+                            continue;
+                        const QUrl url = view->url();
+                        if (url.scheme() == QLatin1String("cloudar")
+                            || url.scheme() == QLatin1String("browser")
+                            || url.scheme() == QLatin1String("light")) {
+                            view->page()->runJavaScript(js);
+                        }
+                    }
+                }
+            });
+    applyPageColorScheme();
 
     // Size grip in a slim status bar — the only way left to resize once the
     // window is frameless and the OS border is gone. A decorated (classic)
@@ -591,9 +623,50 @@ void MainWindow::buildTitleBar()
     connect(m_titleBar, &TitleBar::closeRequested, this, &QWidget::close);
 }
 
+// Tells Chromium which side of light/dark it should render as. This is what
+// makes <input type="checkbox">, scrollbars and the default page background
+// light in a light window: the sheets above cannot reach them, they are drawn
+// by Chromium from its own palette.
+//
+// It is a *profile* preference, so it is set once at startup and again only when
+// the user changes the mode — not on every accent change.
+void MainWindow::applyPageColorScheme()
+{
+    if (!m_profile)
+        return;
+    if (m_tabs) {
+        const QColor pageBg(ThemeManager::instance().prefersDark() ? "#14161c" : "#f7f8fa");
+        for (int i = 0; i < m_tabs->count(); ++i) {
+            auto *view = qobject_cast<QWebEngineView *>(m_tabs->widget(i));
+            if (view && view->page())
+                view->page()->setBackgroundColor(pageBg);
+        }
+    }
+}
+
 void MainWindow::applyTheme()
 {
     qApp->setStyleSheet(ThemeManager::instance().appStyleSheet());
+
+    // Chromium draws its own form controls, scrollbars and default background,
+    // so the palette has to be handed to it too. Without this the window goes
+    // light but <input type="checkbox">, the settings page's own surface and
+    // select dropdowns stay dark — the half-applied look this project rejects.
+    // The classic chrome has a fixed 2009 palette and never takes the modern
+    // one, so it is left alone.
+    if (Theme::current() == Theme::ThemeStyle::Modern) {
+        // Every tab, not just the visible one: a background tab that reloads
+        // later must not paint on a stale palette.
+        if (m_tabs) {
+            const QColor pageBg(ThemeManager::instance().prefersDark() ? "#14161c"
+                                                                       : "#f7f8fa");
+            for (int i = 0; i < m_tabs->count(); ++i) {
+                auto *view = qobject_cast<QWebEngineView *>(m_tabs->widget(i));
+                if (view && view->page())
+                    view->page()->setBackgroundColor(pageBg);
+            }
+        }
+    }
     if (m_addressGlow)
         m_addressGlow->setColor(ThemeManager::instance().accentColor());
 

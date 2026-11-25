@@ -25,7 +25,13 @@
   try {
     if (localStorage.getItem('cloudar.chromeStyle') === 'classic')
       document.documentElement.classList.add('classic');
-  } catch (e) { /* storage disabled: keep the modern look */ }
+    // Same idea for light/dark: app.js re-reads the authoritative value from the
+    // bridge, but the cached one avoids a dark flash on a light desktop. "auto"
+    // defers to the OS through prefers-color-scheme (see themes.css).
+    var cachedMode = localStorage.getItem('cloudar.colorMode');
+    if (cachedMode === 'light' || cachedMode === 'dark')
+      document.documentElement.setAttribute('data-color-mode', cachedMode);
+  } catch (e) { /* storage disabled: keep the default */ }
 </script>
 </head>
 <body>

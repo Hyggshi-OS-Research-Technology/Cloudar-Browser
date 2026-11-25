@@ -12,6 +12,59 @@
    2009 window reads as a bug.
    ========================================================================== */
 
+/* --------------------------------------------------------------------------
+   Light mode for the modern chrome.
+
+   data-color-mode="light"  -> the user pinned Light
+   data-color-mode="dark"   -> the user pinned Dark
+   data-color-mode="auto"   -> follow the OS (and follow it *live* through
+                               prefers-color-scheme, without a reload)
+
+   Only the modern palette is redefined. The classic chrome is a fixed 2009
+   look and must not react to this, which is why the selector requires the
+   absence of .classic rather than just the attribute.
+   -------------------------------------------------------------------------- */
+/* The background surface itself. The default body gradient is dark in
+   base.css, so a light palette that only re-pointed the text/panel tokens would
+   leave a dark animated field behind light cards. */
+html[data-color-mode="light"]:not(.classic) body {
+  background: linear-gradient(135deg, var(--bg-a), var(--bg-b), var(--bg-a));
+}
+
+html[data-color-mode="light"]:not(.classic) {
+  --bg-a: #f4f6fa;
+  --bg-b: #e7ecf5;
+  --text: #1a1d24;
+  --muted: #5b6273;
+  --panel-bg: #ffffff;
+  --panel-solid: #ffffff;
+  --panel-border: #d6dae2;
+  --tile-bg: rgba(255, 255, 255, 0.85);
+  --tile-bg-hover: rgba(45, 127, 249, 0.12);
+  --tile-border: #d6dae2;
+  --field-bg: #ffffff;
+  --field-border: #c8cedb;
+  --shadow: 0 4px 18px rgba(23, 32, 51, 0.12);
+}
+
+@media (prefers-color-scheme: light) {
+  html[data-color-mode="auto"]:not(.classic) {
+    --bg-a: #f4f6fa;
+    --bg-b: #e7ecf5;
+    --text: #1a1d24;
+    --muted: #5b6273;
+    --panel-bg: #ffffff;
+    --panel-solid: #ffffff;
+    --panel-border: #d6dae2;
+    --tile-bg: rgba(255, 255, 255, 0.85);
+    --tile-bg-hover: rgba(45, 127, 249, 0.12);
+    --tile-border: #d6dae2;
+    --field-bg: #ffffff;
+    --field-border: #c8cedb;
+    --shadow: 0 4px 18px rgba(23, 32, 51, 0.12);
+  }
+}
+
 html.classic {
   --bg-a: #e8e8e8;
   --bg-b: #e8e8e8;

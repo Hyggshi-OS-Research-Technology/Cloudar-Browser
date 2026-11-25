@@ -101,6 +101,14 @@ public slots:
     // "classic" (Chrome 2009) or "modern". Takes effect on restart because the
     // window model, tab placement and menu bar all change.
     QString uiStyle() const;
+
+    // Colour mode for the modern chrome: "system" | "light" | "dark". Unlike the
+    // interface style, this can apply to a live window — it changes colours, not
+    // the window model — so setColorMode() repaints immediately.
+    void setColorMode(const QString &mode);
+    // True when this Qt build can observe the OS colour scheme at all. The page
+    // uses it to explain what "System" actually means on an older Qt.
+    bool colorSchemeQueryable() const;
     void setUiStyle(const QString &style);
 
     // Chrome 2009's two toolbar toggles: the Home button and the bookmarks bar.

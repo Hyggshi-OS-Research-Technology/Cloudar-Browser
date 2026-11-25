@@ -21,6 +21,37 @@
        without a flash. Same beige Win32 palette as cloudar://settings: a dark
        glowing card inside a decorated grey window reads as a bug, not a style.
        --------------------------------------------------------------------- */
+    /* Light mode. The modern chrome now has two surfaces; these pages were
+       dark-only, which meant a light window showed a white toolbar around a
+       black page. Same tokens, re-pointed at a light surface — the shapes,
+       spacing and radii above are untouched, so this is one palette swap and
+       not a second design.
+
+       System mode is handled in CSS *and* JS: the attribute carries the resolved
+       answer, and prefers-color-scheme is the fallback for the window before the
+       bridge has answered (see the bootstrap in <head>). */
+    html[data-color-mode="light"]:not(.classic) {
+      --bg: #f7f8fa;
+      --panel: #ffffff;
+      --panel-2: #f1f2f5;
+      --panel-3: #eceef3;
+      --text: #1a1d24;
+      --muted: #5b6273;
+      --border: #d6dae2;
+    }
+
+    @media (prefers-color-scheme: light) {
+      html[data-color-mode="auto"]:not(.classic) {
+        --bg: #f7f8fa;
+        --panel: #ffffff;
+        --panel-2: #f1f2f5;
+        --panel-3: #eceef3;
+        --text: #1a1d24;
+        --muted: #5b6273;
+        --border: #d6dae2;
+      }
+    }
+
     html.classic {
       --bg: #e8e8e8;
       --panel: #ffffff;
@@ -205,6 +236,13 @@
       try {
         if (localStorage.getItem('cloudar.chromeStyle') === 'classic')
           document.documentElement.classList.add('classic');
+        // The native side writes the resolved light/dark answer on every load
+        // (BrowserTabWidget::wireView). Reading the cached copy here keeps a
+        // light window from flashing its dark page before the page script runs;
+        // "auto" defers to the OS through prefers-color-scheme.
+        var cachedMode = localStorage.getItem('cloudar.colorMode');
+        if (cachedMode)
+          document.documentElement.setAttribute('data-color-mode', cachedMode);
       } catch (e) { /* storage disabled: stay with the modern look */ }
     })();
 

@@ -164,6 +164,11 @@ private:
     // pane while it is up, otherwise the tab widget's current tab. Returns null
     // when there is nothing to act on, so every caller can bail out the same way.
     QWebEngineView *activeView() const;
+
+    // Hands the light/dark decision to Chromium (page background, form controls
+    // and scrollbars), which QSS cannot reach. Called at startup and when the
+    // user changes the colour mode.
+    void applyPageColorScheme();
     // One message for both menu builders: they must not disagree about where
     // the restart entry lives, which is exactly how the modern chrome ended up
     // pointing at a Tools menu it does not have.
