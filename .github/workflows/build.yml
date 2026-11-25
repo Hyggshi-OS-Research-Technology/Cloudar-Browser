@@ -123,7 +123,7 @@ jobs:
           node tools/check-i18n.js
 
       - name: Configure CMake
-        run: cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release
+        run: cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release -DCLOUDAR_BUILD_TESTS=ON
 
       - name: Build with Ninja
         run: |
@@ -143,6 +143,14 @@ jobs:
               done
             exit $status
           fi
+
+      - name: Unit tests
+        run: |
+          # LocalFileService decides which directories a cloudar:// page can make
+          # the browser enumerate, and that is a security boundary rather than a
+          # convenience: the path-confinement tests are the reason this step
+          # exists. ctest so a second test file needs no workflow change.
+          ctest --test-dir build --output-on-failure
 
       - name: Verify binary
         run: |

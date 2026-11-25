@@ -250,6 +250,12 @@ void LightSchemeHandler::requestStarted(QWebEngineUrlRequestJob *job)
         serveResource(job, ":/extensions.html", "text/html; charset=utf-8");
     } else if (host == "permissions") {
         serveResource(job, ":/permissions.html", "text/html; charset=utf-8");
+    } else if (host == "files") {
+        // A local directory listing. The path being browsed arrives as a query
+        // parameter rather than as the URL's path: a file system path contains
+        // characters (``#``, ``?``, spaces) that a URL path would mangle, and the
+        // page reads ``location.search`` to know where it is.
+        serveResource(job, ":/files.html", "text/html; charset=utf-8");
     } else {
         job->fail(QWebEngineUrlRequestJob::UrlNotFound);
     }

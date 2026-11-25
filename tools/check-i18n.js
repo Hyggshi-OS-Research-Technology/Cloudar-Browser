@@ -150,8 +150,9 @@ for (const key of usedKeys) {
 
 // --- 6/7: internal pages (parsed first: gate 3 needs the keys they use) ----------------------------------------------------
 // The New Tab page is one of these too, under its own path.
-const PAGE_FILES = ['about', 'bookmarks', 'downloads', 'extensions', 'history',
-                    'permissions', 'settings'].map((p) => path.join(RES_DIR, `${p}.html`))
+const PAGE_FILES = ['about', 'bookmarks', 'downloads', 'extensions', 'files',
+                    'history', 'permissions', 'settings']
+  .map((p) => path.join(RES_DIR, `${p}.html`))
   .concat([path.join(RES_DIR, 'newtab', 'index.html')]);
 
 const pageKeys = new Set();

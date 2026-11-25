@@ -3,6 +3,7 @@
 #include "BookmarkManager.h"
 #include "DownloadManager.h"
 #include "HistoryManager.h"
+#include "LocalFileService.h"
 #include "PermissionStore.h"
 #include "WebExtensionManager.h"
 
@@ -23,7 +24,8 @@ InternalBridge::InternalBridge(BookmarkManager *bookmarks, HistoryManager *histo
                                DownloadManager *downloads, WebExtensionManager *webExtensions,
                                QObject *parent)
     : QObject(parent), m_bookmarks(bookmarks), m_history(history),
-      m_downloads(downloads), m_webExtensions(webExtensions)
+      m_downloads(downloads), m_webExtensions(webExtensions),
+      m_localFiles(new LocalFileService(this))
 {
     if (m_bookmarks)
         connect(m_bookmarks, &BookmarkManager::changed, this, &InternalBridge::bookmarksChanged);
@@ -34,6 +36,9 @@ InternalBridge::InternalBridge(BookmarkManager *bookmarks, HistoryManager *histo
                 this, &InternalBridge::extensionsChanged);
     if (m_downloads)
         connect(m_downloads, &DownloadManager::changed, this, &InternalBridge::downloadsChanged);
+    if (m_localFiles)
+        connect(m_localFiles, &LocalFileService::rootsChanged,
+                this, &InternalBridge::filesRootsChanged);
 }
 
 // ---------------------------------------------------------------------------
@@ -259,4 +264,44 @@ void InternalBridge::clearPermissions()
 {
     PermissionStore::clearAll();
     emit permissionsChanged();
+}
+
+// ---------------------------------------------------------------------------
+// Local files
+// ---------------------------------------------------------------------------
+
+QVariantMap InternalBridge::listDirectory(const QString &directory)
+{
+    if (!m_localFiles) {
+        QVariantMap payload;
+        payload[QStringLiteral("ok")] = false;
+        payload[QStringLiteral("error")] = QStringLiteral("no-service");
+        return payload;
+    }
+    // LocalFileService re-checks the confinement itself; doing it only here
+    // would leave the rule in a transport layer, where the next caller to reach
+    // the service directly would bypass it.
+    return m_localFiles->listDirectory(directory);
+}
+
+QVariantMap InternalBridge::openDirectory(const QString &directory)
+{
+    if (!m_localFiles) {
+        QVariantMap payload;
+        payload[QStringLiteral("ok")] = false;
+        payload[QStringLiteral("error")] = QStringLiteral("no-service");
+        return payload;
+    }
+    m_localFiles->addRoot(directory);
+    return m_localFiles->listDirectory(directory);
+}
+
+QStringList InternalBridge::directoryRoots()
+{
+    return m_localFiles ? m_localFiles->roots() : QStringList();
+}
+
+void InternalBridge::requestFolderPicker()
+{
+    emit folderPickerRequested();
 }

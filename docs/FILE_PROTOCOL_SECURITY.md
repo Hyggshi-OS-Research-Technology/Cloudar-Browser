@@ -30,6 +30,70 @@ When reading local files, the request does not go through the network stack's sa
 - No data exfiltration via network requests from `file://` origins (blocked by same-origin policy)
 - Generally **safer** than browsing the open web
 
+## Directory listing (`cloudar://files/`)
+
+Local folders can be browsed in a tab: **File → Open Folder…**, typing an
+absolute path in the address bar, or the "Open Folder…" button on the listing
+page. The listing is an ordinary internal page (`resources/files.html`) served
+by `LightSchemeHandler`, backed by `LocalFileService`.
+
+That is a new capability — a *web page* asking the browser to enumerate a
+directory — so it is deliberately the narrowest version of it:
+
+### The confinement rule
+
+A directory can be listed **only if the user opened it** (or opened a folder
+containing it, or a folder inside it). `LocalFileService::listDirectory()`
+canonicalises the requested path and compares it against the set of roots
+component-wise; anything else is refused with an `outside-root` error, which the
+page renders as "This page can only list folders you opened."
+
+What that rules out:
+
+| Attempt | Result |
+|:---|:---|
+| `listDirectory('/etc')` from a page, nothing opened | refused — `outside-root` |
+| `listDirectory('/tmp/x/user2')` when `/tmp/x/user` is the root | refused — component-wise comparison, not `startsWith()` |
+| `listDirectory('/root/sub/../../etc')` | canonicalised first, then refused |
+| A symlink inside the root pointing outside it | resolved by `canonicalFilePath()`, then refused |
+| Walking `..` above the root from the page | the reply's `parent` is empty at the root, so the page cannot navigate up |
+| Listing a *file* | refused — `not-a-directory`; the page gets names/sizes/dates, never contents |
+
+Roots are **per session and never persisted**. Reopening the browser does not
+leave a page able to list last week's directory.
+
+### What a page can and cannot get
+
+* **Can**: names, sizes, modification times, and a `file://` URL per entry.
+* **Cannot**: file *contents*. Clicking a file navigates the tab to that
+  `file://` URL, which is exactly what typing the path would have done, and the
+  `file://` origin rules above then apply to it.
+* **Cannot**: choose a folder for itself. The page's "Open Folder…" button asks
+  the *window* to run the picker (`InternalBridge::requestFolderPicker`) — a page
+  that could pick its own root would make the confinement meaningless.
+
+### Why not just widen `LocalContentCanAccessFileUrls`?
+
+Because that setting is a **profile-wide** switch. It would let any `cloudar://`
+page (and any `file://` page) read arbitrary files through normal web APIs, in
+every tab, forever. The listing route is per-root, per-session, read-only and
+limited to metadata — a much smaller grant for the same feature.
+
+`LocalContentCanAccessFileUrls` therefore stays **off** (see
+`MainWindow`'s profile setup), and this feature does not touch it.
+
+### Tests
+
+`tests/tst_localfileservice.cpp` encodes the table above. It is a **security**
+test, not a convenience test: run it with
+
+```bash
+cmake -B build -S . -DCLOUDAR_BUILD_TESTS=ON && cmake --build build --target tst_localfileservice
+ctest --test-dir build --output-on-failure
+```
+
+CI runs it on every Linux job.
+
 ## Best Practices
 
 1. Only open local files from trusted sources

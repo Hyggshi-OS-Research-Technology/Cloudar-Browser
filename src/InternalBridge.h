@@ -10,6 +10,7 @@ class BookmarkManager;
 class HistoryManager;
 class DownloadManager;
 class WebExtensionManager;
+class LocalFileService;
 
 // ---------------------------------------------------------------------------
 // The `internalBridge` object behind cloudar://bookmarks, /history, /downloads,
@@ -81,9 +82,33 @@ public slots:
     void setPermission(const QString &host, const QString &capability, const QString &decision);
     void clearPermissions();
 
+    // --- cloudar://files ------------------------------------------------
+    // A directory listing, confined to a folder the user opened. Everything
+    // that decides what may be listed lives in LocalFileService; these slots are
+    // only the transport, so the page cannot reach a path the native side has
+    // not already accepted.
+    //
+    // `directory` empty means the most recently opened root. The reply is
+    // { ok, path, name, parent, entries, truncated, error } — `error` is a code
+    // ("outside-root", "no-root", ...), never a sentence: the page translates it.
+    QVariantMap listDirectory(const QString &directory);
+    // Opens a folder as a root and returns its listing, so "Open Folder..." and
+    // a click on a folder row in the page go through the same call.
+    QVariantMap openDirectory(const QString &directory);
+    // The roots the user has opened this session, most recent first.
+    QStringList directoryRoots();
+    // Asks the window for its own folder picker. A page cannot choose a folder
+    // itself — that is what keeps the confinement meaningful — so this only
+    // reports the request upward; MainWindow runs the dialog and the new root
+    // arrives back through filesRootsChanged.
+    void requestFolderPicker();
+
 signals:
     // Emitted after anything a page displays changes, so an open page can
     // refresh itself instead of going stale while the user works elsewhere.
+    void filesRootsChanged();
+    // cloudar://files asked for a folder picker (see requestFolderPicker).
+    void folderPickerRequested();
     void bookmarksChanged();
     void historyChanged();
     void downloadsChanged();
@@ -95,4 +120,7 @@ private:
     HistoryManager *m_history = nullptr;
     DownloadManager *m_downloads = nullptr;
     WebExtensionManager *m_webExtensions = nullptr;
+    // Owns the path-confinement rule for cloudar://files. Created here rather
+    // than passed in because nothing else in the window needs it.
+    LocalFileService *m_localFiles = nullptr;
 };

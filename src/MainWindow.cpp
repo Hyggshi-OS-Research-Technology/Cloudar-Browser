@@ -3,6 +3,7 @@
 #include "SettingsDialog.h"
 #include "ExtensionsDialog.h"
 #include "LightSchemeHandler.h"
+#include "LocalFileService.h"
 #include "ThemeManager.h"
 #include "ReaderMode.h"
 #include "AdBlock.h"
@@ -50,6 +51,7 @@
 #include <QMenu>
 #include <QShortcut>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QSysInfo>
 
 MainWindow::MainWindow(bool isIncognito, QWidget *parent, bool mirrorWindow)
@@ -130,6 +132,11 @@ MainWindow::MainWindow(bool isIncognito, QWidget *parent, bool mirrorWindow)
 
     // AdBlock: install request interceptor on profile
     m_adBlockInterceptor = new AdBlockInterceptor(this);
+    // Local file access (roadmap item 5): owns the "which folders may
+    // cloudar://files list?" rule and the address bar's path-vs-search
+    // decision. Created before the bridges below, because InternalBridge
+    // connects to its rootsChanged() signal in its own constructor.
+    m_localFiles = new LocalFileService(this);
     m_profile->setUrlRequestInterceptor(m_adBlockInterceptor);
 
     m_downloadManager = new DownloadManager(this, this);
@@ -156,6 +163,12 @@ MainWindow::MainWindow(bool isIncognito, QWidget *parent, bool mirrorWindow)
     m_internalBridge = new InternalBridge(m_bookmarkManager, m_historyManager,
                                           m_downloadManager, m_webExtensionManager, this);
     m_webChannel->registerObject("internalBridge", m_internalBridge);
+    // cloudar://files cannot choose a folder for itself (that is the whole point
+    // of the confinement), so its "Open Folder..." button asks this window for
+    // the native picker. The new root reaches the page through
+    // filesRootsChanged, the same path a menu-opened folder takes.
+    connect(m_internalBridge, &InternalBridge::folderPickerRequested,
+            this, &MainWindow::pickFolderForFilesPage);
     // The New Tab page's own API: the real interface style for this run, the
     // configured search engine, recent history and — the point of it — real
     // favicons for speed-dial tiles instead of a coloured letter.
@@ -1078,6 +1091,19 @@ void MainWindow::buildModernMenu()
         incognitoWindow->show();
     });
 
+    // Same two entries as the classic File menu, in the same order and with the
+    // same shortcuts — a shortcut that only exists in one chrome is a bug users
+    // report as "the menu item is gone".
+    auto *openFile = menu->addAction(tr("Open File..."));
+    openFile->setShortcut(QKeySequence::Open);
+    connect(openFile, &QAction::triggered, this, &MainWindow::openLocalFile);
+
+    auto *openFolder = menu->addAction(tr("Open Folder..."));
+    openFolder->setShortcut(QKeySequence("Ctrl+Shift+O"));
+    connect(openFolder, &QAction::triggered, this, &MainWindow::openLocalFolder);
+
+    menu->addSeparator();
+
     m_sidebarAction = menu->addAction(tr("Show Sidebar"));
     m_sidebarAction->setCheckable(true);
     m_sidebarAction->setShortcut(QKeySequence("Ctrl+Shift+S"));
@@ -1460,9 +1486,35 @@ void MainWindow::navigateToAddressBarInput()
     if (text.isEmpty())
         return;
 
+    // A path is answered by looking at the filesystem, not by guessing from the
+    // text. The old heuristic asked "does it contain a dot?", which opened
+    // /home/me/site/index.html by luck and turned /home/me/Documents,
+    // ~/Downloads and C:\Users\me\Projects into web searches. Resolving first
+    // also means a *directory* gets opened (as a cloudar://files listing) rather
+    // than sent to a search engine.
+    QString localPath;
+    const QUrl localUrl = LocalFileService::resolveUserInput(text, &localPath);
+    if (!localUrl.isEmpty() && m_localFiles) {
+        QUrl target = localUrl;
+        if (QFileInfo(localPath).isDir()) {
+            // Opening a directory means listing it, and listing is only allowed
+            // for a folder the user opened — so this is where the root is
+            // registered.
+            m_localFiles->addRoot(localPath);
+            target = QUrl(QStringLiteral("cloudar://files/?path=%1")
+                              .arg(QString::fromLatin1(QUrl::toPercentEncoding(localPath))));
+        }
+        if (auto *v = activeView()) {
+            v->load(target);
+            if (!m_isIncognito && m_historyManager)
+                m_historyManager->addVisit(QFileInfo(localPath).fileName(), target.toString());
+        }
+        return;
+    }
+
     QUrl url = QUrl::fromUserInput(text);
-    // Preserve explicit schemes (including file:// and browser://) even
-    // when they don't contain a dot; otherwise a local file or internal
+    // Preserve explicit schemes (including browser://) even
+    // when they don't contain a dot; otherwise an internal
     // page would accidentally become a search query.
     const bool looksLikeUrl = !text.contains(' ') &&
         (text.contains("://") || text.startsWith("about:") || text.contains('.') ||
@@ -1637,6 +1689,64 @@ void MainWindow::tearOffTab(int index)
     }
 }
 
+void MainWindow::openLocalFile()
+{
+    const QString path = QFileDialog::getOpenFileName(
+            this, get_text("local_open_file"), QDir::homePath());
+    if (path.isEmpty())
+        return;
+    // The file's own folder becomes listable, so the listing page can show
+    // siblings. Only the folder, not the whole tree above it.
+    if (m_localFiles)
+        m_localFiles->addRoot(QFileInfo(path).absolutePath());
+    m_tabs->addNewTab(LocalFileService::urlForLocalPath(path), true);
+}
+
+void MainWindow::pickFolderForFilesPage()
+{
+    // Same dialog, different destination. The page that asked is already
+    // showing a listing, so opening its folder in a *new* tab would leave the
+    // user looking at the old one; instead the open cloudar://files tab is
+    // pointed at the new folder and reloads itself, which is the behaviour a
+    // "browse" button in a file manager has.
+    const QString path = QFileDialog::getExistingDirectory(
+            this, get_text("local_open_folder"), QDir::homePath());
+    if (path.isEmpty())
+        return;
+    if (m_localFiles)
+        m_localFiles->addRoot(path);
+
+    const QUrl target(QStringLiteral("cloudar://files/?path=%1")
+                          .arg(QString::fromLatin1(QUrl::toPercentEncoding(path))));
+    for (int i = 0; i < m_tabs->count(); ++i) {
+        auto *view = qobject_cast<QWebEngineView *>(m_tabs->widget(i));
+        if (view && view->url().scheme() == QLatin1String("cloudar")
+            && view->url().host() == QLatin1String("files")) {
+            view->setUrl(target);
+            m_tabs->setCurrentIndex(i);
+            return;
+        }
+    }
+    // The tab was closed between the click and the dialog: fall back to the
+    // normal "open a new tab" path rather than doing nothing.
+    m_tabs->addNewTab(target, true);
+}
+
+void MainWindow::openLocalFolder()
+{
+    const QString path = QFileDialog::getExistingDirectory(
+            this, get_text("local_open_folder"), QDir::homePath());
+    if (path.isEmpty())
+        return;
+    if (m_localFiles)
+        m_localFiles->addRoot(path);
+    // The path travels as a query parameter, not as the URL's path: a folder
+    // name may contain '#', '?' or a space, which a URL path would mangle.
+    m_tabs->addNewTab(QUrl(QStringLiteral("cloudar://files/?path=%1")
+                               .arg(QString::fromLatin1(QUrl::toPercentEncoding(path)))),
+                      true);
+}
+
 void MainWindow::showHistoryDialog()
 {
     QDialog dialog(this);
@@ -1717,6 +1827,16 @@ void MainWindow::buildClassicMenu()
         auto *window = new MainWindow(true);
         window->show();
     });
+
+    fileMenu->addSeparator();
+
+    auto *openFile = fileMenu->addAction(tr("Open File..."));
+    openFile->setShortcut(QKeySequence::Open);
+    connect(openFile, &QAction::triggered, this, &MainWindow::openLocalFile);
+
+    auto *openFolder = fileMenu->addAction(tr("Open Folder..."));
+    openFolder->setShortcut(QKeySequence("Ctrl+Shift+O"));
+    connect(openFolder, &QAction::triggered, this, &MainWindow::openLocalFolder);
 
     fileMenu->addSeparator();
 
