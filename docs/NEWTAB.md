@@ -211,3 +211,34 @@ the previous `lightbrowser.newtab.speeddial` key once on first load. A shortcut
 is page state, not browser state, which is why it is not in `QSettings` — but it
 is sanitised on load (`sanitize()`), so a hand-edited or corrupted entry cannot
 inject a `javascript:` URL into the tile.
+
+## Light and dark
+
+The modern chrome has two surfaces and follows the OS by default. The decision
+lives in `ThemeManager::prefersDark()`, which resolves the stored preference
+(`browser/colorMode`: `system` | `light` | `dark`) against
+`QStyleHints::colorScheme()` — the classic chrome ignores all of it, because its
+2009 palette is fixed by design and the settings page says so next to the
+control rather than pretending.
+
+Three things have to agree, and they are driven from one place each:
+
+| Surface | How it learns | Applies live |
+|:---|:---|:---|
+| Native chrome (QSS) | `ThemeManager::modernStyleSheet()`, which carries a full light palette | yes |
+| Chromium's own controls | `applyPageColorScheme()` → `QWebEnginePage::setBackgroundColor` | yes |
+| `cloudar://` pages | `data-color-mode` on `<html>`, written by `BrowserTabWidget::wireView` | yes |
+
+### The one thing that cannot be done natively
+
+`prefers-color-scheme` inside **web pages** always follows the **OS**, not this
+setting. QtWebEngine 6.8 pushes the OS scheme straight into Chromium
+(`web_contents_adapter.cpp`: `NativeTheme::GetInstanceForWeb()
+->set_preferred_color_scheme(...)` from `QStyleHints::colorScheme()`), and there
+is no public API to override it per profile. So a user who pins *Dark* on a light
+desktop gets a dark chrome, and websites still see `light`.
+
+That is why `cloudar://` pages do not rely on the media query alone: the native
+side writes the **resolved** mode into `data-color-mode`, and the CSS keys off
+that. The media query is only the pre-paint fallback for `auto`.
+`tools/check-newtab.js` gate 8 requires both halves in all seven internal pages.

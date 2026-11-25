@@ -442,8 +442,9 @@ const allCss = {};
 for (const file of walk(NT).filter((f) => f.endsWith('.css'))) {
   allCss[path.relative(ROOT, file)] = read(file);
 }
+const baseCss = allCss['resources/newtab/styles/base.css'] || '';
 const baseTokens = new Set(
-  [...(allCss['resources/newtab/styles/base.css'] || '').matchAll(/^\s{2}(--[\w-]+):/gm)].map((m) => m[1])
+  [...baseCss.matchAll(/^\s{2}(--[\w-]+):/gm)].map((m) => m[1])
 );
 // A token is "defined" if it appears as a declaration anywhere: palette tokens
 // live in :root / html.classic, but a component may scope one to itself
@@ -460,22 +461,91 @@ const themeSrc = allCss['resources/newtab/styles/themes.css'] || '';
 const classicTokens = new Set(
   [...themeSrc.matchAll(/^\s{2}(--[\w-]+):/gm)].map((m) => m[1])
 );
+
+// Every alternate palette, not just the classic one. The New Tab page now has
+// three surfaces for the modern chrome (dark default, pinned light,
+// system-following light) plus the classic one, and a *surface* token missing
+// from one of them leaves that window half-styled — the defect the classic
+// review was about, so the check has to cover all of them.
+//
+// Only surface tokens are required, and that is deliberate: the light palette
+// keeps the same accent, radii and fonts as the dark one, and demanding
+// redefinitions for those would force noise into every palette and teach people
+// to ignore this check. What must never be inherited across palettes is a
+// colour that something paints with.
+const SURFACE_TOKEN = /^--(bg|panel|tile|field|text|muted|shadow|scrim)/;
+
+function paletteBlocks(src) {
+  // Comments first: the prose above explains `html.classic` and carries braces,
+  // which a naive selector scan happily reads as a rule.
+  const clean = src.replace(/\/\*[\s\S]*?\*\//g, '');
+  const blocks = [];
+  // Selectors can carry :not(...) as well: the light palette is
+  // html[data-color-mode="light"]:not(.classic), and a pattern that stopped at
+  // the attribute silently found only the classic block.
+  const re = /(html(?:\[[^\]]*\])*(?::not\([^)]*\))*(?:\.classic)?)\s*\{([^}]*)\}/g;
+  let m;
+  while ((m = re.exec(clean))) {
+    const decls = [...m[2].matchAll(/(--[\w-]+)\s*:/g)].map((x) => x[1]);
+    if (decls.length) blocks.push({ selector: m[1].trim(), tokens: new Set(decls) });
+  }
+  return blocks;
+}
+const palettes = paletteBlocks(themeSrc);
+
 for (const token of usedTokens) {
   if (!declaredTokens.has(token)) {
     errors.push(`${token} is used in CSS but never declared — it would resolve to nothing`);
   }
-  // A palette token must also be redefined for the classic chrome, or the classic
-  // page inherits the dark value and looks half-applied.
-  if (baseTokens.has(token) && !classicTokens.has(token)) {
-    errors.push(`${token} is a palette token in base.css but html.classic never ` +
-                `redefines it — the classic chrome would inherit the dark value`);
+  // A surface token must be redefined in *every* alternate palette, or that
+  // surface inherits whatever the previous one left behind.
+  if (!baseTokens.has(token) || !SURFACE_TOKEN.test(token)) continue;
+  for (const block of palettes) {
+    if (!block.tokens.has(token)) {
+      errors.push(`${token} is a surface token in base.css but ${block.selector} ` +
+                  `never redefines it — that surface would inherit the wrong value`);
+    }
   }
+}
+if (palettes.length < 3) {
+  errors.push(`only ${palettes.length} palette block(s) found in themes.css — the ` +
+              `light/dark/classic check would silently pass on an empty set`);
 }
 // The specific regression: the panel needs an opaque surface so a photo cannot
 // be read through its text.
 for (const token of ['--panel-solid']) {
   if (!baseTokens.has(token)) errors.push(`${token} is not defined in base.css`);
   if (!classicTokens.has(token)) errors.push(`${token} is not defined for html.classic in themes.css`);
+}
+
+// --- 8: every internal page answers light and dark --------------------------
+// A browser that can be light has to be light everywhere. A dark-only internal
+// page inside a light window is the half-applied style this project treats as a
+// defect — <html> would be light while the page painted itself dark.
+//
+// Each page needs both halves: a light palette, and the bootstrap that reads the
+// cached mode before first paint (otherwise it flashes dark on every load).
+const INTERNAL_PAGES = ['about', 'bookmarks', 'downloads', 'extensions', 'history',
+                        'permissions', 'settings'];
+for (const page of INTERNAL_PAGES) {
+  const file = path.join(ROOT, 'resources', `${page}.html`);
+  if (!fs.existsSync(file)) {
+    errors.push(`resources/${page}.html is listed as an internal page but does not exist`);
+    continue;
+  }
+  const src = read(file);
+  if (!/data-color-mode="light"/.test(src)) {
+    errors.push(`resources/${page}.html has no light palette — a light window would ` +
+                `show this page dark`);
+  }
+  if (!/prefers-color-scheme:\s*light/.test(src)) {
+    errors.push(`resources/${page}.html does not handle prefers-color-scheme: light, ` +
+                `so System mode cannot follow the OS before the bridge answers`);
+  }
+  if (!/cloudar\.colorMode/.test(src)) {
+    errors.push(`resources/${page}.html never reads cloudar.colorMode, so it would ` +
+                `flash the dark palette before the native side's value arrives`);
+  }
 }
 
 // --- 6: syntax --------------------------------------------------------------

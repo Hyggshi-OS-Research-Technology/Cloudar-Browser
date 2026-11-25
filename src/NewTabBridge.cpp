@@ -4,6 +4,7 @@
 #include "ClassicTheme.h"
 #include "FaviconStore.h"
 #include "HistoryManager.h"
+#include "ThemeManager.h"
 
 #include <QCoreApplication>
 #include <QDateTime>
@@ -127,6 +128,11 @@ QVariantMap NewTabBridge::initialState()
     // must repaint the New Tab page too, and Theme::current() is the only
     // source that knows about the command-line override.
     out["chromeStyle"] = Theme::keyFor(Theme::current());
+    // The modern chrome now has a light and a dark surface, so the page cannot
+    // assume dark. This is the *resolved* answer (System already applied), which
+    // is what CSS wants; the raw preference is not useful to a stylesheet.
+    out["colorMode"] = ThemeManager::instance().prefersDark() ? "dark" : "light";
+    out["colorModePreference"] = ThemeManager::instance().colorModeKey();
 
     const QString searchTemplate =
             QSettings().value(QLatin1String(kSearchKey), QLatin1String(kDefaultSearch)).toString();

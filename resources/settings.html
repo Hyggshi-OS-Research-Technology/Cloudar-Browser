@@ -33,6 +33,37 @@
        around it. The class is applied from JS once the native side reports
        which chrome is active.
        ------------------------------------------------------------------ */
+    /* Light mode. The modern chrome now has two surfaces; these pages were
+       dark-only, which meant a light window showed a white toolbar around a
+       black page. Same tokens, re-pointed at a light surface — the shapes,
+       spacing and radii above are untouched, so this is one palette swap and
+       not a second design.
+
+       System mode is handled in CSS *and* JS: the attribute carries the resolved
+       answer, and prefers-color-scheme is the fallback for the window before the
+       bridge has answered (see the bootstrap in <head>). */
+    html[data-color-mode="light"]:not(.classic) {
+      --bg: #f7f8fa;
+      --panel: #ffffff;
+      --panel-2: #f1f2f5;
+      --panel-3: #eceef3;
+      --text: #1a1d24;
+      --muted: #5b6273;
+      --border: #d6dae2;
+    }
+
+    @media (prefers-color-scheme: light) {
+      html[data-color-mode="auto"]:not(.classic) {
+        --bg: #f7f8fa;
+        --panel: #ffffff;
+        --panel-2: #f1f2f5;
+        --panel-3: #eceef3;
+        --text: #1a1d24;
+        --muted: #5b6273;
+        --border: #d6dae2;
+      }
+    }
+
     html.classic {
       --bg: #e8e8e8;
       --panel: #d4d0c8;
@@ -389,6 +420,20 @@
     .row .control {
       flex: none;
     }
+
+    /* A short state word ("Dark", "Off", "Auto"). Used by the colour-mode row to
+       say what is on screen right now, as distinct from what is selected. */
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 600;
+    }
+    html.classic .badge { border-radius: 0; border-color: #a0a0a0; }
 
     /* Rows that are whole clickable labels (toggle rows, checkbox rows) */
     label.row,
@@ -775,6 +820,18 @@
       max-width: 460px;
     }
   </style>
+
+  <!-- Same two-step as every other internal page: the native side writes the
+       resolved light/dark answer into localStorage on each load, and this reads
+       it before first paint so a light window does not flash a dark page. -->
+  <script>
+    (function applyColorMode() {
+      try {
+        var cached = localStorage.getItem('cloudar.colorMode');
+        if (cached) document.documentElement.setAttribute('data-color-mode', cached);
+      } catch (e) { /* storage disabled: keep the default surface */ }
+    })();
+  </script>
 </head>
 
 <body>
@@ -940,6 +997,38 @@
             </div>
             <div class="control">
               <button class="btn secondary" id="restartNowBtn">Restart Cloudar</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" data-keywords="dark light theme mode system appearance color scheme auto">
+          <div class="card-title">Color mode</div>
+          <div class="row">
+            <div class="info">
+              <div class="label">Light or dark</div>
+              <div class="desc">
+                <strong>System</strong> follows your operating system and switches on its own when
+                the OS does &mdash; no restart needed.<br>
+                <strong>Light</strong> and <strong>Dark</strong> pin one mode regardless of the OS.<br>
+                <span id="colorModeScopeNote">This changes the modern chrome.</span>
+                <span id="colorModeQueryNote"></span>
+              </div>
+            </div>
+            <div class="control">
+              <select id="colorModeSelect" class="field-wide">
+                <option value="system">System</option>
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+              </select>
+            </div>
+          </div>
+          <div class="row">
+            <div class="info">
+              <div class="label">Currently showing</div>
+              <div class="desc" id="colorModeStateLabel">&mdash;</div>
+            </div>
+            <div class="control">
+              <span class="badge" id="colorModeStateBadge">&mdash;</span>
             </div>
           </div>
         </div>
@@ -1689,6 +1778,37 @@
       });
 
       // Interface style
+      // --- colour mode -----------------------------------------------------
+      // Applies live (it only changes colours), so there is no "restart
+      // required" row for it. What it does *not* do is stated rather than
+      // implied: the classic chrome is a fixed 2009 palette.
+      var colorModeSelect = document.getElementById('colorModeSelect');
+      if (colorModeSelect) {
+        colorModeSelect.value = data.colorMode || 'system';
+        if (data.colorModeApplies === false) {
+          document.getElementById('colorModeScopeNote').textContent =
+            'The classic chrome uses its fixed 2009 palette, so this setting is ' +
+            'saved but has no visible effect while Classic is active.';
+        }
+        if (data.colorModeQueryable === false) {
+          document.getElementById('colorModeQueryNote').textContent =
+            ' This build of Qt cannot read the OS theme, so System behaves as Light.';
+        }
+        document.getElementById('colorModeStateLabel').textContent =
+          data.colorModeDark ? 'Dark' : 'Light';
+        document.getElementById('colorModeStateBadge').textContent =
+          data.colorModeDark ? 'Dark' : 'Light';
+        colorModeSelect.addEventListener('change', function (e) {
+          bridge.setColorMode(e.target.value);
+          // setColorMode repaints before this returns, so the badge can be
+          // updated from the value the user just chose.
+          var dark = e.target.value === 'dark' ||
+                     (e.target.value === 'system' && data.colorModeSystemDark);
+          document.getElementById('colorModeStateLabel').textContent = dark ? 'Dark' : 'Light';
+          document.getElementById('colorModeStateBadge').textContent = dark ? 'Dark' : 'Light';
+        });
+      }
+
       var uiStyleSelect = document.getElementById('uiStyleSelect');
       uiStyleSelect.value = data.uiStyle || 'classic';
       // Reskin this page so it matches the chrome that is actually running (see

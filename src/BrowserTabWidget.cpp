@@ -3,6 +3,7 @@
 #include "TabPreviewPopup.h"
 #include "WebExtensionManager.h"
 #include "ClassicTheme.h"
+#include "ThemeManager.h"
 
 #include <QWebEnginePage>
 #include <QWebEngineNewWindowRequest>
@@ -339,6 +340,23 @@ void BrowserTabWidget::wireView(QWebEngineView *view)
             view->page()->runJavaScript(
                 QStringLiteral("try{localStorage.setItem('cloudar.chromeStyle','%1')}catch(e){}")
                     .arg(styleKey));
+
+            // The same channel carries the light/dark decision. The *resolved*
+            // answer is written, not the preference: a page cannot query
+            // QStyleHints, and "system" would leave it guessing. The classic
+            // chrome keeps "auto", and its CSS ignores the attribute anyway —
+            // its palette is fixed by design.
+            const QString colorMode =
+                    Theme::current() == Theme::ThemeStyle::Modern
+                        ? (ThemeManager::instance().prefersDark() ? QStringLiteral("dark")
+                                                                  : QStringLiteral("light"))
+                        : QStringLiteral("auto");
+            view->page()->runJavaScript(
+                QStringLiteral("try{"
+                               "localStorage.setItem('cloudar.colorMode','%1');"
+                               "document.documentElement.setAttribute('data-color-mode','%1');"
+                               "}catch(e){}")
+                    .arg(colorMode));
         }
 
         if (currentWidget() == view) {

@@ -61,6 +61,21 @@ var CloudarNewTab = (function () {
     }));
   }
 
+  // Light/dark for the modern chrome. The bridge reports the *resolved* mode
+  // (System already applied by the native side), so this is a plain switch; the
+  // OS-following case is covered by prefers-color-scheme in themes.css for the
+  // window we cannot see changing.
+  function applyColorMode(mode) {
+    var key = (mode === 'light' || mode === 'dark') ? mode : 'auto';
+    document.documentElement.setAttribute('data-color-mode', key);
+    try { localStorage.setItem('cloudar.colorMode', key); } catch (err) { /* tab only */ }
+    document.dispatchEvent(new CustomEvent('cloudar:colormode', { detail: key }));
+  }
+
+  function currentColorMode() {
+    return document.documentElement.getAttribute('data-color-mode') || 'auto';
+  }
+
   function currentStyle() {
     return document.documentElement.getAttribute('data-chrome-style') || 'modern';
   }
@@ -147,6 +162,8 @@ var CloudarNewTab = (function () {
             state = data || {};
             if (state.chromeStyle)
               applyStyle(state.chromeStyle);
+            if (state.colorMode)
+              applyColorMode(state.colorMode);
             notifyChannel(api);
             notifyReady();
           });
@@ -163,6 +180,8 @@ var CloudarNewTab = (function () {
   return {
     // --- lifecycle -------------------------------------------------------
     onReady: onReady,
+    applyColorMode: applyColorMode,
+    currentColorMode: currentColorMode,
     startChannel: startChannel,
 
     // Runs `fn(state)` once the channel has answered (or failed) and the style
