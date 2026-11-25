@@ -124,6 +124,23 @@ Details, and what was deliberately *not* reproduced: [`docs/CLASSIC_UI.md`](docs
   cannot choose a folder for itself — see
   [`docs/FILE_PROTOCOL_SECURITY.md`](docs/FILE_PROTOCOL_SECURITY.md).
 
+### 🔔 Notifications
+
+- **Real web notifications.** `QWebEngineProfile::setNotificationPresenter()` finally puts
+  `Notification` to work: an allowed site gets a card in the corner of the window, clicking it
+  raises the tab, dismissing it tells the page so.
+- **Not OS notifications.** These cards are drawn by Cloudar; nothing appears when the window is
+  closed. The permission prompt says exactly that before you allow it —
+  [`docs/KNOWN_ISSUES.md`](docs/KNOWN_ISSUES.md) §12.
+
+### 🪟 Web shortcuts (app windows)
+
+- **Tools → Web shortcuts → Create Shortcut** saves the current page and reopens it in a window
+  with no tabs, no address bar and no menus — the thing Chrome calls *Create shortcut*.
+- Also `cloudar-browser --app <url>` and `--app-id <id>` for a launcher you write yourself.
+- **It is not a PWA install:** nothing is cached, so the page still needs the network. No manifest,
+  no service worker, no desktop entry — [`docs/KNOWN_ISSUES.md`](docs/KNOWN_ISSUES.md) §13.
+
 ### 🌐 Internal pages (`cloudar://`)
 
 `newtab` · `settings` · `bookmarks` · `history` · `downloads` · `extensions` · `permissions` ·

@@ -11,6 +11,7 @@
 #include "PerformanceProfile.h"
 #include "ClassicTheme.h"
 #include "Language.h"
+#include "WebShortcutStore.h"
 
 int main(int argc, char *argv[])
 {
@@ -58,6 +59,7 @@ int main(int argc, char *argv[])
                   "      --classic           Force the classic (Chrome 2009) interface.\n"
                   "      --modern            Force the modern dark interface.\n"
                   "      --perf-tier <tier>  auto | legacy | low | balanced | high.\n"
+                  "      --app <url>         Open the page in a web-shortcut window.\n"
                   "\n"
                   "Either interface switch applies to this launch only; the saved\n"
                   "preference lives in Settings -> Appearance -> Interface style.\n",
@@ -116,6 +118,22 @@ int main(int argc, char *argv[])
     QCommandLineOption modernOption("modern", "Force the modern dark user interface.");
     parser.addOption(modernOption);
 
+    // Web shortcut window (roadmap item 7): one page, no tabs, no omnibox. The
+    // value is a URL rather than a stored id so that a desktop launcher someone
+    // writes by hand works without knowing the id scheme; a stored shortcut's
+    // own launcher uses --app-id (below) so a renamed shortcut keeps working.
+    QCommandLineOption appOption(
+        "app",
+        "Open a URL in a web-shortcut window (no tabs, no address bar).",
+        "url");
+    parser.addOption(appOption);
+
+    QCommandLineOption appIdOption(
+        "app-id",
+        "Open a stored web shortcut in its own window, by id.",
+        "id");
+    parser.addOption(appIdOption);
+
     QCommandLineOption perfOption(
         "perf-tier",
         "Override CPU/GPU tuning: auto, legacy, low, balanced or high.",
@@ -155,6 +173,36 @@ int main(int argc, char *argv[])
     QDir().mkpath(dataDir);
 
     const bool incognito = parser.isSet(incognitoOption);
+
+    // A web-shortcut window replaces the normal one entirely: two windows on
+    // startup would mean closing the browser frame to get at the app.
+    if (parser.isSet(appOption) || parser.isSet(appIdOption)) {
+        QString name;
+        QUrl target;
+        QString shortcutId;
+        if (parser.isSet(appIdOption)) {
+            WebShortcutStore store;
+            const WebShortcutStore::Shortcut shortcut = store.find(parser.value(appIdOption));
+            if (!shortcut.isValid()) {
+                fputs("cloudar-browser: no web shortcut with that id\n", stderr);
+                return 2;
+            }
+            name = shortcut.name;
+            target = shortcut.url;
+            shortcutId = shortcut.id;
+        } else {
+            target = QUrl::fromUserInput(parser.value(appOption));
+            if (!WebShortcutStore::isShortcutableUrl(target)) {
+                fputs("cloudar-browser: --app needs an http or https URL\n", stderr);
+                return 2;
+            }
+            name = target.host();
+        }
+        MainWindow *window = MainWindow::createAppWindow(name, target, shortcutId);
+        window->show();
+        return app.exec();
+    }
+
     MainWindow window(incognito);
     window.resize(1200, 800);
 

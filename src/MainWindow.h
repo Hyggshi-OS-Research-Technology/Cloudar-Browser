@@ -41,6 +41,8 @@
 class QSplitter;
 class QMenu;
 class LocalFileService;
+class NotificationPresenter;
+class WebShortcutStore;
 class QToolBar;
 class QToolButton;
 
@@ -55,6 +57,21 @@ public:
     explicit MainWindow(bool isIncognito = false, QWidget *parent = nullptr,
                         bool mirrorWindow = false);
 
+    // A "web shortcut" window (roadmap item 7): one site, no tabs, no omnibox,
+    // no menus beyond a reload/back row, and a title bar that shows the
+    // shortcut's name. See src/WebShortcutStore.h for what this is not.
+    //
+    // Built by createAppWindow(), which constructs a normal window and then
+    // replaces its tab surface: the profile, scheme handlers, ad-block
+    // interceptor and QWebChannel are exactly the ones a normal window has, and
+    // duplicating that setup for a second window model is how the two drift
+    // apart (see docs/KNOWN_ISSUES.md §11 for the same trade on tear-off).
+    static MainWindow *createAppWindow(const QString &name, const QUrl &url,
+                                       const QString &shortcutId,
+                                       QWidget *parent = nullptr);
+    bool isAppWindow() const { return m_isAppWindow; }
+    QString shortcutId() const { return m_shortcutId; }
+
     void openUrl(const QUrl &url);
     void setSidebarVisible(bool visible);
     MemorySaver *memorySaver() const { return m_memorySaver; }
@@ -63,6 +80,10 @@ public:
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
     void showEvent(QShowEvent *event) override;
+    // Notification toasts are positioned in window coordinates, so they have to
+    // be re-stacked when the window changes size.
+    void resizeEvent(QResizeEvent *event) override;
+    void closeEvent(QCloseEvent *event) override;
 
 public slots:
     // Opens (or focuses) the DevTools window for the current tab. Public because
@@ -88,6 +109,13 @@ private slots:
     // LocalFileService's confinement rule.
     void openLocalFile();
     void openLocalFolder();
+    // A notification was activated: raise the tab whose page sent it.
+    void focusPageForNotification(const QUrl &origin);
+    // "Create web shortcut..." for the current page, and the menu that launches
+    // the ones that already exist.
+    void createShortcutForCurrentPage();
+    void openShortcutById(const QString &id);
+    void showShortcutMenu();
     // cloudar://files asked for the folder picker (see requestFolderPicker):
     // the chosen folder replaces the current listing instead of opening a
     // second tab.
@@ -151,6 +179,12 @@ private:
     // which folders the user opened, so cloudar://files keeps working after the
     // tab that opened the folder is gone.
     LocalFileService *m_localFiles = nullptr;
+    // Web notifications (roadmap item 6). Owns the toasts and the profile's
+    // notification presenter; see NotificationPresenter.h for what this build
+    // does *not* do with them.
+    NotificationPresenter *m_notifications = nullptr;
+    // Web shortcuts (roadmap item 7). QSettings-backed, see WebShortcutStore.h.
+    WebShortcutStore *m_shortcuts = nullptr;
     SettingsBridge *m_settingsBridge = nullptr;
     // Both are null on the classic chrome, which uses the OS window frame and
     // QMainWindow's own menu bar; everything that touches them checks first.
@@ -168,6 +202,13 @@ private:
     bool m_isIncognito = false;
     // See the constructor: a window that exists to hold one torn-off tab.
     bool m_mirrorWindow = false;
+    // Set only for a web-shortcut window: the id of the shortcut it shows, so
+    // "Open at login"-style re-launches and the shortcut menu can tell which
+    // one this is. Empty in a normal window.
+    QString m_shortcutId;
+    bool m_isAppWindow = false;
+    // Where a shortcut window's size is remembered (empty in a normal window).
+    QString m_appGeometryKey;
     bool m_firstShowDone = false;
     QVariantAnimation *m_sidebarAnimation = nullptr;
 
@@ -219,6 +260,9 @@ private:
     void buildClassicMenu();      // Chrome 2009-style Page/Tools menus
     void buildToolbar();
     void buildSidebar();
+    // App-window mode: one page, a back/forward/reload row, and the shortcut's
+    // name as the title. See WebShortcutStore.h for what an app window is not.
+    void buildAppWindow(const QString &name, const QUrl &url);
     void buildBookmarksBar(); // second toolbar row, directly below the nav toolbar
     void buildMenu();
     void applySettings(); // pull home page / search engine / cookie policy from QSettings

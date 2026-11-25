@@ -74,7 +74,11 @@ TabPreviewPopup::TabPreviewPopup(QWidget *parent) : QWidget(parent)
 
     auto *divider = new QFrame(m_card);
     divider->setFrameShape(QFrame::HLine);
-    divider->setStyleSheet(QStringLiteral("background: rgba(255, 255, 255, 0.08); max-height: 1px; min-height: 1px; border: none;"));
+    divider->setStyleSheet(
+        // A white 8% hairline is invisible on a light surface: it assumes the
+        // dark card. The border colour works in both.
+        QStringLiteral("background: %1; max-height: 1px; min-height: 1px; border: none;")
+            .arg(colors.border.name()));
     layout->addWidget(divider);
 
     auto *footerLayout = new QHBoxLayout;

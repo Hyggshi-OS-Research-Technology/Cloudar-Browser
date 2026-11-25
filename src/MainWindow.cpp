@@ -4,6 +4,9 @@
 #include "ExtensionsDialog.h"
 #include "LightSchemeHandler.h"
 #include "LocalFileService.h"
+#include "NotificationPresenter.h"
+#include "WebShortcutStore.h"
+#include "WebShortcutDialog.h"
 #include "ThemeManager.h"
 #include "ReaderMode.h"
 #include "AdBlock.h"
@@ -44,7 +47,9 @@
 #include <QHBoxLayout>
 #include <QSplitter>
 #include <QTimer>
+#include <QCursor>
 #include <QShowEvent>
+#include <QResizeEvent>
 #include <QToolButton>
 #include <QTabBar>
 #include <QSignalBlocker>
@@ -138,6 +143,20 @@ MainWindow::MainWindow(bool isIncognito, QWidget *parent, bool mirrorWindow)
     // connects to its rootsChanged() signal in its own constructor.
     m_localFiles = new LocalFileService(this);
     m_profile->setUrlRequestInterceptor(m_adBlockInterceptor);
+
+    // Web notifications (roadmap item 6). Installed on the profile right after
+    // it exists, because the presenter has to be in place before the first page
+    // can ask to show anything. The host and the activate handler are attached
+    // further down, once the tab widget exists — until then an incoming
+    // notification is closed instead of queued, which is the honest answer for
+    // a window that cannot draw it yet.
+    m_notifications = new NotificationPresenter(this);
+    m_notifications->installOn(m_profile);
+
+    // Web shortcuts (roadmap item 7). QSettings-backed and independent of the
+    // renderer's storage partition, so clearing browsing data does not delete a
+    // shortcut the user created on purpose.
+    m_shortcuts = new WebShortcutStore(this);
 
     m_downloadManager = new DownloadManager(this, this);
     m_historyManager = new HistoryManager(this);
@@ -373,6 +392,14 @@ MainWindow::MainWindow(bool isIncognito, QWidget *parent, bool mirrorWindow)
             &MainWindow::handleFeaturePermission);
 #endif
 
+    // Notifications now have a window to appear in and a tab list to resolve
+    // their origin against.
+    if (m_notifications) {
+        m_notifications->setHost(this);
+        m_notifications->setActivateHandler(
+            [this](const QUrl &origin) { focusPageForNotification(origin); });
+    }
+
     buildTitleBar();
     buildToolbar();
     buildSidebar();
@@ -460,6 +487,18 @@ MainWindow::MainWindow(bool isIncognito, QWidget *parent, bool mirrorWindow)
         statusBar()->showMessage(QString("🛡 %1 ads blocked").arg(count), 2000);
     });
 
+    // A toast vanishes after six seconds, so the status bar confirms it: a site
+    // the user allowed that silently shows nothing is the worst outcome here.
+    if (m_notifications) {
+        connect(m_notifications, &NotificationPresenter::shown, this,
+                [this](const QUrl &origin, const QString &) {
+                    if (statusBar() && !origin.host().isEmpty())
+                        statusBar()->showMessage(
+                            get_text("notification_shown_status").replace("{site}", origin.host()),
+                            3000);
+                });
+    }
+
     // IdleEasterEgg
     m_idleEasterEgg = new IdleEasterEgg(this, this);
 
@@ -475,6 +514,93 @@ MainWindow::MainWindow(bool isIncognito, QWidget *parent, bool mirrorWindow)
     }
 
     updateWindowTitle(QString());
+}
+
+// ---------------------------------------------------------------------------
+// Web shortcuts (roadmap item 7)
+// ---------------------------------------------------------------------------
+
+MainWindow *MainWindow::createAppWindow(const QString &name, const QUrl &url,
+                                        const QString &shortcutId, QWidget *parent)
+{
+    // A window built by the normal constructor and then reduced to one page.
+    // Doing it the other way round (a second constructor that skips the tab
+    // widget) means a second copy of the profile/scheme/adblock/channel setup,
+    // and the two copies drift: that is exactly how the classic chrome ended up
+    // with no stylesheet on the New Tab page.
+    auto *window = new MainWindow(false, parent);
+    window->m_shortcutId = shortcutId;
+    window->buildAppWindow(name, url);
+    return window;
+}
+
+void MainWindow::buildAppWindow(const QString &name, const QUrl &url)
+{
+    m_isAppWindow = true;
+    // Nothing about a shortcut belongs in the session: it is one page, and
+    // writing it would replace the user's tab list with it (the same hazard the
+    // tear-off window documents).
+    m_mirrorWindow = true;
+
+    // The chrome a shortcut does not get: tab strip, address bar, bookmark bar,
+    // menu. The toolbar row keeps only what a page needs to recover from a bad
+    // navigation.
+    if (m_bookmarkToolbar)
+        m_bookmarkToolbar->hide();
+    if (m_navToolbar) {
+        // Rebuilt, because removing the omnibox from a laid-out toolbar leaves
+        // its stretch behind and the buttons end up floating in the middle.
+        const QList<QAction *> keep = {m_backAction, m_forwardAction, m_reloadStopAction};
+        for (QAction *action : m_navToolbar->actions()) {
+            if (!keep.contains(action))
+                m_navToolbar->removeAction(action);
+        }
+        if (m_addressBar) {
+            m_addressBar->hide();
+            m_addressBar->deleteLater();
+            m_addressBar = nullptr;
+        }
+    }
+    if (auto *bar = statusBar())
+        bar->hide();
+    if (m_sidebar)
+        m_sidebar->hide();
+    if (m_sidebarAction)
+        m_sidebarAction->setEnabled(false);
+    if (m_aiSidebar)
+        m_aiSidebar->hide();
+
+    // The single page. The tab strip is hidden rather than removed: BrowserTabWidget
+    // owns the view, the sleep/wake path and the context menu, and a second
+    // web-view host would be a second place for those to be wrong.
+    if (m_tabs) {
+        m_tabs->setHorizontalTabBarVisible(false);
+        m_tabs->setTabsClosable(false);
+        m_tabs->addNewTab(url);
+    }
+
+    setWindowTitle(name);
+    // A shortcut window is small on purpose — it is an app, not a browser — but
+    // it remembers being resized, because the user did that deliberately.
+    QSettings settings;
+    const QString geometryKey = QStringLiteral("shortcutWindows/%1/geometry")
+                                    .arg(m_shortcutId.isEmpty() ? url.host() : m_shortcutId);
+    const QByteArray saved = settings.value(geometryKey).toByteArray();
+    if (!saved.isEmpty())
+        restoreGeometry(saved);
+    else
+        resize(960, 720);
+    m_appGeometryKey = geometryKey;
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    // Only the shortcut window persists anything here; a normal window's
+    // geometry is restored by the window manager, and writing it would fight
+    // the user's own placement.
+    if (m_isAppWindow && !m_appGeometryKey.isEmpty())
+        QSettings().setValue(m_appGeometryKey, saveGeometry());
+    QMainWindow::closeEvent(event);
 }
 
 void MainWindow::buildSidebar()
@@ -1102,6 +1228,43 @@ void MainWindow::buildModernMenu()
     openFolder->setShortcut(QKeySequence("Ctrl+Shift+O"));
     connect(openFolder, &QAction::triggered, this, &MainWindow::openLocalFolder);
 
+    // Web shortcuts. One entry that opens the list (with create/remove inside)
+    // plus the direct "create" action: an app window is a place to *go*, so the
+    // menu has to be able to open one, not only create one.
+    auto *shortcuts = menu->addMenu(tr("Web shortcuts"));
+    connect(shortcuts, &QMenu::aboutToShow, this, [this, shortcuts]() {
+        // Built on demand: the list changes whenever a shortcut is added or
+        // removed, and rebuilding it on every menu open is cheaper than
+        // keeping a QMenu and a QSettings read in sync.
+        shortcuts->clear();
+        const auto all = m_shortcuts->all();
+        if (all.isEmpty()) {
+            QAction *empty = shortcuts->addAction(get_text("shortcut_menu_empty"));
+            empty->setEnabled(false);
+        }
+        for (const auto &shortcut : all) {
+            QAction *open = shortcuts->addAction(shortcut.name);
+            const QString id = shortcut.id;
+            connect(open, &QAction::triggered, this, [this, id]() { openShortcutById(id); });
+        }
+        shortcuts->addSeparator();
+        const auto current = activeView();
+        QAction *create = shortcuts->addAction(get_text("shortcut_create"));
+        create->setEnabled(current && WebShortcutStore::isShortcutableUrl(current->url()));
+        connect(create, &QAction::triggered, this, &MainWindow::createShortcutForCurrentPage);
+        if (!all.isEmpty()) {
+            QMenu *removeMenu = shortcuts->addMenu(get_text("shortcut_remove"));
+            for (const auto &shortcut : all) {
+                QAction *remove = removeMenu->addAction(shortcut.name);
+                const QString id = shortcut.id;
+                connect(remove, &QAction::triggered, this, [this, id]() {
+                    if (m_shortcuts->remove(id))
+                        statusBar()->showMessage(get_text("shortcut_removed"), 3000);
+                });
+            }
+        }
+    });
+
     menu->addSeparator();
 
     m_sidebarAction = menu->addAction(tr("Show Sidebar"));
@@ -1235,6 +1398,119 @@ void MainWindow::setSidebarVisible(bool visible)
     // must not overwrite the preference the modern chrome will want back.
     if (visible || Theme::current() != Theme::ThemeStyle::Classic || m_firstShowDone)
         QSettings().setValue("browser/sidebarEnabled", visible);
+}
+
+void MainWindow::resizeEvent(QResizeEvent *event)
+{
+    QMainWindow::resizeEvent(event);
+    if (m_notifications)
+        m_notifications->restyle(); // also re-stacks the toasts
+}
+
+void MainWindow::createShortcutForCurrentPage()
+{
+    auto *view = activeView();
+    if (!view || m_isAppWindow)
+        return;
+    const QUrl url = view->url();
+    if (!WebShortcutStore::isShortcutableUrl(url)) {
+        // Say why, rather than opening a dialog that silently cannot work:
+        // cloudar:// and file:// pages have no host to shortcut.
+        statusBar()->showMessage(get_text("shortcut_needs_web_page"), 4000);
+        return;
+    }
+
+    // Existing shortcut: the dialog is prefilled and Add updates the name in
+    // place instead of creating a second entry for the same site.
+    const WebShortcutStore::Shortcut existing = m_shortcuts->findByUrl(url);
+    WebShortcutDialog dialog(existing.isValid() ? existing.name : view->title(), url, this);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+
+    const WebShortcutStore::Shortcut created = m_shortcuts->add(dialog.shortcutName(), url);
+    if (!created.isValid()) {
+        statusBar()->showMessage(get_text("shortcut_needs_web_page"), 4000);
+        return;
+    }
+    statusBar()->showMessage(
+        get_text("shortcut_created").replace("{name}", created.name), 4000);
+}
+
+void MainWindow::openShortcutById(const QString &id)
+{
+    const WebShortcutStore::Shortcut shortcut = m_shortcuts->find(id);
+    if (!shortcut.isValid())
+        return;
+    // A new window every time, like launching an app twice: reusing one window
+    // would make two shortcuts to one site fight over it.
+    MainWindow *window = createAppWindow(shortcut.name, shortcut.url, shortcut.id);
+    window->show();
+}
+
+void MainWindow::showShortcutMenu()
+{
+    QMenu menu(this);
+    const QList<WebShortcutStore::Shortcut> shortcuts = m_shortcuts->all();
+
+    if (shortcuts.isEmpty()) {
+        QAction *empty = menu.addAction(get_text("shortcut_menu_empty"));
+        empty->setEnabled(false);
+    } else {
+        for (const WebShortcutStore::Shortcut &shortcut : shortcuts) {
+            QAction *action = menu.addAction(shortcut.name);
+            action->setToolTip(shortcut.url.toDisplayString());
+            const QString id = shortcut.id;
+            connect(action, &QAction::triggered, this, [this, id]() { openShortcutById(id); });
+        }
+        menu.addSeparator();
+        // Removal lives here rather than in a manager page: there is no other
+        // UI that lists shortcuts, and one submenu with a delete entry per item
+        // is worse than one "remove" list.
+        QMenu *removeMenu = menu.addMenu(get_text("shortcut_remove"));
+        for (const WebShortcutStore::Shortcut &shortcut : shortcuts) {
+            QAction *action = removeMenu->addAction(shortcut.name);
+            const QString id = shortcut.id;
+            connect(action, &QAction::triggered, this, [this, id]() {
+                if (m_shortcuts->remove(id))
+                    statusBar()->showMessage(get_text("shortcut_removed"), 3000);
+            });
+        }
+    }
+
+    menu.addSeparator();
+    QAction *add = menu.addAction(get_text("shortcut_create"));
+    connect(add, &QAction::triggered, this, &MainWindow::createShortcutForCurrentPage);
+
+    // Anchored to the menu bar / window, since there is no button for it: the
+    // entry point is the View menu (classic) and the ☰ menu (modern).
+    if (m_titleBar)
+        menu.exec(m_titleBar->mapToGlobal(QPoint(m_titleBar->width() - 40, m_titleBar->height())));
+    else
+        menu.exec(QCursor::pos());
+}
+
+void MainWindow::focusPageForNotification(const QUrl &origin)
+{
+    if (!m_tabs || !origin.isValid())
+        return;
+    // Match on scheme+host rather than the full URL: the notification's origin
+    // carries no path, and the tab may have navigated deeper into the same site
+    // since the permission was granted.
+    for (int i = 0; i < m_tabs->count(); ++i) {
+        auto *view = qobject_cast<QWebEngineView *>(m_tabs->widget(i));
+        if (!view)
+            continue; // a slept tab: it has no page to match, see MemorySaver
+        const QUrl url = view->url();
+        if (url.host() == origin.host() && url.scheme() == origin.scheme()) {
+            m_tabs->setCurrentIndex(i);
+            view->setFocus();
+            raise();
+            activateWindow();
+            return;
+        }
+    }
+    // The tab was closed while the toast was up; reopening it would be a
+    // surprise navigation the user did not ask for, so this is a no-op.
 }
 
 void MainWindow::showEvent(QShowEvent *event)
@@ -1394,7 +1670,13 @@ void MainWindow::requestPermission(const QWebEnginePermission &permission)
         question.setText(get_text("permission_request_message")
                              .replace("{origin}", origin.host())
                              .replace("{permission}", permissionName(permission.permissionType())));
-        question.setInformativeText(get_text("permission_info"));
+        // Notifications are the one permission whose *scope* differs from what
+        // the prompt implies, so they get their own sentence: these cards are
+        // drawn by Cloudar, not delivered by the operating system.
+        question.setInformativeText(
+            permission.permissionType() == QWebEnginePermission::PermissionType::Notifications
+                ? get_text("permission_info_notifications")
+                : get_text("permission_info"));
         auto *deny = question.addButton(get_text("permission_deny"), QMessageBox::RejectRole);
         auto *allow = question.addButton(get_text("permission_allow"), QMessageBox::AcceptRole);
         question.exec();
@@ -1446,7 +1728,9 @@ void MainWindow::handleFeaturePermission(const QUrl &origin, QWebEnginePage::Fea
         question.setText(get_text("permission_request_message")
                              .replace("{origin}", origin.host())
                              .replace("{permission}", featureName(feature)));
-        question.setInformativeText(get_text("permission_info"));
+        question.setInformativeText(feature == QWebEnginePage::Notifications
+                                        ? get_text("permission_info_notifications")
+                                        : get_text("permission_info"));
         auto *deny = question.addButton(get_text("permission_deny"), QMessageBox::RejectRole);
         auto *allow = question.addButton(get_text("permission_allow"), QMessageBox::AcceptRole);
         question.exec();
@@ -1932,6 +2216,39 @@ void MainWindow::buildClassicMenu()
     connect(downloads, &QAction::triggered, this, [this]() { m_downloadManager->showDialog(); });
 
     auto *toolsMenu = m_menuBar->addMenu(tr("&Tools"));
+    // Same content as the modern ☰ menu's Web shortcuts submenu, built the same
+    // way, so the two chromes cannot offer different shortcuts.
+    auto *shortcutsMenu = toolsMenu->addMenu(tr("Web shortcuts"));
+    connect(shortcutsMenu, &QMenu::aboutToShow, this, [this, shortcutsMenu]() {
+        shortcutsMenu->clear();
+        const auto all = m_shortcuts->all();
+        if (all.isEmpty()) {
+            QAction *empty = shortcutsMenu->addAction(get_text("shortcut_menu_empty"));
+            empty->setEnabled(false);
+        }
+        for (const auto &shortcut : all) {
+            QAction *open = shortcutsMenu->addAction(shortcut.name);
+            const QString id = shortcut.id;
+            connect(open, &QAction::triggered, this, [this, id]() { openShortcutById(id); });
+        }
+        shortcutsMenu->addSeparator();
+        const auto current = activeView();
+        QAction *create = shortcutsMenu->addAction(get_text("shortcut_create"));
+        create->setEnabled(current && WebShortcutStore::isShortcutableUrl(current->url()));
+        connect(create, &QAction::triggered, this, &MainWindow::createShortcutForCurrentPage);
+        if (!all.isEmpty()) {
+            QMenu *removeMenu = shortcutsMenu->addMenu(get_text("shortcut_remove"));
+            for (const auto &shortcut : all) {
+                QAction *remove = removeMenu->addAction(shortcut.name);
+                const QString id = shortcut.id;
+                connect(remove, &QAction::triggered, this, [this, id]() {
+                    if (m_shortcuts->remove(id))
+                        statusBar()->showMessage(get_text("shortcut_removed"), 3000);
+                });
+            }
+        }
+    });
+    toolsMenu->addSeparator();
     auto *extensions = toolsMenu->addAction(tr("Extensions"));
     connect(extensions, &QAction::triggered, this, &MainWindow::showExtensionsDialog);
     auto *settings = toolsMenu->addAction(tr("Settings"));

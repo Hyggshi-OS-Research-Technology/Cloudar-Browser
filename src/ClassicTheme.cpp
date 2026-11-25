@@ -293,6 +293,22 @@ void paintClassicPlus(QPainter &p, const QColor &c, int s)
     p.drawLine(QPointF(s * 0.26, s * 0.5), QPointF(s * 0.74, s * 0.5));
 }
 
+// The tab close button used to be :/close.svg, a *fixed* #c7cede cross. On a
+// dark tab that reads correctly; on a light tab it is white on #f1f2f5, i.e.
+// invisible — the button was there and simply could not be seen. Painted here
+// like every other glyph, so it takes the palette's text colour instead.
+void paintCloseCross(QPainter &p, const QColor &c, int s)
+{
+    QPen pen(c, qMax(1.2, s * 0.11));
+    pen.setCapStyle(Qt::RoundCap);
+    p.setPen(pen);
+    p.setBrush(Qt::NoBrush);
+    const qreal a = s * 0.30;
+    const qreal b = s * 0.70;
+    p.drawLine(QPointF(a, a), QPointF(b, b));
+    p.drawLine(QPointF(b, a), QPointF(a, b));
+}
+
 void paintClassicReader(QPainter &p, const QColor &c, int s)
 {
     QPen pen(c, 1.2);
@@ -433,11 +449,18 @@ PopupColors popupColors()
         c.dim = QColor(QString::fromLatin1(kClassicDim));
         c.placeholder = QColor(QStringLiteral("#e6e3dd"));
     } else {
-        c.surface = QColor(QStringLiteral("#16181f"));
-        c.border = QColor(255, 255, 255, 20);
-        c.text = QColor(QStringLiteral("#f8fafc"));
-        c.dim = QColor(QStringLiteral("#94a3b8"));
-        c.placeholder = QColor(QStringLiteral("#20222a"));
+        // The modern chrome has a *light* palette too, and this branch used to
+        // return the dark one unconditionally: in light mode the tab hover card
+        // was a near-black rectangle floating over a white window, which is the
+        // same "one black rectangle" mistake the comment above describes for the
+        // classic chrome. Derived from the shared palette so it cannot drift.
+        const ThemeManager::Palette pal = ThemeManager::instance().palette();
+        const bool dark = ThemeManager::instance().prefersDark();
+        c.surface = pal.tabHover;
+        c.border = dark ? QColor(255, 255, 255, 20) : pal.border;
+        c.text = pal.text;
+        c.dim = pal.dim;
+        c.placeholder = dark ? QColor(QStringLiteral("#20222a")) : pal.hover;
     }
     return c;
 }
@@ -456,6 +479,7 @@ static void paintGlyph(QPainter &p, const QString &name, const QColor &color, in
     else if (name == "menu")       paintClassicMenu(p, color, s);
     else if (name == "plus")       paintClassicPlus(p, color, s);
     else if (name == "reader")     paintClassicReader(p, color, s);
+    else if (name == "close")      paintCloseCross(p, color, s);
 }
 
 QIcon icon(const QString &name, int size)
@@ -495,17 +519,26 @@ QIcon icon(const QString &name, int size)
         return result;
     }
 
-    // Modern: colored glyphs on dark chrome.
+    // Modern: the glyph follows the *light/dark palette*, not a hard-coded
+    // light-on-dark colour. In light mode #d7dce8 on a #ffffff toolbar is
+    // white on white, which is the same defect the tab close button had.
+    const ThemeManager::Palette pal = ThemeManager::instance().palette();
+    const QColor normal = pal.text;
+    const QColor faded = !pal.text.isValid() ? QColor("#4b5262")
+                        : (ThemeManager::instance().prefersDark()
+                               ? QColor("#4b5262")
+                               : QColor("#aab1bf"));
+
     QPixmap pix = makePixmap(size);
     QPainter p(&pix);
     p.setRenderHint(QPainter::Antialiasing, true);
-    paintGlyph(p, name, QColor("#d7dce8"), size);
+    paintGlyph(p, name, normal, size);
     p.end();
 
     QPixmap disabled = makePixmap(size);
     QPainter dp(&disabled);
     dp.setRenderHint(QPainter::Antialiasing, true);
-    paintGlyph(dp, name, QColor("#4b5262"), size);
+    paintGlyph(dp, name, faded, size);
     dp.end();
 
     QIcon result;

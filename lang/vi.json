@@ -332,5 +332,20 @@
   "files_error_title": "Không liệt kê được thư mục này",
   "files_error_body": "Không thể đọc thư mục.",
   "files_no_bridge_title": "Không khả dụng",
-  "files_no_bridge_body": "Trang này phải được mở trong Cloudar Browser."
+  "files_no_bridge_body": "Trang này phải được mở trong Cloudar Browser.",
+  "notification_dismiss": "Bỏ qua thông báo",
+  "permission_info_notifications": "Cloudar sẽ hiển thị thông báo của trang này dưới dạng thẻ trong cửa sổ này. Hệ điều hành không gửi chúng: khi cửa sổ đóng thì không có gì hiện ra.",
+  "notification_shown_status": "{site} đã gửi một thông báo",
+  "shortcut_dialog_title": "Tạo lối tắt web",
+  "shortcut_dialog_intro": "Mở trang này trong cửa sổ riêng, không có thẻ hay thanh địa chỉ.",
+  "shortcut_dialog_note": "Lối tắt này không phải là cài đặt: trang vẫn cần mạng và không có gì được lưu để dùng ngoại tuyến.",
+  "shortcut_name_label": "Tên",
+  "shortcut_url_label": "Trang",
+  "shortcut_create": "Tạo lối tắt",
+  "shortcut_menu_empty": "Chưa có lối tắt web nào",
+  "shortcut_remove": "Xoá lối tắt",
+  "shortcut_removed": "Đã xoá lối tắt",
+  "shortcut_created": "Đã tạo lối tắt \"{name}\"",
+  "shortcut_needs_web_page": "Chỉ có thể tạo lối tắt cho trang web",
+  "Web shortcuts": "Lối tắt web"
 }

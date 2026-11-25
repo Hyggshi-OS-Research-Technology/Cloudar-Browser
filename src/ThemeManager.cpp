@@ -147,43 +147,66 @@ QString ThemeManager::appStyleSheet() const
     return Theme::appStyleSheet(m_accent);
 }
 
+// Two full palettes, not a tint of one. A light surface needs different values
+// for every role (window, chrome, border, tab, hover, input) — a single dark
+// sheet with a light window background reads as a broken dark theme, which is
+// exactly the "style applied halfway" defect this project treats as a bug.
+//
+// These are the *only* light/dark values in the program. The stylesheet below
+// and the widgets that paint themselves (tab close buttons, the title bar,
+// painted popups) both read them, so a role cannot be right in one place and
+// wrong in the other — which is how the tab close button ended up dark-only.
+ThemeManager::Palette ThemeManager::paletteFor(bool dark)
+{
+    Palette p;
+    if (dark) {
+        p.window   = QColor("#14161c");
+        p.chrome   = QColor("#181b22");
+        p.border   = QColor("#262b36");
+        p.tab      = QColor("#1b1e28");
+        p.tabHover = QColor("#252a37");
+        p.hover    = QColor("#222633");
+        p.input    = QColor("#1d212b");
+        p.text     = QColor("#e8ecf5");
+        p.dim      = QColor("#c7cede");
+    } else {
+        p.window   = QColor("#f7f8fa");
+        p.chrome   = QColor("#ffffff");
+        p.border   = QColor("#d6dae2");
+        p.tab      = QColor("#f1f2f5");
+        p.tabHover = QColor("#e7e9ee");
+        p.hover    = QColor("#eceef3");
+        p.input    = QColor("#ffffff");
+        p.text     = QColor("#1a1d24");
+        p.dim      = QColor("#5b6273");
+    }
+    // Filled in by the caller: it depends on the accent, not the mode.
+    p.onAccent = QColor("#0b0e14");
+    return p;
+}
+
+ThemeManager::Palette ThemeManager::palette() const
+{
+    Palette p = paletteFor(prefersDark());
+    p.onAccent = readableTextOn(m_accent);
+    return p;
+}
+
 QString ThemeManager::modernStyleSheet(const QColor &color) const
 {
     const QColor accentColor = color.isValid() ? color : m_accent;
     const QString accent = accentColor.name();
     const QString accentHover = accentColor.lighter(115).name();
-    const QString text = readableTextOn(accentColor).name();
 
-    // Two full palettes, not a tint of one. A light surface needs different
-    // values for every role (window, chrome, border, tab, hover, input) — a
-    // single dark sheet with a light window background reads as a broken dark
-    // theme, which is exactly the "style applied halfway" defect this project
-    // treats as a bug.
-    struct Palette {
-        const char *window;   // behind the whole window
-        const char *chrome;   // menu bar, toolbar, tab strip, status bar
-        const char *border;   // 1px separators and outlines
-        const char *tab;      // unselected tab
-        const char *tabHover;
-        const char *hover;    // generic hover surface
-        const char *input;    // address bar
-        const char *text;     // primary text
-        const char *dim;      // secondary text and unselected tab labels
-        const char *strong;   // text on the accent
-    };
-    static const Palette kDark = {
-        "#14161c", "#181b22", "#262b36", "#1b1e28", "#252a37",
-        "#222633", "#1d212b", "#e8ecf5", "#c7cede", "#0b0e14"
-    };
-    static const Palette kLight = {
-        "#f7f8fa", "#ffffff", "#d6dae2", "#f1f2f5", "#e7e9ee",
-        "#eceef3", "#ffffff", "#1a1d24", "#5b6273", "#0b0e14"
-    };
-    const Palette &p = prefersDark() ? kDark : kLight;
-
-    // The accent is the one colour that stays as the user chose it; only the
-    // text drawn on top of it flips.
+    const Palette pal = paletteFor(prefersDark());
     const QString onAccent = ThemeManager::readableTextOn(accentColor).name();
+    // Local names for the roles the sheet below interpolates. Kept as
+    // #rrggbb strings because that is what QSS parses.
+    const auto hex = [](const QColor &c) { return c.name(); };
+    const QString pWindow = hex(pal.window), pChrome = hex(pal.chrome),
+                  pBorder = hex(pal.border), pTab = hex(pal.tab),
+                  pTabHover = hex(pal.tabHover), pHover = hex(pal.hover),
+                  pInput = hex(pal.input), pText = hex(pal.text), pDim = hex(pal.dim);
 
     return QString(R"(
         QMainWindow { background: %3; }
@@ -210,8 +233,12 @@ QString ThemeManager::modernStyleSheet(const QColor &color) const
         QTabBar::tab:!selected:!hover QTabBar::close-button {
             image: none;
         }
+        /* The close glyph is painted (Theme::icon("close")), not an SVG: the
+           shipped close.svg is a fixed #c7cede cross, which is white on the
+           light tab surface and therefore invisible in light mode. A QSS
+           `image:` cannot follow the palette, so the *shape* comes from
+           qproperty-less painting and only the wash comes from QSS. */
         QTabBar::tab:selected QTabBar::close-button, QTabBar::tab:hover QTabBar::close-button {
-            image: url(:/close.svg);
             subcontrol-position: right;
             margin-left: 4px;
             margin-right: 2px;
@@ -219,11 +246,9 @@ QString ThemeManager::modernStyleSheet(const QColor &color) const
             border-radius: 8px;
         }
         QTabBar::close-button:hover {
-            image: url(:/close-hover.svg);
             background-color: rgba(127, 127, 127, 0.28);
         }
         QTabBar::close-button:pressed {
-            image: url(:/close-hover.svg);
             background-color: #e81123;
         }
         #NewTabStripButton { background: transparent; border: none;
@@ -251,16 +276,64 @@ QString ThemeManager::modernStyleSheet(const QColor &color) const
         QProgressBar { background: transparent; border: none; }
         QProgressBar::chunk { background: %1; border-radius: 2px; }
         QStatusBar { background: %4; color: %10; border: none; }
-    )").arg(accent,                                  // 1
-            accentHover,                             // 2
-            QString::fromLatin1(p.window),           // 3
-            QString::fromLatin1(p.chrome),            // 4
-            QString::fromLatin1(p.border),            // 5
-            onAccent,                                 // 6
-            QString::fromLatin1(p.tab),               // 7
-            QString::fromLatin1(p.input),             // 8
-            QString::fromLatin1(p.tabHover),          // 9
-            QString::fromLatin1(p.text),              // 10
-            QString::fromLatin1(p.dim),               // 11
-            QString::fromLatin1(p.hover));            // 12
+
+        /* ---- Dialogs and their controls ----
+           The sheet stopped at the main window, so every dialog this app opens
+           (message boxes, the file picker's Qt-side widgets, Extensions,
+           Settings, prompts) was drawn by the platform style *inside* a dark
+           window: a white QMessageBox, black-on-black QPushButton labels under
+           a dark sheet that does set QWidget colour, and a QLineEdit whose
+           only rule was the pill shape meant for the omnibox. These rules are
+           the missing half of the palette. */
+        QDialog { background: %3; }
+        QDialog QLabel, QDialog QCheckBox, QDialog QRadioButton { color: %10; }
+        QMessageBox { background: %4; }
+        QMessageBox QLabel { color: %10; }
+        QPushButton { background: %9; color: %10; border: 1px solid %5;
+                      border-radius: 6px; padding: 5px 16px; min-width: 64px; }
+        QPushButton:hover { background: %2; color: %6; border-color: %1; }
+        QPushButton:pressed { background: %1; color: %6; }
+        QPushButton:default { border-color: %1; }
+        QPushButton:disabled { color: %11; border-color: %5; background: %3; }
+        /* Not the omnibox pill: an input inside a dialog is a plain field. */
+        QDialog QLineEdit, QDialog QSpinBox, QDialog QComboBox {
+            background: %8; color: %10; border: 1px solid %5;
+            border-radius: 6px; padding: 4px 8px;
+        }
+        QDialog QLineEdit:focus { border-color: %1; }
+        QComboBox QAbstractItemView { background: %4; color: %10;
+                                      border: 1px solid %5;
+                                      selection-background-color: %1;
+                                      selection-color: %6; }
+        QListWidget, QTreeWidget, QTableWidget, QTextBrowser, QPlainTextEdit {
+            background: %8; color: %10; border: 1px solid %5; border-radius: 6px;
+        }
+        QListWidget::item:selected, QTreeWidget::item:selected,
+        QTableWidget::item:selected { background: %1; color: %6; }
+        QListWidget::item:hover { background: %9; }
+        QTabWidget::pane { border: 1px solid %5; border-radius: 6px; }
+        QGroupBox { color: %10; border: 1px solid %5; border-radius: 6px;
+                    margin-top: 10px; padding-top: 6px; }
+        QGroupBox::title { subcontrol-origin: margin; left: 10px; color: %11; }
+        QScrollBar:vertical { background: transparent; width: 10px; margin: 0; }
+        QScrollBar::handle:vertical { background: %12; min-height: 28px;
+                                      border-radius: 5px; }
+        QScrollBar::handle:vertical:hover { background: %11; }
+        QScrollBar:horizontal { background: transparent; height: 10px; margin: 0; }
+        QScrollBar::handle:horizontal { background: %12; min-width: 28px;
+                                        border-radius: 5px; }
+        QScrollBar::add-line, QScrollBar::sub-line { width: 0; height: 0; }
+        QToolTip { background: %4; color: %10; border: 1px solid %5; padding: 4px 6px; }
+    )").arg(accent)                                 // 1
+       .arg(accentHover)                             // 2
+       .arg(pWindow)                                 // 3
+       .arg(pChrome)                                 // 4
+       .arg(pBorder)                                 // 5
+       .arg(onAccent)                                // 6
+       .arg(pTab)                                    // 7
+       .arg(pInput)                                  // 8
+       .arg(pTabHover)                               // 9
+       .arg(pText)                                   // 10
+       .arg(pDim)                                    // 11
+       .arg(pHover);                                 // 12
 }

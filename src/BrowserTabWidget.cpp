@@ -40,6 +40,13 @@ BrowserTabWidget::BrowserTabWidget(QWebEngineProfile *profile, QWebChannel *chan
     : QTabWidget(parent), m_profile(profile), m_channel(channel)
 {
     setTabsClosable(true);
+    // QTabBar draws the default close button as the style's own tiny cross,
+    // which on a dark sheet is a grey smudge and never follows the light/dark
+    // palette. tabInserted() installs the painted glyph instead (see
+    // Theme::icon and the "close" case in ClassicTheme.cpp), and this keeps it
+    // correct when the user flips light/dark without restarting.
+    connect(&ThemeManager::instance(), &ThemeManager::colorModeChanged, this,
+            [this](bool) { applyTabCloseGlyphs(); });
     setMovable(true);
     setDocumentMode(true);
     tabBar()->setExpanding(false);
@@ -156,6 +163,10 @@ bool BrowserTabWidget::eventFilter(QObject *watched, QEvent *event)
 void BrowserTabWidget::tabInserted(int index)
 {
     QTabWidget::tabInserted(index);
+    // Queued: QTabWidget has not created the style's close button yet at this
+    // point, and applyCloseGlyph() needs to replace whatever is there.
+    QMetaObject::invokeMethod(this, [this, index]() { applyCloseGlyph(index); },
+                              Qt::QueuedConnection);
     repositionNewTabButton();
     QMetaObject::invokeMethod(this, &BrowserTabWidget::repositionNewTabButton, Qt::QueuedConnection);
 }
@@ -427,6 +438,49 @@ QWebEngineView *BrowserTabWidget::addNewTab(const QUrl &url, bool makeCurrent)
     repositionNewTabButton();
     emit tabsChanged();
     return view;
+}
+
+void BrowserTabWidget::applyCloseGlyph(int index)
+{
+    if (index < 0 || index >= count())
+        return;
+    QAbstractButton *button = tabBar()->tabButton(index, QTabBar::RightSide);
+    auto *tool = qobject_cast<QToolButton *>(button);
+    // Two cases reach the `!tool` branch: Qt created the button but as a plain
+    // QTabBar::CloseButton (its own painted cross), or it created nothing. The
+    // first must be deleted before it is replaced, or QTabBar keeps a child
+    // button that is no longer the tab's and paints a second cross over ours.
+    if (button && !tool) {
+        tabBar()->setTabButton(index, QTabBar::RightSide, nullptr);
+        delete button;
+    }
+    if (!tool) {
+        // The style has not created the button yet (it does so on the first
+        // paint); create our own so the glyph is right from the first frame.
+        tool = new QToolButton(tabBar());
+        tool->setObjectName(QStringLiteral("TabCloseButton"));
+        tool->setAutoRaise(true);
+        tool->setFocusPolicy(Qt::NoFocus);
+        tool->setIconSize(QSize(12, 12));
+        tool->setCursor(Qt::ArrowCursor);
+        tabBar()->setTabButton(index, QTabBar::RightSide, tool);
+        connect(tool, &QToolButton::clicked, this, [this, tool]() {
+            // Resolved through the button's own position: tabs move, so a
+            // captured index would close the wrong one after a drag.
+            const int fromButton = tabBar()->tabAt(
+                tabBar()->mapFromGlobal(tool->mapToGlobal(tool->rect().center())));
+            if (fromButton >= 0)
+                closeTabAt(fromButton);
+        });
+        tool->setToolTip(get_text("tab_close"));
+    }
+    tool->setIcon(Theme::icon(QStringLiteral("close"), 12));
+}
+
+void BrowserTabWidget::applyTabCloseGlyphs()
+{
+    for (int i = 0; i < count(); ++i)
+        applyCloseGlyph(i);
 }
 
 void BrowserTabWidget::closeTabAt(int index)

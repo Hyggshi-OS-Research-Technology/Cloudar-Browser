@@ -332,5 +332,20 @@
   "files_error_title": "无法列出此文件夹",
   "files_error_body": "无法读取该文件夹。",
   "files_no_bridge_title": "不可用",
-  "files_no_bridge_body": "此页面必须在 Cloudar Browser 中打开。"
+  "files_no_bridge_body": "此页面必须在 Cloudar Browser 中打开。",
+  "notification_dismiss": "关闭通知",
+  "permission_info_notifications": "Cloudar 会在本窗口中以卡片形式显示此站点的通知。这些通知并非由操作系统投递：窗口关闭时不会显示任何内容。",
+  "notification_shown_status": "{site} 发送了通知",
+  "shortcut_dialog_title": "创建网络快捷方式",
+  "shortcut_dialog_intro": "在独立窗口中打开此页面，不显示标签页或地址栏。",
+  "shortcut_dialog_note": "此快捷方式并非安装：页面仍然需要联网，也不会保存任何内容供离线使用。",
+  "shortcut_name_label": "名称",
+  "shortcut_url_label": "页面",
+  "shortcut_create": "创建快捷方式",
+  "shortcut_menu_empty": "还没有网络快捷方式",
+  "shortcut_remove": "删除快捷方式",
+  "shortcut_removed": "快捷方式已删除",
+  "shortcut_created": "已创建快捷方式“{name}”",
+  "shortcut_needs_web_page": "只能为网页创建快捷方式",
+  "Web shortcuts": "网络快捷方式"
 }

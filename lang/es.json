@@ -332,5 +332,20 @@
   "files_error_title": "No se pudo listar esta carpeta",
   "files_error_body": "No se pudo leer la carpeta.",
   "files_no_bridge_title": "No disponible",
-  "files_no_bridge_body": "Esta página debe abrirse dentro de Cloudar Browser."
+  "files_no_bridge_body": "Esta página debe abrirse dentro de Cloudar Browser.",
+  "notification_dismiss": "Descartar notificación",
+  "permission_info_notifications": "Cloudar mostrará las notificaciones de este sitio como una tarjeta en esta ventana. No las entrega el sistema operativo: no aparece nada mientras la ventana está cerrada.",
+  "notification_shown_status": "{site} ha enviado una notificación",
+  "shortcut_dialog_title": "Crear acceso directo web",
+  "shortcut_dialog_intro": "Abre esta página en su propia ventana, sin pestañas ni barra de direcciones.",
+  "shortcut_dialog_note": "El acceso directo no es una instalación: la página sigue necesitando la red y no se guarda nada para usarla sin conexión.",
+  "shortcut_name_label": "Nombre",
+  "shortcut_url_label": "Página",
+  "shortcut_create": "Crear acceso directo",
+  "shortcut_menu_empty": "Aún no hay accesos directos web",
+  "shortcut_remove": "Eliminar acceso directo",
+  "shortcut_removed": "Acceso directo eliminado",
+  "shortcut_created": "Acceso directo «{name}» creado",
+  "shortcut_needs_web_page": "Solo se pueden crear accesos directos para páginas web",
+  "Web shortcuts": "Accesos directos web"
 }

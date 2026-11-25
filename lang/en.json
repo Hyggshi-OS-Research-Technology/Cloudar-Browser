@@ -332,5 +332,20 @@
   "files_error_title": "Could not list this folder",
   "files_error_body": "The folder could not be read.",
   "files_no_bridge_title": "Not available",
-  "files_no_bridge_body": "This page has to be opened inside Cloudar Browser."
+  "files_no_bridge_body": "This page has to be opened inside Cloudar Browser.",
+  "notification_dismiss": "Dismiss notification",
+  "permission_info_notifications": "Cloudar will show this site's notifications as a card in this window. They are not delivered by the operating system: nothing appears while the window is closed.",
+  "notification_shown_status": "{site} sent a notification",
+  "shortcut_dialog_title": "Create web shortcut",
+  "shortcut_dialog_intro": "Opens this page in its own window, without tabs or an address bar.",
+  "shortcut_dialog_note": "The shortcut is not an installation: the page still needs the network, and nothing is saved for offline use.",
+  "shortcut_name_label": "Name",
+  "shortcut_url_label": "Page",
+  "shortcut_create": "Create Shortcut",
+  "shortcut_menu_empty": "No web shortcuts yet",
+  "shortcut_remove": "Remove Shortcut",
+  "shortcut_removed": "Shortcut removed",
+  "shortcut_created": "Shortcut \"{name}\" created",
+  "shortcut_needs_web_page": "Shortcuts can only be created for web pages",
+  "Web shortcuts": "Web shortcuts"
 }

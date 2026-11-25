@@ -3,6 +3,51 @@
 All notable changes to Cloudar Browser. Version numbers follow
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **Web notifications** (`src/NotificationPresenter.*`, `src/NotificationToast.*`). QtWebEngine
+  has had `QWebEngineProfile::setNotificationPresenter()` since Qt 5.13, so this is a real
+  implementation: an allowed site's notification becomes a card in the corner of the window that
+  owns the page, clicking it runs the page's `click()` handler and raises the tab, dismissing it
+  runs `close()`. At most three, oldest evicted, and a denied site is dropped silently.
+  - **Not OS notifications**: nothing is delivered while the window is closed and there is no
+    notification centre. The permission prompt says so before the user allows it, and
+    `docs/KNOWN_ISSUES.md` §12 lists the rest.
+- **Web shortcuts / app windows** (`src/WebShortcutStore.*`, `src/WebShortcutDialog.*`,
+  `MainWindow::createAppWindow`). A saved page that opens in its own window: no tab strip, no
+  omnibox, no menus, its own title and remembered geometry. Reached from the classic **Tools**
+  menu and the modern ☰ menu, and from `--app <url>` / `--app-id <id>`.
+  - Explicitly **not** a PWA install: no manifest, no service worker, no offline cache, no
+    launcher entry. See `docs/KNOWN_ISSUES.md` §13.
+- `tests/tst_webshortcutstore.cpp`, and the CI step that runs it.
+
+### Changed
+
+- The modern chrome now has one palette definition (`ThemeManager::paletteFor()`), used by both
+  the stylesheet and every widget that paints itself. Previously the painted widgets hard-coded
+  the dark values.
+- New gate: `tools/check-css.js` verifies that both chromes' stylesheet substitutions are
+  complete (a role added to the sheet but not to the `.arg()` chain renders as a literal `%13`
+  that Qt silently drops) and that the modern sheet loads no image assets with baked-in colours.
+
+### Fixed
+
+- **Light mode drew dark-only chrome.** The tab close button was a fixed `#c7cede` cross — white
+  on the light tab surface, i.e. an invisible button — the tab hover card was a near-black
+  rectangle over a white window, the title bar's window controls kept dark-mode glyphs after a
+  light/dark flip, and the sidebar's row dividers used a `rgba(255,255,255,0.08)` hairline that
+  does not exist on a light background. All four now derive from the shared palette; the close
+  glyph is painted (`Theme::icon("close")`) instead of shipped as an SVG with a baked-in colour.
+- **The modern stylesheet had no rules for dialogs.** Every `QMessageBox`, `QFileDialog` and
+  prompt in a dark window was drawn by the platform style — a white box, or black-on-black button
+  labels under a sheet that does set `QWidget` colour. Dialogs, buttons, inputs, lists, group
+  boxes, scrollbars and tooltips now have palette rules in both modes.
+- **A notification permission prompt claimed more than the browser does.** It now carries its own
+  explanatory sentence (`permission_info_notifications`) instead of the generic
+  "you can change this later".
+
 ## [0.2.0] — 2026-11-24
 
 The "classic chrome + honest hardware support" release.
