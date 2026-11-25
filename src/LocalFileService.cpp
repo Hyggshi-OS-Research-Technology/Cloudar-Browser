@@ -55,6 +55,11 @@ bool looksLikeLocalPath(const QString &input)
 {
     if (input.startsWith(QLatin1Char('/')))
         return true;                       // POSIX absolute
+    // "~" alone is the home directory, which is a path and not a search for
+    // the word "~". The test caught this: expandTilde() handled it, but the
+    // path-vs-search gate rejected it before it ever got there.
+    if (input == QLatin1String("~"))
+        return true;
     if (input.startsWith(QLatin1String("~/")))
         return true;                       // home-relative
     if (input.startsWith(QLatin1String("\\\\")))
