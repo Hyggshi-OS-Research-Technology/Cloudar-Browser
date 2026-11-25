@@ -52,8 +52,8 @@
 #include <QFileDialog>
 #include <QSysInfo>
 
-MainWindow::MainWindow(bool isIncognito, QWidget *parent)
-    : QMainWindow(parent), m_isIncognito(isIncognito)
+MainWindow::MainWindow(bool isIncognito, QWidget *parent, bool mirrorWindow)
+    : QMainWindow(parent), m_isIncognito(isIncognito), m_mirrorWindow(mirrorWindow)
 {
     setWindowIcon(QIcon(":/icon.png"));
 
@@ -450,10 +450,16 @@ MainWindow::MainWindow(bool isIncognito, QWidget *parent)
     // IdleEasterEgg
     m_idleEasterEgg = new IdleEasterEgg(this, this);
 
-    if (!m_isIncognito && m_sessionManager->restoreEnabled() && !m_sessionManager->urls().isEmpty())
+    // A window opened for one torn-off tab starts empty on purpose: the tab is
+    // added by the caller, and neither the saved session nor the home page
+    // belongs in it.
+    if (m_mirrorWindow) {
+        // nothing to open
+    } else if (!m_isIncognito && m_sessionManager->restoreEnabled() && !m_sessionManager->urls().isEmpty()) {
         m_tabs->restoreTabs(m_sessionManager->urls(), m_sessionManager->currentIndex());
-    else
+    } else {
         m_tabs->addNewTab(QUrl(SettingsDialog(this).homePage()));
+    }
 
     updateWindowTitle(QString());
 }
@@ -471,6 +477,9 @@ void MainWindow::buildSidebar()
     m_browserSplitter->setStretchFactor(0, 0);
     m_browserSplitter->setStretchFactor(1, 1);
     connect(m_sidebar, &BrowserSidebar::expandedChanged, this, [this](bool exp) { setSidebarExpanded(exp, true); });
+    // Reordering happens inside the sidebar (it owns the gesture); only the
+    // tear-off needs this window, because it has to build another one.
+    connect(m_sidebar, &BrowserSidebar::tabTearOffRequested, this, &MainWindow::tearOffTab);
     connect(m_browserSplitter, &QSplitter::splitterMoved, this, [this](int position, int) {
         if (!m_sidebar->isVisible()) return;
         const bool shouldExpand = (position >= 120);
@@ -1429,6 +1438,10 @@ void MainWindow::saveSession()
 {
     if (m_isIncognito)
         return;
+    // A one-tab window does not own the session: writing it here would replace
+    // the main window's tab list with the single torn-off tab.
+    if (m_mirrorWindow)
+        return;
     if (m_sessionManager && m_tabs)
         m_sessionManager->save(m_tabs->openUrls(), m_tabs->currentIndex());
 }
@@ -1582,10 +1595,46 @@ void MainWindow::openInNewWindow(const QUrl &url)
     // separate profile rather than a shared one. Cookies and logins therefore do
     // not carry across, which is a real limitation and is why the menu item is
     // worded "Open link in new window" and nothing more.
-    auto *window = new MainWindow(false);
+    auto *window = new MainWindow(false, nullptr, /*mirrorWindow=*/true);
     window->setAttribute(Qt::WA_DeleteOnClose, true);
     window->show();
     window->m_tabs->addNewTab(url, true);
+}
+
+void MainWindow::tearOffTab(int index)
+{
+    if (!m_tabs || index < 0 || index >= m_tabs->count())
+        return;
+
+    BrowserTabWidget::TabSnapshot snapshot;
+    if (!m_tabs->snapshotTab(index, &snapshot) || snapshot.url.isEmpty())
+        return;
+
+    // A window of its own, built exactly like "Open link in new window"
+    // (openInNewWindow), which is the honest description of what it is: a new
+    // MainWindow around one page, with the constructor's own QWebEngineProfile.
+    // Cookies, logins and the tab's back/forward list therefore do not carry
+    // over — docs/KNOWN_ISSUES.md §11 says so rather than implying the tab was
+    // moved wholesale.
+    auto *window = new MainWindow(m_isIncognito, nullptr, true);
+    window->setAttribute(Qt::WA_DeleteOnClose, true);
+    auto *view = window->m_tabs->addNewTab(snapshot.url, true);
+    // The strip label until the page reports its own title. Real pages overwrite
+    // this within a frame or two; a slept tab keeps the title it was showing.
+    if (view && !snapshot.title.isEmpty())
+        window->m_tabs->setTabText(window->m_tabs->indexOf(view), snapshot.title);
+    window->show();
+
+    if (m_tabs->count() > 1) {
+        // The tab now lives in its own window; leaving a copy behind in this one
+        // would make the gesture duplicate instead of move. closeTabAt() keeps
+        // the "never zero tabs" invariant and records the URL for Ctrl+Shift+T.
+        m_tabs->closeTabAt(index);
+    } else {
+        // Tearing off the last tab: the new window is now the only thing worth
+        // keeping on screen, so this one closes rather than lingering empty.
+        close();
+    }
 }
 
 void MainWindow::showHistoryDialog()

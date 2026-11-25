@@ -166,3 +166,37 @@ The interface language setting is implemented end to end (see
 `lang/{ja,zh}.json` were 13 keys short of `en.json` before this work; all
 dictionaries now carry identical key sets, which `node tools/check-i18n.js`
 enforces on every push.
+
+## 11. Tearing a tab off into its own window
+
+Dragging a tab out of the vertical sidebar over empty space opens it in a new
+window, in the same spirit as Chrome's tear-off. The gesture is a sidebar
+feature: the horizontal tab strip (the only surface in the classic chrome) keeps
+`QTabWidget`'s own drag-to-reorder and has no tear-off. What the new window is
+**not** is a moved tab:
+
+* **The page is reopened, not relocated.** Moving a live `QWebEngineView` into
+  another top-level window re-parents its Chromium rendering delegate, and the
+  first frame after such a move is a reliable way to get a blank view. The new
+  window loads the URL instead, so **in-page state is lost**: form input, scroll
+  position, a playing video's position.
+* **The tab's back/forward list is lost** for the same reason. `Ctrl+Shift+T`
+  in the old window reopens the closed tab with a list that still only knows
+  the URL.
+* **The new window has its own `QWebEngineProfile`**, exactly like
+  **File -> New Window**. Cookies and logins therefore do not carry over: a
+  site you are signed into in one window is signed out in the other. Sharing the
+  profile would mean handing one window's profile to another and skipping every
+  profile-level setup step (scheme handlers, the ad-block interceptor, the
+  engine attributes) for the second window, which is a larger change than the
+  gesture warrants.
+* **It does not touch the saved session.** A window holding one torn-off tab
+  neither restores the session on start nor writes it on close, so closing the
+  main window still saves the tabs you were actually working in.
+* **Slept tabs tear off too.** Memory Saver replaced the view with a placeholder,
+  so there is no page to snapshot; the remembered URL is what opens in the new
+  window.
+
+Reordering tabs *inside* the sidebar has none of these limitations: it moves the
+real tab, which keeps its history, its page state and its cookies, because both
+surfaces are one call to `QTabBar::moveTab()`.

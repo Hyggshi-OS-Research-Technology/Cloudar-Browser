@@ -475,6 +475,28 @@ void BrowserTabWidget::closeTabAt(int index)
     emit tabsChanged();
 }
 
+bool BrowserTabWidget::snapshotTab(int index, TabSnapshot *snapshot) const
+{
+    if (!snapshot || index < 0 || index >= count())
+        return false;
+
+    snapshot->title = tabText(index);
+    snapshot->icon = tabIcon(index);
+
+    // A slept tab keeps its URL on the side (see m_sleptUrls) but has no page.
+    if (m_sleptUrls.contains(index)) {
+        snapshot->url = QUrl(m_sleptUrls.value(index));
+        return !snapshot->url.isEmpty();
+    }
+
+    auto *view = qobject_cast<QWebEngineView *>(widget(index));
+    if (!view)
+        return false;
+
+    snapshot->url = view->url();
+    return !snapshot->url.isEmpty();
+}
+
 QWebEngineView *BrowserTabWidget::currentView() const
 {
     return qobject_cast<QWebEngineView *>(currentWidget());
