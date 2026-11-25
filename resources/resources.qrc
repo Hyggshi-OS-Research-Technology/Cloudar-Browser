@@ -16,6 +16,7 @@
         <file>newtab/components/search-bar.js</file>
         <file>newtab/components/quick-access.js</file>
         <file>newtab/components/customize-panel.js</file>
+        <file>newtab/components/frame-editor.js</file>
         <file>settings.html</file>
         <file>flags.html</file>
         <file>about.html</file>

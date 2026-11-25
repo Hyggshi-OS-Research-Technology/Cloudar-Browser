@@ -256,6 +256,20 @@ var CloudarNewTab = (function () {
       reader.readAsDataURL(blobOrNull);
     },
 
+    // Where the wallpaper sits in the window. Same rule as every other
+    // preference here: the browser stores it (QSettings), not the page, because
+    // the page's storage is cleared with browsing data.
+    saveFraming: function (x, y, zoom, cb) {
+      var done = typeof cb === 'function' ? cb : function () {};
+      if (!bridge || !bridge.saveWallpaperFraming) { done(false, 'no bridge'); return; }
+      try {
+        bridge.saveWallpaperFraming(Number(x) || 0, Number(y) || 0, Number(zoom) || 1,
+          function (ok) { done(!!ok, ok ? '' : 'the browser refused it'); });
+      } catch (err) {
+        done(false, err && err.name);
+      }
+    },
+
     clearMedia: function (cb) {
       var done = typeof cb === 'function' ? cb : function () {};
       if (!bridge || !bridge.clearWallpaperMedia) { done(); return; }

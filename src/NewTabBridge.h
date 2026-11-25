@@ -90,12 +90,26 @@ public slots:
     // same code) so it never has to guess whether its media survived.
     QString wallpaperMediaUrl();
 
-    // What is currently stored: { kind, value, url, bytes } — kind is "default"
-    // when nothing is set. `bytes` is the real file size, so the panel can say
-    // how much disk the wallpaper uses instead of estimating.
+    // What is currently stored: { kind, value, url, bytes, framing } — kind is
+    // "default" when nothing is set. `bytes` is the real file size, so the panel
+    // can say how much disk the wallpaper uses instead of estimating. `framing`
+    // is { x, y, zoom } and is only meaningful for an image or video wallpaper.
     QVariantMap wallpaperState();
 
     void clearWallpaperMedia();
+
+    // How the wallpaper sits in the window: the point of the image that is
+    // centred (focusX/focusY, each -1..1) and how far in it is zoomed (zoom,
+    // 1..4). At 0,0,1 the wallpaper is the centred cover it always was.
+    //
+    // This is a deliberate choice like the wallpaper itself, so it lives in
+    // QSettings with it and survives a restart — the page's localStorage is in
+    // the storage partition and gets cleared. Values are clamped here, not
+    // trusted from the page: a zoom of 0 or a focus of 40 would otherwise
+    // render a blank window with no way back through the UI.
+    //
+    // Returns true when the value was stored.
+    bool saveWallpaperFraming(double focusX, double focusY, double zoom);
 
 signals:
     // (pageUrl, iconUrl) — iconUrl is exactly what faviconUrl() would return now

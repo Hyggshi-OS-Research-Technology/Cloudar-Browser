@@ -120,6 +120,52 @@ revokes the previous handle in that slot. `releaseAll()` runs on `pagehide` and
 when the page is hidden, so a background tab does not pin a decoded video in
 memory for hours.
 
+### Adjusting the frame
+
+An image or a video can be panned and zoomed after it is chosen. The frame editor
+opens by itself once a wallpaper has been applied, and again from **Adjust the
+frame** in the Customize panel; drag to move, scroll or use the slider to zoom
+(100%–400%), `Shift`-free arrow keys to nudge, `Esc` or **Done** to finish.
+
+Three numbers describe it, stored in `QSettings` next to the wallpaper itself
+(`browser/newTabWallpaper/{focusX,focusY,zoom}`):
+
+| Value | Range | Meaning |
+|:---|:---|:---|
+| `focusX`, `focusY` | -1..1 | which point of the image is centred |
+| `zoom` | 1..4 | 1 is the plain `object-fit: cover` fill |
+
+`0, 0, 1` is the centred cover the page used before this feature, so every
+wallpaper saved by an older build still renders identically.
+
+The editor is **WYSIWYG on purpose**: it transforms the real wallpaper layer
+rather than a preview box. A separate preview needs its own copy of the geometry
+and its own idea of what `cover` means, which is how a panel ends up showing one
+crop and applying another. Applying a wallpaper also announces
+`cloudar:wallpaper-applied`, so nothing has to poll to notice.
+
+Both layers are boxes with `object-fit: cover`, and the pan is computed in
+**pixels from the layer's layout box**:
+
+    overflow = (offsetWidth * zoom - innerWidth) / 2   (per axis)
+    translate = focus * overflow
+
+Percentages cannot express this: `cover` may crop only one axis (a 4:3 photo in a
+16:9 window), and the layer box is not always the window size. The first version
+of this used `focus * (zoom - 1) * 100%`, which is twice the real overflow —
+dragging to the edge pulled the image past the window and exposed the background.
+`tools/` carries no simulation of this; the invariant was verified offline over
+3000 combinations of window size, image aspect ratio, zoom and focus: the image
+always covers the window, an axis that exactly fits never moves, and focus ±1
+lands the image edge exactly on the window edge.
+
+The limits live in **two** places by necessity — `kMinZoom`/`kMaxZoom`/
+`kMaxFocus` in `src/NewTabBridge.cpp` (which clamps, because a settings file can
+be edited) and `MIN_ZOOM`/`MAX_ZOOM`/`MAX_FOCUS` in `scripts/background.js`
+(which draws the slider). `tools/check-newtab.js` gate 6b fails the build if the
+pairs disagree, so the slider can never offer a zoom the browser silently
+changes.
+
 ### Remote wallpaper URLs
 
 `cloudar://` is registered as a **secure** scheme, so Chromium treats it as a

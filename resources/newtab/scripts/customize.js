@@ -113,6 +113,21 @@ var CloudarCustomize = (function () {
         });
       }
 
+      // --- the frame editor takes over the screen ---------------------------
+      // The panel is 300 px of controls sitting exactly where the user needs to
+      // look at (and drag) the wallpaper, so it gets out of the way. It reopens
+      // on close because the user is still in the middle of customising.
+      var panelWasOpen = false;
+      document.addEventListener('cloudar:framing-open', function () {
+        if (!panel) return;
+        panelWasOpen = panel.classList.contains('open');
+        if (panelWasOpen) panel.classList.remove('open');
+      });
+      document.addEventListener('cloudar:framing-close', function () {
+        if (panel && panelWasOpen) panel.classList.add('open');
+        panelWasOpen = false;
+      });
+
       // --- reset -----------------------------------------------------------
       var resetBtn = document.getElementById('resetBg');
       if (resetBtn) {
