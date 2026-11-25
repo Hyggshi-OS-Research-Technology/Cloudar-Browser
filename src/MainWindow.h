@@ -40,6 +40,10 @@
 
 class QSplitter;
 class QMenu;
+// Overridden events: declared rather than included, so MainWindow.h keeps its
+// include list small. QWidget.h does not pull in every event type.
+class QCloseEvent;
+class QResizeEvent;
 class LocalFileService;
 class NotificationPresenter;
 class WebShortcutStore;

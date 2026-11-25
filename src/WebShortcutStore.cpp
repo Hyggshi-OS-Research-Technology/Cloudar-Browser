@@ -27,8 +27,9 @@ QString normalized(const QUrl &url)
 {
     QUrl copy = url;
     copy.setFragment(QString());
-    QString text = copy.toString(QUrl::RemoveTrailingSlash);
-    return text;
+    // StripTrailingSlash, not RemoveTrailingSlash: the latter does not exist and
+    // CI caught it (QUrl's enum is ComponentFormattingOption).
+    return copy.toString(QUrl::StripTrailingSlash);
 }
 } // namespace
 

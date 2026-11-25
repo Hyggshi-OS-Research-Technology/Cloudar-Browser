@@ -63,16 +63,6 @@ public:
     // copy drifting out of sync with this one.
     QString modernStyleSheet(const QColor &accent) const;
 
-signals:
-    void accentChanged(const QColor &color);
-    // Emitted when what is on screen changes: the user picked a mode, or the OS
-    // flipped while the preference is System. Consumers re-read prefersDark().
-    void colorModeChanged(bool dark);
-
-private:
-    explicit ThemeManager(QObject *parent = nullptr);
-    Q_DISABLE_COPY(ThemeManager)
-
     // One definition of the light/dark palette, shared by the stylesheet and by
     // every widget that paints itself. The painted widgets used to hard-code
     // the dark values, which is why the tab close button was #c7cede — i.e.
@@ -93,6 +83,16 @@ private:
     Palette palette() const;
     // The same palette for an explicit dark/light answer.
     static Palette paletteFor(bool dark);
+
+signals:
+    void accentChanged(const QColor &color);
+    // Emitted when what is on screen changes: the user picked a mode, or the OS
+    // flipped while the preference is System. Consumers re-read prefersDark().
+    void colorModeChanged(bool dark);
+
+private:
+    explicit ThemeManager(QObject *parent = nullptr);
+    Q_DISABLE_COPY(ThemeManager)
 
     QColor m_accent;
     ColorMode m_mode = ColorMode::System;

@@ -67,6 +67,9 @@ public:
     void setActivateHandler(std::function<void(const QUrl &origin)> handler);
 
     static int maxVisible();
+    // How many toast cards are on screen right now. Public because it is the
+    // only thing an automated check can assert about a widget stack.
+    int visibleCount() const { return static_cast<int>(m_toasts.size()); }
 
 public slots:
     // Repaint every live toast after a light/dark flip. The card paints itself,
