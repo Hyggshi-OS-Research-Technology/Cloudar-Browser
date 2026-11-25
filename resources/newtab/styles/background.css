@@ -125,7 +125,7 @@ body.frame-editing .media-controls {
   color: #d7dce6;
   flex: 1 1 220px;
 }
-.frame-zoom input[type="range"] { flex: 1; accent-color: var(--accent-1, #4c8dff); }
+.frame-zoom input[type="range"] { flex: 1; accent-color: var(--accent); }
 .frame-zoom output { min-width: 42px; text-align: right; font-variant-numeric: tabular-nums; }
 
 .frame-bar .action {
@@ -156,7 +156,12 @@ html.classic .frame-outline { border-color: rgba(0, 0, 0, 0.5); box-shadow: none
   z-index: 10;
   display: none;
   gap: 8px;
+  /* Slide out of the Customize panel's way. Fixed to the window, these two
+     buttons used to sit on top of the panel's bottom text — covering the one
+     place that reports whether a background failed to load. */
+  transition: transform 0.25s ease;
 }
+body.panel-open .media-controls { transform: translateX(calc(-1 * var(--panel-width, 300px) - 8px)); }
 .media-controls.show { display: flex; }
 
 .media-btn {

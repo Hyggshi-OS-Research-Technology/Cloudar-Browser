@@ -222,11 +222,28 @@ var CloudarBackground = (function () {
              zoom: zoom };
   }
 
+  // Which wallpaper surface the body is showing, from the classes alone.
+  //
+  // One source of truth for a question three places ask: which layer gets the
+  // transform, whether the frame editor can open, and what the panel says about
+  // the current background. They used to each read the class list themselves,
+  // which is how they drifted apart.
+  //
+  // 'video' and 'image' both have an element; 'color' is the plain colour
+  // surface; 'default' is the animated page and has nothing to frame.
+  function surface() {
+    if (!body) return 'default';
+    if (body.classList.contains('video-bg')) return 'video';
+    if (body.classList.contains('image-bg')) return 'image';
+    if (body.classList.contains('custom-bg')) return 'color';
+    return 'default';
+  }
+
   // The layer that is actually visible, or null.
   function activeLayer() {
-    if (!body) return null;
-    if (body.classList.contains('video-bg')) return bgVideo;
-    if (body.classList.contains('image-bg')) return bgImage;
+    var kind = surface();
+    if (kind === 'video') return bgVideo;
+    if (kind === 'image') return bgImage;
     return null;
   }
 
@@ -302,6 +319,25 @@ var CloudarBackground = (function () {
     });
   }
 
+  // "Which layer is visible" just changed — image-bg / video-bg / neither.
+  //
+  // This exists because of a real bug: the "Adjust the frame" button asked
+  // isFramable() exactly twice, when the frame editor was initialised and when a
+  // new wallpaper was applied. A wallpaper restored from IndexedDB arrives
+  // *asynchronously*, so on a slow profile it landed after the editor had already
+  // decided the button was disabled — and then nothing re-asked. The button stayed
+  // greyed out over a wallpaper that was clearly there, which is exactly what a
+  // screenshot showed.
+  //
+  // Every path that adds or removes image-bg/video-bg dispatches this, and the
+  // editor listens. tools/check-newtab.js gate 7 counts the class toggles against
+  // the dispatches so a future path cannot forget.
+  function announceSurface() {
+    try {
+      document.dispatchEvent(new CustomEvent('cloudar:wallpaper-changed'));
+    } catch (err) { /* nothing is listening; harmless */ }
+  }
+
   // Fired after a *new* wallpaper has been applied (not on restore, where the
   // stored frame is already correct). The frame editor opens itself on this,
   // which is how "choose an image and then adjust it" works without the panel
@@ -313,7 +349,8 @@ var CloudarBackground = (function () {
   }
 
   function isFramable() {
-    return !!body && (body.classList.contains('image-bg') || body.classList.contains('video-bg'));
+    var kind = surface();
+    return kind === 'image' || kind === 'video';
   }
 
   // --- applying -----------------------------------------------------------
@@ -324,7 +361,13 @@ var CloudarBackground = (function () {
       bgVideo.load();
     }
     releaseObjectUrl('bg');
-    if (body) body.classList.remove('video-bg');
+    if (body) {
+      // Only announce when it actually changed: stopVideo() runs on every image
+      // and colour path too, and this signal drives a button's enabled state.
+      var wasVideo = body.classList.contains('video-bg');
+      body.classList.remove('video-bg');
+      if (wasVideo) announceSurface();
+    }
     var controls = document.getElementById('mediaControls');
     if (controls) controls.classList.remove('show');
     if (videoPreview) {
@@ -358,6 +401,7 @@ var CloudarBackground = (function () {
     // Still images and videos share one transform, so the frame the user chose
     // applies to whichever layer becomes visible.
     applyTransform();
+    announceSurface();
 
     bgVideo.src = src;
     bgVideo.muted = !audioEnabled;
@@ -392,6 +436,7 @@ var CloudarBackground = (function () {
     body.style.backgroundImage = '';
     body.style.backgroundColor = hex;
     if (colorPicker) colorPicker.value = hex;
+    announceSurface();
   }
 
   // An image wallpaper is a real <img> layer, not a CSS background. Both are
@@ -413,6 +458,7 @@ var CloudarBackground = (function () {
       body.style.backgroundImage = 'url("' + url + '")';
     }
     applyTransform();
+    announceSurface();
   }
 
   // Original bytes when possible, so a restart does not re-compress an already
@@ -570,7 +616,9 @@ var CloudarBackground = (function () {
           imagePreview.classList.add('show');
         }
         stopVideo();
-        body.classList.add('custom-bg');
+        // applyImageUrl() already put both custom-bg and image-bg in place; this
+        // line used to re-add custom-bg and announce nothing.
+        announceSurface();
         saveSetting({ type: 'image', source: 'local', mime: mime });
         // Order matters: the bridge clears the stored framing when a new
         // wallpaper arrives, so the centring has to be written after that call,
@@ -665,6 +713,27 @@ var CloudarBackground = (function () {
     probe.src = url;
   }
 
+  // A link to a *page* is not a link to a file. The old code only asked "does
+  // this name end in .mp4?", treated everything else as an image, probed it, and
+  // reported "it could not be loaded" — a technically true sentence that tells
+  // the user nothing. Pasting a YouTube watch link is the obvious thing to try,
+  // so it gets named for what it is.
+  var MEDIA_FILE = /\.(jpe?g|png|webp|gif|bmp|avif|mp4|webm|ogv|ogg|mov|m4v)(\?.*)?$/i;
+
+  function pageInsteadOfFile(url) {
+    var host = '';
+    try { host = new URL(url).hostname.toLowerCase(); } catch (err) { return null; }
+    if (/(^|\.)(youtube\.com|youtu\.be)$/.test(host)) {
+      return 'That is a YouTube page, not a video file. This field needs a direct ' +
+             'file address ending in .mp4 or .webm (right-click the video and copy ' +
+             'its address, if the site offers one). YouTube playback needs an ' +
+             'embedded player, which this page cannot use.';
+    }
+    return 'That address is a web page, not an image or video file. It needs to ' +
+           'point straight at a file — something ending in .jpg, .png, .webp, ' +
+           '.mp4 or .webm.';
+  }
+
   function setWebMedia(rawUrl) {
     var url = (rawUrl || '').trim();
     if (!url) return;
@@ -679,6 +748,15 @@ var CloudarBackground = (function () {
     }
     if (!/^https:\/\//i.test(url)) {
       onStatus('Only https:// addresses can be used as a wallpaper.', true);
+      return;
+    }
+
+    // Cheap and unambiguous: no extension at all means a page, not a file. This
+    // is what a YouTube share link looks like. Skipped when the name does end in
+    // a media extension, because plenty of CDNs serve files from URLs with query
+    // strings.
+    if (!MEDIA_FILE.test(url)) {
+      onStatus(pageInsteadOfFile(url), true);
       return;
     }
 
@@ -747,9 +825,13 @@ var CloudarBackground = (function () {
       body.classList.remove('image-bg');
       body.style.backgroundImage = '';
       body.style.backgroundColor = '';
+      // reset() also calls setFraming(), which announces the frame but not the
+      // surface; the frame editor's button reads the surface.
+      announceSurface();
     }
     if (bgImage) bgImage.removeAttribute('src');
     setFraming({ x: 0, y: 0, zoom: 1 }, { commit: true });
+    announceSurface();
     if (imagePreview) imagePreview.classList.remove('show');
     saveSetting({ type: 'default' });
     persist('default', null, '');
@@ -860,6 +942,7 @@ var CloudarBackground = (function () {
     setFraming: setFraming,
     commitFraming: function () { saveFraming(); },
     isFramable: isFramable,
+    surface: surface,
     framingBounds: function () { return { min: MIN_ZOOM, max: MAX_ZOOM }; },
     // Pixels the visible layer can still travel on each axis. The editor needs
     // this to translate a pointer movement into a focus change.

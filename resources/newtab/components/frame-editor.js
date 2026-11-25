@@ -58,9 +58,17 @@ var CloudarFrameEditor = (function () {
     if (!adjustButton) return;
     var available = !!(api && api.isFramable && api.isFramable());
     adjustButton.disabled = !available;
-    adjustButton.title = available
-      ? 'Drag and zoom the wallpaper'
-      : 'Choose an image or a video first';
+    // Say what the current background actually is, instead of a generic
+    // instruction. "Choose an image or video first" was wrong and unhelpful when
+    // a photo *was* showing.
+    var kind = (api && api.surface) ? api.surface() : 'default';
+    if (available) {
+      adjustButton.title = 'Drag and zoom the ' + (kind === 'video' ? 'video' : 'image');
+    } else if (kind === 'color') {
+      adjustButton.title = 'A solid colour has no frame to adjust — choose an image or a video';
+    } else {
+      adjustButton.title = 'Choose an image or a video first';
+    }
   }
 
   function showIdle() {
@@ -81,7 +89,11 @@ var CloudarFrameEditor = (function () {
 
   function openEditor() {
     var api = bg();
-    if (!api || !overlay || !api.isFramable()) return false;
+    if (!api || !overlay || !api.isFramable()) {
+      // Whoever asked gets the truth rather than a silent no-op.
+      syncAdjustButton();
+      return false;
+    }
     open = true;
     overlay.hidden = false;
     document.body.classList.add('frame-editing');
@@ -265,6 +277,12 @@ var CloudarFrameEditor = (function () {
     // The wallpaper can change without the editor being open; keep the button's
     // enabled state honest.
     document.addEventListener('cloudar:framing', syncControls);
+
+    // 'cloudar:wallpaper-changed' is the one that matters after a restore: the
+    // wallpaper from IndexedDB or from the browser arrives asynchronously, so the
+    // button has to be re-asked, not decided once at init.
+    document.addEventListener('cloudar:wallpaper-changed', syncAdjustButton);
+
     document.addEventListener('cloudar:wallpaper-applied', function () {
       syncControls();
       if (!open && bg() && bg().isFramable()) openEditor();
@@ -293,6 +311,11 @@ var CloudarFrameEditor = (function () {
     wake();
   }
 
+  // Not onReady(): the button's state depends on which wallpaper layer is
+  // visible, and that can change after this file initialises (an IndexedDB
+  // restore, then the browser's own copy once initialState() answers). init()
+  // takes the elements it needs; the surface arrives through
+  // 'cloudar:wallpaper-changed'.
   CloudarNewTab.onReady(function () { init(); });
 
   return {

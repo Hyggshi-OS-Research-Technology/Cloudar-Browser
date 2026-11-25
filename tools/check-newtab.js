@@ -387,6 +387,97 @@ if (retIndex < 0) {
   }
 }
 
+// --- 7: wallpaper surface signals + theme tokens ----------------------------
+// Two failures that only show up at runtime on a real machine:
+//
+//   a. a path changes which wallpaper layer is visible (image-bg / video-bg /
+//      custom-bg) but does not announce it, so the "Adjust the frame" button
+//      keeps whatever it decided at startup. That is the bug a screenshot caught:
+//      the button greyed out over a wallpaper restored from IndexedDB, because a
+//      restore arrives *after* the editor initialised and nothing re-asked.
+//   b. a CSS custom property is used but defined in only one theme, so half the
+//      UI is unstyled in the other. This is the class of defect the classic
+//      chrome review was about.
+const BG_SRC = stripComments(read(BG_JS));
+// Group the toggles by function: every function that changes the surface must
+// also announce it. An earlier version counted calls globally, which passed a
+// function that removed video-bg silently while a sibling announced twice.
+function functionsOf(src) {
+  const out = [];
+  let i = 0;
+  const re = /function\s+([\w$]+)\s*\([^)]*\)\s*{/g;
+  let m;
+  while ((m = re.exec(src))) {
+    const start = m.index;
+    let depth = 0;
+    let k = re.lastIndex - 1;
+    for (; k < src.length; k++) {
+      if (src[k] === '{') depth++;
+      else if (src[k] === '}') { depth--; if (depth === 0) break; }
+    }
+    out.push({ name: m[1], body: src.slice(start, k + 1) });
+    i++;
+  }
+  return out;
+}
+for (const fn of functionsOf(BG_SRC)) {
+  const toggles = [...fn.body.matchAll(/classList\.(?:add|remove|toggle)\(\s*'(image-bg|video-bg|custom-bg)'/g)];
+  if (!toggles.length) continue;
+  if (!/announceSurface\(\)/.test(fn.body)) {
+    errors.push(`${fn.name}() in scripts/background.js changes the wallpaper surface ` +
+                `(${[...new Set(toggles.map((t) => t[1]))].join(', ')}) but never calls ` +
+                `announceSurface() — controls that read the surface would not be told`);
+  }
+}
+
+// Every class the CSS keys the background off must be toggled somewhere.
+for (const cls of ['image-bg', 'video-bg', 'custom-bg']) {
+  if (!new RegExp(`classList\\.(?:add|toggle)\\(\\s*'${cls}'`).test(BG_SRC)) {
+    errors.push(`background.css styles body.${cls} but no code ever adds that class`);
+  }
+}
+
+// Custom properties: defined in every theme block that redefines the palette.
+const allCss = {};
+for (const file of walk(NT).filter((f) => f.endsWith('.css'))) {
+  allCss[path.relative(ROOT, file)] = read(file);
+}
+const baseTokens = new Set(
+  [...(allCss['resources/newtab/styles/base.css'] || '').matchAll(/^\s{2}(--[\w-]+):/gm)].map((m) => m[1])
+);
+// A token is "defined" if it appears as a declaration anywhere: palette tokens
+// live in :root / html.classic, but a component may scope one to itself
+// (--panel-width on .panel) and that is legitimate.
+const declaredTokens = new Set(
+  [...Object.values(allCss).join('\n').matchAll(/(?:^|[\s{;])(--[\w-]+)\s*:/gm)].map((m) => m[1])
+);
+const usedTokens = new Set();
+for (const [file, src] of Object.entries(allCss)) {
+  if (file.endsWith('base.css')) continue;
+  for (const m of src.matchAll(/var\((--[\w-]+)/g)) usedTokens.add(m[1]);
+}
+const themeSrc = allCss['resources/newtab/styles/themes.css'] || '';
+const classicTokens = new Set(
+  [...themeSrc.matchAll(/^\s{2}(--[\w-]+):/gm)].map((m) => m[1])
+);
+for (const token of usedTokens) {
+  if (!declaredTokens.has(token)) {
+    errors.push(`${token} is used in CSS but never declared — it would resolve to nothing`);
+  }
+  // A palette token must also be redefined for the classic chrome, or the classic
+  // page inherits the dark value and looks half-applied.
+  if (baseTokens.has(token) && !classicTokens.has(token)) {
+    errors.push(`${token} is a palette token in base.css but html.classic never ` +
+                `redefines it — the classic chrome would inherit the dark value`);
+  }
+}
+// The specific regression: the panel needs an opaque surface so a photo cannot
+// be read through its text.
+for (const token of ['--panel-solid']) {
+  if (!baseTokens.has(token)) errors.push(`${token} is not defined in base.css`);
+  if (!classicTokens.has(token)) errors.push(`${token} is not defined for html.classic in themes.css`);
+}
+
 // --- 6: syntax --------------------------------------------------------------
 for (const file of jsFiles) {
   const src = read(file);

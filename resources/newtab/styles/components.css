@@ -272,10 +272,14 @@ html.classic .customize-btn:hover { transform: none; }
   top: 0;
   right: 0;
   height: 100%;
-  width: 300px;
+  /* Width is a variable because other fixed-position controls have to move out
+     of the panel's way: a button anchored to the window corner ended up sitting
+     on top of the panel's own content. */
+  --panel-width: 300px;
+  width: var(--panel-width);
   max-width: 86vw;
-  background: var(--panel-bg);
-  backdrop-filter: blur(14px);
+  /* Opaque, not --panel-bg: see the note on --panel-solid in base.css. */
+  background: var(--panel-solid);
   border-left: 1px solid var(--panel-border);
   z-index: 3;
   padding: 22px 20px;
