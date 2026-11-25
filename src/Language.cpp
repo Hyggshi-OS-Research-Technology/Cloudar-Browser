@@ -200,7 +200,7 @@ void LanguageManager::loadTranslations() {
     // English is the fallback for every missing key, and it is not optional: a
     // dictionary that failed to load leaves getText() returning raw keys, which
     // is exactly what the "lang/" folder missing produced.
-    m_fallback.clear();
+    m_fallback = QJsonObject();
     loadDictionary(QStringLiteral("en"), &m_fallback);
     const QString englishSource = m_source;
 
@@ -213,7 +213,7 @@ void LanguageManager::loadTranslations() {
         return;
     }
 
-    m_translations.clear();
+    m_translations = QJsonObject();
     if (!loadDictionary(m_currentLanguage, &m_translations)) {
         // Report the failure instead of pretending: getText() falls back to
         // English per key, and the settings page shows where the dictionary came
