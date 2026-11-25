@@ -18,7 +18,7 @@ resources/newtab/
 │   ├── app.js                 bridge plumbing, chrome style, helpers
 │   ├── search.js              search submit + URL-vs-query rules
 │   ├── speed-dial.js          shortcut state, storage, URL normalisation
-│   ├── background.js          wallpaper: IndexedDB, object-URL lifecycle
+│   ├── background.js          wallpaper: browser-backed storage, media probes
 │   └── customize.js           the panel's controls
 └── components/
     ├── search-bar.js          engine label (a fact from the bridge)
@@ -88,20 +88,49 @@ Step 3 is a fallback. It used to be the whole design.
 
 ## Wallpaper storage
 
+The browser owns the wallpaper, not the page. A `cloudar://` page's
+`localStorage` and IndexedDB belong to the renderer's storage partition, and this
+build clears browsing data on exit unless the user opted into persistent
+cookies — so a wallpaper kept there disappeared on restart. The durable copy is
+native:
+
 | Media | Where | Why |
 |:---|:---|:---|
-| colour / web URL | `localStorage` (`cloudar.newtab.background`) | a few dozen bytes |
-| device image | IndexedDB `cloudar_wallpaper_db/images` | a 1920×1080 JPEG is 300–800 KB as base64 |
-| device video | IndexedDB `cloudar_wallpaper_db/videos` | same store, same code path |
+| colour / web URL | `QSettings` `browser/newTabWallpaper/{kind,value}` | a few dozen bytes |
+| device image | `<AppDataLocation>/wallpaper/wallpaper.<ext>` | outside the storage partition, survives clearing browsing data |
+| device video | `<AppDataLocation>/wallpaper/wallpaper.<ext>` | same slot, same code path |
 
-The image cap is 2560 px on the long edge, re-encoded at JPEG q=0.85 — and the
-original bytes are kept untouched when the file is already small, so restarting
-never re-compresses a screenshot twice.
+One file per kind, so choosing ten wallpapers cannot leave a directory of
+orphans. The suffix comes from the MIME the page reports with the bytes, and
+`cloudar://newtab/media/wallpaper.<ext>` answers with the matching
+Content-Type — a PNG is served as `image/png` instead of being mislabelled
+`image/jpeg`.
+
+The page caps an uploaded image at 2560 px on the long edge and re-encodes to
+JPEG q=0.85 **only when it has to**; a file that is already small enough is
+stored byte-for-byte in its original format, which is what keeps PNG
+transparency and avoids compressing a screenshot twice on every restart.
+
+Restore happens in two stages: the local copy synchronously (no flash of the
+default background), then `initialState().wallpaper` once the QWebChannel reply
+actually arrives. The second stage is the one that survives a restart.
 
 Every `URL.createObjectURL()` goes through `setObjectUrl(slot, blob)`, which
 revokes the previous handle in that slot. `releaseAll()` runs on `pagehide` and
 when the page is hidden, so a background tab does not pin a decoded video in
 memory for hours.
+
+### Remote wallpaper URLs
+
+`cloudar://` is registered as a **secure** scheme, so Chromium treats it as a
+secure origin. That has two consequences the panel has to handle out loud:
+
+* `http://` media is blocked as mixed content, with no callback into the page.
+  The panel refuses it up front and says why.
+* `https://` media is only accepted after it has actually loaded. The page probes
+  the URL with `Image`/`video` first, so a typo, a 404 or a blocked host produces
+  an error message and leaves the current background untouched — instead of
+  claiming success over an unchanged screen.
 
 Storage failures are shown in the panel with the real `DOMException` name —
 `QuotaExceededError` in particular is a normal outcome for video and the user

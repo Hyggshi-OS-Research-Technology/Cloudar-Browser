@@ -31,6 +31,21 @@
 
    Everything here is deliberately Blob-based rather than data-URL-based so the
    same code path serves images and videos.
+
+   Two callback rules this file has already broken once, both silent at runtime:
+
+   3. **A handler's event argument is opt-in.** `reader.onload = function () {`
+      takes no parameter, so reading `e.target.result` inside it is a
+      ReferenceError — the assignment to img.src never happened, the image's own
+      load event therefore never fired, and uploading a local wallpaper did
+      nothing at all while showing no message. Use the closure (`reader.result`),
+      which is always in scope. tools/check-newtab.js gate 6 fails the build on
+      this class of mistake now.
+   4. **A URL is not "applied" until it has loaded.** setWebMedia() probes the
+      address first: cloudar:// is a secure scheme, so http:// media is blocked
+      as mixed content with no error delivered to the page, and a broken https://
+      link fails the same quiet way. Claiming success either way was a report the
+      product could not back up.
    ========================================================================== */
 
 var CloudarBackground = (function () {
@@ -239,32 +254,56 @@ var CloudarBackground = (function () {
     body.style.backgroundImage = 'url("' + url + '")';
   }
 
-  // Original bytes, so a restart does not re-compress an already-compressed
-  // image. The 2560 px cap in prepareImage() is what keeps this reasonable.
+  // Original bytes when possible, so a restart does not re-compress an already
+  // compressed image; the 2560 px cap in prepareImage() is what keeps the stored
+  // file modest.
+  //
+  // The callback is cb(err, blob, mime). The mime is not decoration: the browser
+  // stores exactly one file per kind and has to know whether those bytes are a
+  // JPEG, a PNG or a WebP to serve them back with the right Content-Type. This
+  // function used to drop it on the "already small enough" path, so a PNG sat on
+  // disk as wallpaper.jpg and the scheme handler answered image/jpeg. Chromium
+  // sniffs image bytes, which is the only reason that mostly looked fine.
   function prepareImage(file, cb) {
     var reader = new FileReader();
-    reader.onerror = function () { cb(reader.error || new Error('could not read file'), null); };
+    reader.onerror = function () {
+      cb(reader.error || new Error('could not read file'), null, '');
+    };
     reader.onload = function () {
+      // `reader`, not an event argument: this handler is called with no
+      // arguments. The old code read `e.target.result` here, which threw a
+      // ReferenceError before img.src was ever set — so the load callback never
+      // fired and a local image did nothing at all, silently.
+      var dataUrl = String(reader.result || '');
+      var typeFromDataUrl = (/^data:([-\w.+]+\/[-\w.+]+)[;,]/.exec(dataUrl) || [])[1] || '';
       var img = new Image();
-      img.onerror = function () { cb(new Error('not a decodable image'), null); };
+      img.onerror = function () { cb(new Error('not a decodable image'), null, ''); };
       img.onload = function () {
-        var scale = Math.min(1, MAX_IMAGE_DIM / Math.max(img.width, img.height));
+        var w = img.naturalWidth || img.width;
+        var h = img.naturalHeight || img.height;
+        if (!w || !h) { cb(new Error('the image has no size'), null, ''); return; }
+        var scale = Math.min(1, MAX_IMAGE_DIM / Math.max(w, h));
+        var mime = typeFromDataUrl || file.type || 'image/jpeg';
         if (scale >= 1 && file.size <= 4 * 1024 * 1024) {
           // Already small enough: keep the original bytes and its format.
-          cb(null, file);
+          cb(null, file, mime);
           return;
         }
         var canvas = document.createElement('canvas');
-        canvas.width = Math.round(img.width * scale);
-        canvas.height = Math.round(img.height * scale);
+        canvas.width = Math.max(1, Math.round(w * scale));
+        canvas.height = Math.max(1, Math.round(h * scale));
         var ctx = canvas.getContext('2d');
+        // A downscaled re-encode is JPEG whatever the source was, and a PNG with
+        // transparency must not come back with black corners.
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         canvas.toBlob(function (blob) {
-          if (!blob) { cb(new Error('could not encode image'), null); return; }
-          cb(null, blob);
+          if (!blob) { cb(new Error('could not encode image'), null, ''); return; }
+          cb(null, blob, 'image/jpeg');
         }, 'image/jpeg', JPEG_QUALITY);
       };
-      img.src = e.target.result;
+      img.src = dataUrl;
     };
     reader.readAsDataURL(file);
   }
@@ -285,8 +324,8 @@ var CloudarBackground = (function () {
   // its result to a callback (see the header of scripts/app.js). The previous
   // version treated the call as synchronous, so it could not tell success from
   // failure and reported nothing either way.
-  function persist(kind, blobOrNull, value) {
-    CloudarNewTab.saveMedia(kind, blobOrNull, value, function (ok, detail) {
+  function persist(kind, blobOrNull, value, mime) {
+    CloudarNewTab.saveMedia(kind, blobOrNull, value, mime || '', function (ok, detail) {
       if (ok) return;
       if (detail === 'no bridge') {
         onStatus('Saved for this tab only: the browser bridge is not available here, ' +
@@ -340,7 +379,7 @@ var CloudarBackground = (function () {
 
   // --- public: setting local media ---------------------------------------
   function setLocalImage(file) {
-    prepareImage(file, function (err, blob) {
+    prepareImage(file, function (err, blob, mime) {
       if (err) {
         onStatus('Could not use that image: ' + err.message, true);
         return;
@@ -360,8 +399,8 @@ var CloudarBackground = (function () {
         }
         stopVideo();
         body.classList.add('custom-bg');
-        saveSetting({ type: 'image', source: 'local' });
-        persist('image', blob, '');
+        saveSetting({ type: 'image', source: 'local', mime: mime });
+        persist('image', blob, '', mime);
         onStatus('Image saved (' + formatBytes(blob.size) + '). It will still be here next time.');
       });
     });
@@ -381,7 +420,7 @@ var CloudarBackground = (function () {
       var url = setObjectUrl('video', file);
       applyVideo(url, false);
       saveSetting({ type: 'video', source: 'local', sound: false });
-      persist('video', file, '');
+      persist('video', file, '', 'video/mp4');
 
       if (videoPreview) {
         videoPreview.src = setObjectUrl('preview', file);
@@ -397,24 +436,89 @@ var CloudarBackground = (function () {
   }
 
   // --- public: setting a web URL -----------------------------------------
+  // A URL is only reported as applied once it has actually loaded. The previous
+  // version called applyImageUrl() and immediately claimed success, so a typo, a
+  // 404 or a blocked request still produced "Using a remote image" over an
+  // unchanged screen. Probing first also catches the case Chromium refuses
+  // silently: cloudar:// is registered as a secure scheme, so an http:// image
+  // is mixed content and never loads.
+  function probeImage(url, cb) {
+    var img = new Image();
+    var settled = false;
+    var timer = setTimeout(function () { finish('timed out'); }, 15000);
+    function finish(err) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      img.onload = img.onerror = null;
+      cb(err || null);
+    }
+    img.onload = function () {
+      if (!img.naturalWidth && !img.naturalHeight) finish('the URL is not an image');
+      else finish(null);
+    };
+    img.onerror = function () { finish('it could not be loaded'); };
+    img.src = url;
+  }
+
+  function probeVideo(url, cb) {
+    var probe = document.createElement('video');
+    var settled = false;
+    var timer = setTimeout(function () { finish('timed out'); }, 15000);
+    function finish(err) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      probe.removeAttribute('src');
+      try { probe.load(); } catch (e) { /* detached probe */ }
+      cb(err || null);
+    }
+    probe.muted = true;
+    probe.preload = 'metadata';
+    probe.onloadedmetadata = function () { finish(null); };
+    probe.onerror = function () { finish('it could not be loaded as a video'); };
+    probe.src = url;
+  }
+
   function setWebMedia(rawUrl) {
     var url = (rawUrl || '').trim();
     if (!url) return;
     var isVideo = /\.(mp4|webm|ogg|ogv|mov|m4v)(\?.*)?$/i.test(url);
 
-    if (isVideo) {
-      clearMedia();
-      releaseObjectUrl('image');
-      applyVideo(url, false);
-      saveSetting({ type: 'video', source: 'web', value: url, sound: false });
-      persist('web', null, url);
-      if (videoPreview) {
-        videoPreview.src = url;
-        var wrapper = document.getElementById('videoPreviewWrapper');
-        if (wrapper) wrapper.classList.add('show');
+    // Say it out loud instead of failing silently: on a secure origin Chromium
+    // blocks these without any callback into the page.
+    if (/^http:\/\//i.test(url)) {
+      onStatus('This page runs on a secure internal scheme, so an http:// address ' +
+               'is blocked as mixed content. Use the https:// version of the same address.', true);
+      return;
+    }
+    if (!/^https:\/\//i.test(url)) {
+      onStatus('Only https:// addresses can be used as a wallpaper.', true);
+      return;
+    }
+
+    onStatus(isVideo ? 'Checking the video address\u2026' : 'Loading the image\u2026');
+
+    (isVideo ? probeVideo : probeImage)(url, function (err) {
+      if (err) {
+        onStatus('Could not use that address: ' + err +
+                 '. The current background has been left alone.', true);
+        return;
       }
-      onStatus('Playing a remote video. Nothing is downloaded to disk.');
-    } else {
+      if (isVideo) {
+        clearMedia();
+        releaseObjectUrl('image');
+        applyVideo(url, false);
+        saveSetting({ type: 'video', source: 'web', value: url, sound: false });
+        persist('web', null, url);
+        if (videoPreview) {
+          videoPreview.src = url;
+          var wrapper = document.getElementById('videoPreviewWrapper');
+          if (wrapper) wrapper.classList.add('show');
+        }
+        onStatus('Playing a remote video. Nothing is downloaded to disk.');
+        return;
+      }
       stopVideo();
       applyImageUrl(url);
       saveSetting({ type: 'web', value: url });
@@ -424,7 +528,7 @@ var CloudarBackground = (function () {
         imagePreview.classList.add('show');
       }
       onStatus('Using a remote image. It is fetched from the network each time.');
-    }
+    });
   }
 
   function setColor(hex) {
