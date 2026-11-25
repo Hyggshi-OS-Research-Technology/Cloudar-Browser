@@ -329,6 +329,64 @@ for (const file of jsFiles) {
   }
 }
 
+// --- 6b: the frame editor contract -----------------------------------------
+// Two ways "adjust the frame" can rot without any error being logged:
+//
+//   a. the page and the browser disagree about the limits, so the slider offers a
+//      zoom the bridge silently clamps — the slider says 500% and the wallpaper
+//      stops changing;
+//   b. a component calls CloudarBackground.<fn>() that the module does not
+//      return, which is a button that throws when clicked.
+//
+// Both are checked against the code, not against a list kept in this file.
+const BG_JS = path.join(NT, 'scripts', 'background.js');
+const bgJs = read(BG_JS);
+
+// The values the C++ side enforces...
+const cppLimits = {};
+for (const m of read(BRIDGE_CPP).matchAll(
+    /constexpr double k(Min|Max)Zoom = ([\d.]+);|constexpr double kMaxFocus = ([\d.]+);/g)) {
+  if (m[1]) cppLimits[m[1].toLowerCase() === 'min' ? 'min' : 'max'] = Number(m[2]);
+  else cppLimits.focus = Number(m[3]);
+}
+// ...and the values the page draws with.
+const jsLimits = {};
+for (const m of bgJs.matchAll(/var (MIN_ZOOM|MAX_ZOOM|MAX_FOCUS) = ([\d.]+);/g)) {
+  jsLimits[m[1]] = Number(m[2]);
+}
+const limitPairs = [
+  ['zoom min', cppLimits.min, jsLimits.MIN_ZOOM, 'kMinZoom', 'MIN_ZOOM'],
+  ['zoom max', cppLimits.max, jsLimits.MAX_ZOOM, 'kMaxZoom', 'MAX_ZOOM'],
+  ['focus', cppLimits.focus, jsLimits.MAX_FOCUS, 'kMaxFocus', 'MAX_FOCUS'],
+];
+for (const [what, a, b, aName, bName] of limitPairs) {
+  if (a === undefined) errors.push(`NewTabBridge.cpp no longer defines ${aName}`);
+  if (b === undefined) errors.push(`scripts/background.js no longer defines ${bName}`);
+  if (a !== undefined && b !== undefined && a !== b) {
+    errors.push(`${what} limit disagrees: ${aName}=${a} in C++ but ${bName}=${b} in JS — ` +
+                `the editor would offer a value the browser silently clamps`);
+  }
+}
+
+// Public surface of the background module: the keys of its return { ... }.
+const retIndex = bgJs.lastIndexOf('  return {');
+if (retIndex < 0) {
+  errors.push('scripts/background.js has no `return {` block to read the public API from');
+} else {
+  const exported = new Set(
+    [...bgJs.slice(retIndex).matchAll(/^\s{2,4}(\w+):/gm)].map((m) => m[1])
+  );
+  for (const file of jsFiles) {
+    const src = stripComments(read(file));
+    for (const m of src.matchAll(/\bCloudarBackground\.(\w+)\s*\(/g)) {
+      if (!exported.has(m[1])) {
+        errors.push(`${path.relative(ROOT, file)} calls CloudarBackground.${m[1]}() ` +
+                    `but background.js does not export it`);
+      }
+    }
+  }
+}
+
 // --- 6: syntax --------------------------------------------------------------
 for (const file of jsFiles) {
   const src = read(file);

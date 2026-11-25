@@ -29,6 +29,11 @@
 </script>
 </head>
 <body>
+  <!-- Both wallpaper layers are full-window and get the same transform, so the
+       frame editor can move/zoom an image and a video through one code path.
+       They used to differ: the image was a CSS background (background-size:
+       cover, position: center) and could not be panned or zoomed at all. -->
+  <img id="bgImage" class="bg-image" alt="">
   <video id="bgVideo" class="bg-video" autoplay loop muted playsinline></video>
   <div class="scrim"></div>
   <div class="blob one"></div>
@@ -113,6 +118,12 @@
           <input type="checkbox" id="videoAudioToggle"> Enable sound
         </label>
       </div>
+      <!-- Reopens the frame editor. It opens by itself after a wallpaper is
+           picked; this is for coming back to it later. Disabled until there is
+           something to pan, because a button that does nothing is a defect. -->
+      <button class="action secondary" id="adjustFrame" type="button" disabled>
+        Adjust the frame
+      </button>
     </section>
 
     <section>
@@ -128,12 +139,39 @@
     <div class="bg-status" id="bgStatus" role="status" aria-live="polite"></div>
   </aside>
 
+  <!-- Frame editor: a full-window pan/zoom mode over the live wallpaper. It is
+       deliberately WYSIWYG — it applies the real transform to the real layer,
+       so there is no second, divergent preview that can disagree with the
+       result. Opened automatically after a wallpaper is applied, and again from
+       the "Adjust the frame" button in the Customize panel. -->
+  <div class="frame-overlay" id="frameOverlay" role="dialog" aria-modal="true"
+       aria-labelledby="frameTitle" hidden>
+    <div class="frame-outline" id="frameOutline"></div>
+    <div class="frame-bar">
+      <div class="frame-bar-row">
+        <strong id="frameTitle">Drag to reposition</strong>
+        <span class="frame-hint" id="frameHint">Scroll or use the slider to zoom</span>
+      </div>
+      <div class="frame-bar-row">
+        <label class="frame-zoom" for="frameZoom">
+          Zoom
+          <input type="range" id="frameZoom" min="1" max="4" step="0.01" value="1">
+          <output id="frameZoomValue">100%</output>
+        </label>
+        <button class="action secondary" id="frameFit" type="button">Fill screen</button>
+        <button class="action secondary" id="frameCenter" type="button">Centre</button>
+        <button class="action" id="frameDone" type="button">Done</button>
+      </div>
+    </div>
+  </div>
+
   <script src="qrc:/qtwebchannel/qwebchannel.js"></script>
   <script src="assets/scripts/app.js"></script>
   <script src="assets/scripts/speed-dial.js"></script>
   <script src="assets/scripts/search.js"></script>
   <script src="assets/scripts/background.js"></script>
   <script src="assets/scripts/customize.js"></script>
+  <script src="assets/components/frame-editor.js"></script>
   <script src="assets/components/search-bar.js"></script>
   <script src="assets/components/quick-access.js"></script>
   <script src="assets/components/customize-panel.js"></script>

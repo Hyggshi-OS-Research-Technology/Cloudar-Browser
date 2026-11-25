@@ -61,12 +61,34 @@ var CloudarBackground = (function () {
   var MAX_IMAGE_DIM = 2560;     // full-screen on a 1440p display, still modest
   var JPEG_QUALITY = 0.85;
 
+  // Framing bounds. These mirror kMinZoom/kMaxZoom/kMaxFocus in NewTabBridge.cpp:
+  // the page clamps so the UI cannot produce a value the browser would silently
+  // change, and the browser clamps again because a settings file can be edited.
+  var MIN_ZOOM = 1;
+  var MAX_ZOOM = 4;
+  var MAX_FOCUS = 1;
+
   var body = null;
+  var bgImage = null;
   var bgVideo = null;
   var videoPreview = null;
   var imagePreview = null;
   var colorPicker = null;
   var onStatus = function () {};
+
+  // Where the wallpaper sits: the point centred (x, y in -1..1) and the zoom
+  // (1..4). 0,0,1 is the centred cover this page always had.
+  //
+  // The pan is expressed in pixels and computed from the layer's *layout* box
+  // (offsetWidth/offsetHeight), not as a percentage. The first version used
+  // `x * (zoom - 1) * 100%`, which is twice the croppable overflow — dragging to
+  // the edge pulled the image past the window and exposed the background. The
+  // overflow is (box * zoom - window) / 2, and the box is not always the window
+  // (a 16:9 image in a taller window is width-limited and taller than the
+  // window), so the box has to be measured rather than assumed.
+  var framing = { x: 0, y: 0, zoom: 1 };
+  var framingTimer = null;
+  var framingFailureReported = false;
 
   // --- object URL registry ------------------------------------------------
   // One live handle per purpose. `set` returns the new URL and revokes whatever
@@ -185,6 +207,115 @@ var CloudarBackground = (function () {
     } catch (e) { return null; }
   }
 
+  // --- framing ------------------------------------------------------------
+  function clampFraming(f) {
+    f = f || {};
+    var zoom = Number(f.zoom);
+    if (!isFinite(zoom)) zoom = 1;
+    zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom));
+    var x = Number(f.x);
+    var y = Number(f.y);
+    if (!isFinite(x)) x = 0;
+    if (!isFinite(y)) y = 0;
+    return { x: Math.min(MAX_FOCUS, Math.max(-MAX_FOCUS, x)),
+             y: Math.min(MAX_FOCUS, Math.max(-MAX_FOCUS, y)),
+             zoom: zoom };
+  }
+
+  // The layer that is actually visible, or null.
+  function activeLayer() {
+    if (!body) return null;
+    if (body.classList.contains('video-bg')) return bgVideo;
+    if (body.classList.contains('image-bg')) return bgImage;
+    return null;
+  }
+
+  // How far the layer can move before something is exposed, in pixels. Zero on
+  // an axis that exactly fits: there is nothing cropped there to reveal.
+  //
+  // offsetWidth is the layout box before the transform, so this stays correct
+  // for images and videos alike and needs no knowledge of the intrinsic size.
+  function maxPan(layer) {
+    var el = layer || activeLayer();
+    if (!el || !el.offsetWidth || !el.offsetHeight) return { x: 0, y: 0 };
+    return {
+      x: Math.max(0, (el.offsetWidth * framing.zoom - window.innerWidth) / 2),
+      y: Math.max(0, (el.offsetHeight * framing.zoom - window.innerHeight) / 2)
+    };
+  }
+
+  function applyTransform() {
+    var t = 'translate(-50%, -50%)';
+    var el = activeLayer();
+    if (el) {
+      var limit = maxPan(el);
+      var dx = framing.x * limit.x;
+      var dy = framing.y * limit.y;
+      t += ' translate(' + dx.toFixed(2) + 'px, ' + dy.toFixed(2) + 'px)';
+    }
+    t += ' scale(' + framing.zoom.toFixed(4) + ')';
+    // Written to both layers so switching between an image and a video keeps the
+    // frame; the hidden one is not rendered, so this costs nothing.
+    if (bgImage) bgImage.style.transform = t;
+    if (bgVideo) bgVideo.style.transform = t;
+  }
+
+  // The pan is measured in pixels against the window, so a resize changes how
+  // far the same stored focus can travel. Recomputed rather than re-saved: the
+  // stored value is a fraction of whatever the crop is, which is what makes a
+  // framed wallpaper still look framed after the window is resized or the tab is
+  // reopened at a different size.
+  window.addEventListener('resize', function () { applyTransform(); });
+
+  // The frame editor listens for this instead of polling, so dragging the
+  // wallpaper keeps its slider and its readout honest.
+  function announceFraming() {
+    try {
+      document.dispatchEvent(new CustomEvent('cloudar:framing', {
+        detail: { x: framing.x, y: framing.y, zoom: framing.zoom }
+      }));
+    } catch (err) { /* CustomEvent unavailable: the editor still reads on open */ }
+  }
+
+  function setFraming(next, opts) {
+    framing = clampFraming(next);
+    applyTransform();
+    announceFraming();
+    if (opts && opts.commit) return saveFraming();
+    // Dragging fires this per pointer move; a QSettings write per pixel would be
+    // absurd. 250 ms after the last change is one write per gesture.
+    if (framingTimer) clearTimeout(framingTimer);
+    framingTimer = setTimeout(function () { framingTimer = null; saveFraming(); }, 250);
+  }
+
+  // Persist the frame where the wallpaper lives — QSettings, next to it, because
+  // the page's localStorage is cleared with browsing data.
+  function saveFraming() {
+    if (framingTimer) { clearTimeout(framingTimer); framingTimer = null; }
+    if (!CloudarNewTab.saveFraming) return;
+    CloudarNewTab.saveFraming(framing.x, framing.y, framing.zoom, function (ok, detail) {
+      if (ok || framingFailureReported) return;
+      framingFailureReported = true;
+      onStatus('The wallpaper frame could not be saved' +
+               (detail ? ' (' + detail + ')' : '') +
+               '. It will be lost when you close this tab.', true);
+    });
+  }
+
+  // Fired after a *new* wallpaper has been applied (not on restore, where the
+  // stored frame is already correct). The frame editor opens itself on this,
+  // which is how "choose an image and then adjust it" works without the panel
+  // having to know about the editor.
+  function announceApplied() {
+    try {
+      document.dispatchEvent(new CustomEvent('cloudar:wallpaper-applied'));
+    } catch (err) { /* nothing listens; harmless */ }
+  }
+
+  function isFramable() {
+    return !!body && (body.classList.contains('image-bg') || body.classList.contains('video-bg'));
+  }
+
   // --- applying -----------------------------------------------------------
   function stopVideo() {
     if (bgVideo) {
@@ -206,12 +337,27 @@ var CloudarBackground = (function () {
     if (wrapper) wrapper.classList.remove('show');
   }
 
+  // The frame editor component registers itself here. Keeping the reference in
+  // this module means applying a wallpaper and clicking "Adjust the frame" go
+  // through the same entry point.
+  var frameEditor = null;
+
+  function openFrameEditor() {
+    if (!frameEditor || !isFramable()) return false;
+    frameEditor.open();
+    return true;
+  }
+
   function applyVideo(src, audioEnabled) {
     if (!body || !bgVideo) return;
     body.classList.remove('custom-bg');
+    body.classList.remove('image-bg');
     body.classList.add('video-bg');
     body.style.backgroundImage = '';
     body.style.backgroundColor = '#000';
+    // Still images and videos share one transform, so the frame the user chose
+    // applies to whichever layer becomes visible.
+    applyTransform();
 
     bgVideo.src = src;
     bgVideo.muted = !audioEnabled;
@@ -242,16 +388,31 @@ var CloudarBackground = (function () {
   function applyColor(hex) {
     if (!body) return;
     body.classList.add('custom-bg');
+    body.classList.remove('image-bg');
     body.style.backgroundImage = '';
     body.style.backgroundColor = hex;
     if (colorPicker) colorPicker.value = hex;
   }
 
+  // An image wallpaper is a real <img> layer, not a CSS background. Both are
+  // cover-cropped, but a background cannot be panned or zoomed with the frame
+  // editor (background-size: cover ignores a zoom factor), and keeping the image
+  // in its own element means the editor and the video path share one transform.
   function applyImageUrl(url) {
     if (!body) return;
     body.classList.add('custom-bg');
+    body.classList.remove('video-bg');
     body.style.backgroundColor = '';
-    body.style.backgroundImage = 'url("' + url + '")';
+    body.style.backgroundImage = '';
+    if (bgImage) {
+      bgImage.src = url;
+      body.classList.add('image-bg');
+    } else {
+      // No layer in the document (a page that is not the New Tab page): fall
+      // back to the stylesheet path rather than showing nothing.
+      body.style.backgroundImage = 'url("' + url + '")';
+    }
+    applyTransform();
   }
 
   // Original bytes when possible, so a restart does not re-compress an already
@@ -324,8 +485,12 @@ var CloudarBackground = (function () {
   // its result to a callback (see the header of scripts/app.js). The previous
   // version treated the call as synchronous, so it could not tell success from
   // failure and reported nothing either way.
-  function persist(kind, blobOrNull, value, mime) {
+  function persist(kind, blobOrNull, value, mime, done) {
+    // `done(ok)` is optional and only used by the wallpaper paths, which need to
+    // know whether the browser took the file before saving a frame on top of it.
+    var finish = typeof done === 'function' ? done : function () {};
     CloudarNewTab.saveMedia(kind, blobOrNull, value, mime || '', function (ok, detail) {
+      finish(ok);
       if (ok) return;
       if (detail === 'no bridge') {
         onStatus('Saved for this tab only: the browser bridge is not available here, ' +
@@ -342,6 +507,13 @@ var CloudarBackground = (function () {
   function applyFromState(wallpaper) {
     if (!wallpaper || !wallpaper.kind || wallpaper.kind === 'default') return false;
     var kind = wallpaper.kind;
+    // The frame belongs to the wallpaper that is stored, so it is applied first
+    // and the image/video paths call applyTransform() with it already in place.
+    if (wallpaper.framing) {
+      framing = clampFraming(wallpaper.framing);
+      applyTransform();
+      announceFraming();
+    }
     if (kind === 'color') {
       applyColor(wallpaper.value);
       return true;
@@ -400,7 +572,15 @@ var CloudarBackground = (function () {
         stopVideo();
         body.classList.add('custom-bg');
         saveSetting({ type: 'image', source: 'local', mime: mime });
-        persist('image', blob, '', mime);
+        // Order matters: the bridge clears the stored framing when a new
+        // wallpaper arrives, so the centring has to be written after that call,
+        // not before it.
+        persist('image', blob, '', mime, function (ok) {
+          if (ok) {
+            setFraming({ x: 0, y: 0, zoom: 1 }, { commit: true });
+            announceApplied();
+          }
+        });
         onStatus('Image saved (' + formatBytes(blob.size) + '). It will still be here next time.');
       });
     });
@@ -420,7 +600,12 @@ var CloudarBackground = (function () {
       var url = setObjectUrl('video', file);
       applyVideo(url, false);
       saveSetting({ type: 'video', source: 'local', sound: false });
-      persist('video', file, '', 'video/mp4');
+      persist('video', file, '', 'video/mp4', function (ok) {
+        if (ok) {
+          setFraming({ x: 0, y: 0, zoom: 1 }, { commit: true });
+          announceApplied();
+        }
+      });
 
       if (videoPreview) {
         videoPreview.src = setObjectUrl('preview', file);
@@ -510,7 +695,12 @@ var CloudarBackground = (function () {
         releaseObjectUrl('image');
         applyVideo(url, false);
         saveSetting({ type: 'video', source: 'web', value: url, sound: false });
-        persist('web', null, url);
+        persist('web', null, url, '', function (ok) {
+          if (ok) {
+            setFraming({ x: 0, y: 0, zoom: 1 }, { commit: true });
+            announceApplied();
+          }
+        });
         if (videoPreview) {
           videoPreview.src = url;
           var wrapper = document.getElementById('videoPreviewWrapper');
@@ -522,7 +712,12 @@ var CloudarBackground = (function () {
       stopVideo();
       applyImageUrl(url);
       saveSetting({ type: 'web', value: url });
-      persist('web', null, url);
+      persist('web', null, url, '', function (ok) {
+        if (ok) {
+          setFraming({ x: 0, y: 0, zoom: 1 }, { commit: true });
+          announceApplied();
+        }
+      });
       if (imagePreview) {
         imagePreview.style.backgroundImage = 'url("' + url + '")';
         imagePreview.classList.add('show');
@@ -549,9 +744,12 @@ var CloudarBackground = (function () {
     if (body) {
       body.classList.remove('custom-bg');
       body.classList.remove('video-bg');
+      body.classList.remove('image-bg');
       body.style.backgroundImage = '';
       body.style.backgroundColor = '';
     }
+    if (bgImage) bgImage.removeAttribute('src');
+    setFraming({ x: 0, y: 0, zoom: 1 }, { commit: true });
     if (imagePreview) imagePreview.classList.remove('show');
     saveSetting({ type: 'default' });
     persist('default', null, '');
@@ -623,6 +821,7 @@ var CloudarBackground = (function () {
   return {
     init: function (statusFn) {
       body = document.body;
+      bgImage = document.getElementById('bgImage');
       bgVideo = document.getElementById('bgVideo');
       videoPreview = document.getElementById('videoPreview');
       imagePreview = document.getElementById('imagePreview');
@@ -652,6 +851,23 @@ var CloudarBackground = (function () {
           onStatus('');
       });
     },
+
+    // --- frame editor surface ---------------------------------------------
+    // The editor is a thin UI over these; all the clamping and persistence is
+    // here, next to the code that renders the transform, so there is exactly one
+    // implementation of "where is the wallpaper".
+    framing: function () { return { x: framing.x, y: framing.y, zoom: framing.zoom }; },
+    setFraming: setFraming,
+    commitFraming: function () { saveFraming(); },
+    isFramable: isFramable,
+    framingBounds: function () { return { min: MIN_ZOOM, max: MAX_ZOOM }; },
+    // Pixels the visible layer can still travel on each axis. The editor needs
+    // this to translate a pointer movement into a focus change.
+    maxPan: function () { return maxPan(null); },
+    openFrameEditor: openFrameEditor,
+    // Called once by components/frame-editor.js. A function rather than a
+    // property assignment so nothing can replace it by accident.
+    setFrameEditor: function (editor) { frameEditor = editor || null; },
 
     applyColor: setColor,
     applyWebMedia: setWebMedia,

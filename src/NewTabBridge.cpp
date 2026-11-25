@@ -15,6 +15,9 @@
 #include <QUrl>
 #include <QVariantList>
 #include <QVariantMap>
+#include <QtGlobal>
+
+#include <cmath>
 
 namespace {
 
@@ -26,6 +29,17 @@ const char *kWallpaperKindKey = "browser/newTabWallpaper/kind";
 const char *kWallpaperValueKey = "browser/newTabWallpaper/value";
 const char *kWallpaperFileKey = "browser/newTabWallpaper/file";
 const char *kWallpaperMimeKey = "browser/newTabWallpaper/mime";
+// How the wallpaper is positioned inside the window. See saveWallpaperFraming().
+const char *kFramingXKey = "browser/newTabWallpaper/focusX";
+const char *kFramingYKey = "browser/newTabWallpaper/focusY";
+const char *kFramingZoomKey = "browser/newTabWallpaper/zoom";
+
+// Bounds shared by the writer and the reader, so a hand-edited settings file and
+// a page bug are handled by the same rule. 1.0 is "cover" and 4.0 is the most
+// zoom the editor offers; the focus is a fraction of the *croppable* overflow.
+constexpr double kMinZoom = 1.0;
+constexpr double kMaxZoom = 4.0;
+constexpr double kMaxFocus = 1.0;
 
 QString wallpaperDir()
 {
@@ -179,6 +193,10 @@ QString NewTabBridge::saveWallpaperMedia(const QString &kind, const QString &bas
         // Nothing to store on disk: a colour and a URL are a few bytes.
         clearWallpaperMedia();
         settings.setValue(QLatin1String(kWallpaperKindKey), normalised);
+        // Colour has no frame, and a new web URL starts centred too.
+        settings.remove(QLatin1String(kFramingXKey));
+        settings.remove(QLatin1String(kFramingYKey));
+        settings.remove(QLatin1String(kFramingZoomKey));
         settings.setValue(QLatin1String(kWallpaperValueKey), value);
         settings.remove(QLatin1String(kWallpaperFileKey));
         settings.remove(QLatin1String(kWallpaperMimeKey));
@@ -218,6 +236,11 @@ QString NewTabBridge::saveWallpaperMedia(const QString &kind, const QString &bas
     }
 
     settings.setValue(QLatin1String(kWallpaperKindKey), normalised);
+    // A new file starts centred and unzoomed. Keeping the previous pan would
+    // frame the new image with a crop chosen for a different one.
+    settings.remove(QLatin1String(kFramingXKey));
+    settings.remove(QLatin1String(kFramingYKey));
+    settings.remove(QLatin1String(kFramingZoomKey));
     settings.setValue(QLatin1String(kWallpaperFileKey), path);
     settings.setValue(QLatin1String(kWallpaperMimeKey), mime.trimmed().toLower());
     settings.remove(QLatin1String(kWallpaperValueKey));
@@ -239,6 +262,44 @@ QString NewTabBridge::wallpaperMediaUrl()
     // or leak the user's home directory into a page-visible string.
     return QStringLiteral("cloudar://newtab/media/") + QFileInfo(path).fileName();
 }
+
+bool NewTabBridge::saveWallpaperFraming(double focusX, double focusY, double zoom)
+{
+    // Silently clamping is the right call here: a zoom of 0.4 or 7 arrives from
+    // a slider drag or a corrupted setting, never from a person asking for an
+    // invisible wallpaper. Clamping keeps the window recoverable.
+    const double x = qBound(-kMaxFocus, focusX, kMaxFocus);
+    const double y = qBound(-kMaxFocus, focusY, kMaxFocus);
+    const double z = qBound(kMinZoom, zoom, kMaxZoom);
+
+    if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z))
+        return false;
+
+    QSettings settings;
+    settings.setValue(QLatin1String(kFramingXKey), x);
+    settings.setValue(QLatin1String(kFramingYKey), y);
+    settings.setValue(QLatin1String(kFramingZoomKey), z);
+    return true;
+}
+
+namespace {
+
+// Stored framing, clamped, with 0,0,1 as the default. Shared by
+// wallpaperState() and initialState() so the two can never disagree.
+QVariantMap framingFromSettings(const QSettings &settings)
+{
+    const double x = qBound(-kMaxFocus, settings.value(QLatin1String(kFramingXKey), 0.0).toDouble(), kMaxFocus);
+    const double y = qBound(-kMaxFocus, settings.value(QLatin1String(kFramingYKey), 0.0).toDouble(), kMaxFocus);
+    const double z = qBound(kMinZoom, settings.value(QLatin1String(kFramingZoomKey), 1.0).toDouble(), kMaxZoom);
+
+    QVariantMap out;
+    out["x"] = x;
+    out["y"] = y;
+    out["zoom"] = z;
+    return out;
+}
+
+} // namespace
 
 QVariantMap NewTabBridge::wallpaperState()
 {
@@ -262,6 +323,7 @@ QVariantMap NewTabBridge::wallpaperState()
             bytes = info.size();
     }
     out["bytes"] = static_cast<qlonglong>(bytes);
+    out["framing"] = framingFromSettings(settings);
     return out;
 }
 
