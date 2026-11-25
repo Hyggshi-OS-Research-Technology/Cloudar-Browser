@@ -444,18 +444,23 @@ void BrowserTabWidget::applyCloseGlyph(int index)
 {
     if (index < 0 || index >= count())
         return;
-    QAbstractButton *button = tabBar()->tabButton(index, QTabBar::RightSide);
-    auto *tool = qobject_cast<QToolButton *>(button);
+    // tabButton() returns QWidget*, whose only overload is the QWidget* one —
+    // assigning it to a QAbstractButton* is the conversion the compiler
+    // rejected. The button Qt creates there is always one, but the type has to
+    // be spelled out rather than assumed.
+    QWidget *buttonWidget = tabBar()->tabButton(index, QTabBar::RightSide);
+    auto *tool = qobject_cast<QToolButton *>(buttonWidget);
     // Two cases reach the `!tool` branch: Qt created the button but as a plain
     // QTabBar::CloseButton (its own painted cross), or it created nothing. The
     // first must be deleted before it is replaced, or QTabBar keeps a child
     // button that is no longer the tab's and paints a second cross over ours.
-    if (button && !tool) {
-        // setTabButton() only accepts a QWidget*, and Qt's own close button is
-        // a QTabBar::CloseButton (a QAbstractButton) — so the clear is a plain
-        // QWidget* cast of nullptr, which is where the compiler needed help.
+    if (buttonWidget && !tool) {
+        // Qt created its own close button (a QAbstractButton) and we are
+        // replacing it, so the old one has to be detached before it is deleted
+        // or QTabBar keeps a child button that no longer belongs to the tab and
+        // paints a second cross over ours.
         tabBar()->setTabButton(index, QTabBar::RightSide, static_cast<QWidget *>(nullptr));
-        delete button;
+        delete buttonWidget;
     }
     if (!tool) {
         // The style has not created the button yet (it does so on the first
