@@ -3,6 +3,7 @@
 #include "TabPreviewPopup.h"
 #include "WebExtensionManager.h"
 #include "ClassicTheme.h"
+#include "Language.h"
 #include "ThemeManager.h"
 
 #include <QWebEnginePage>
@@ -225,7 +226,7 @@ void BrowserTabWidget::showPreviewForTab(int index)
     if (m_sleptUrls.contains(index)) {
         m_previewPopup->setContent(QPixmap(), tabText(index),
                                     QUrl(m_sleptUrls.value(index)),
-                                    tr("Sleeping (memory released)"));
+                                    QStringLiteral("sleeping"));
         const QRect sleptRect = tabBar()->tabRect(index);
         m_previewPopup->move(tabBar()->mapToGlobal(QPoint(sleptRect.left(), sleptRect.bottom() + 6)));
         m_previewPopup->fadeIn();
@@ -238,7 +239,8 @@ void BrowserTabWidget::showPreviewForTab(int index)
 
     const bool active = (index == currentIndex());
     m_previewPopup->setContent(tabThumbnail(index), tabText(index), view->url(),
-                                active ? tr("Active renderer") : tr("Background renderer"));
+                                active ? QStringLiteral("active")
+                                       : QStringLiteral("background"));
 
     const QRect tabRect = tabBar()->tabRect(index);
     const QPoint anchor = tabBar()->mapToGlobal(QPoint(tabRect.left(), tabRect.bottom() + 6));
@@ -278,7 +280,7 @@ void BrowserTabWidget::wireView(QWebEngineView *view)
     connect(view, &QWebEngineView::titleChanged, this, [this, view](const QString &title) {
         int idx = indexOf(view);
         if (idx >= 0) {
-            setTabText(idx, title.isEmpty() ? "New Tab" : title);
+            setTabText(idx, title.isEmpty() ? get_text("new_tab_title") : title);
             if (tabIcon(idx).isNull())
                 setTabIcon(idx, defaultFavicon(view->url()));
             repositionNewTabButton();
@@ -416,7 +418,7 @@ QWebEngineView *BrowserTabWidget::addNewTab(const QUrl &url, bool makeCurrent)
     view->setPage(page);
     wireView(view);
 
-    int idx = addTab(view, defaultFavicon(url), "New Tab");
+    int idx = addTab(view, defaultFavicon(url), get_text("new_tab_title"));
     if (makeCurrent)
         setCurrentIndex(idx);
 
@@ -769,10 +771,23 @@ bool BrowserTabWidget::reopenTabAt(int index)
         tabBar()->moveTab(newIndex, index);
         setCurrentIndex(index);
     }
-    if (!title.isEmpty() && !title.startsWith(tr("Sleeping")))
+    if (!title.isEmpty())
         setTabText(index, title);
     emit tabsChanged();
     return true;
+}
+
+void BrowserTabWidget::retranslate()
+{
+    for (int i = 0; i < count(); ++i) {
+        // Only the placeholders this widget itself wrote are rewritten. A real
+        // page title is the site's text, not ours to translate, and a tab whose
+        // title is still the empty-state one has not loaded a page yet.
+        const QString current = tabText(i);
+        if (current == QLatin1String("New Tab") || current.isEmpty())
+            setTabText(i, get_text("new_tab_title"));
+    }
+    repositionNewTabButton();
 }
 
 void BrowserTabWidget::showTabContextMenu(int index, const QPoint &globalPos)

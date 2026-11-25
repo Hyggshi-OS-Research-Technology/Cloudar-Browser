@@ -64,7 +64,7 @@ void AISidebar::setupChatTab() {
     m_chatView->setUrl(QUrl("https://chatgpt.com/"));
     chatLayout->addWidget(m_chatView, 1);
 
-    m_tabs->addTab(chatWidget, "AI Chat");
+    m_tabs->addTab(chatWidget, get_text("ai_chat_tab"));
 }
 
 void AISidebar::setupServicesTab() {
@@ -113,7 +113,7 @@ void AISidebar::setupServicesTab() {
     }
 
     scroll->setWidget(servicesWidget);
-    m_tabs->addTab(scroll, "Services");
+    m_tabs->addTab(scroll, get_text("ai_services_tab"));
 }
 
 void AISidebar::onProviderChanged(const QString &name) {
@@ -134,4 +134,10 @@ void AISidebar::toggleSidebar() {
 
 void AISidebar::retranslateUi() {
     setWindowTitle(get_text("ai_sidebar_title"));
+    // Only the two tab labels are ours; the provider names below them are the
+    // services' own names and stay as they are.
+    if (m_tabs && m_tabs->count() >= 1)
+        m_tabs->setTabText(0, get_text("ai_chat_tab"));
+    if (m_tabs && m_tabs->count() >= 2)
+        m_tabs->setTabText(1, get_text("ai_services_tab"));
 }

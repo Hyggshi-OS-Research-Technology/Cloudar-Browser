@@ -1,4 +1,5 @@
 #include "BookmarkBar.h"
+#include "Language.h"
 #include "BookmarkManager.h"
 #include "ClassicTheme.h"
 
@@ -78,16 +79,18 @@ void BookmarkButton::dropEvent(QDropEvent *event)
 void BookmarkButton::contextMenuEvent(QContextMenuEvent *event)
 {
     QMenu menu(this);
-    auto *openAction = menu.addAction("Open");
-    auto *renameAction = menu.addAction("Rename");
-    auto *deleteAction = menu.addAction("Delete");
+    auto *openAction = menu.addAction(get_text("bookmark_open"));
+    auto *renameAction = menu.addAction(get_text("bookmark_rename"));
+    auto *deleteAction = menu.addAction(get_text("bookmark_delete"));
 
     QAction *chosen = menu.exec(event->globalPos());
     if (chosen == openAction) {
         emit activated(m_url);
     } else if (chosen == renameAction) {
         bool ok = false;
-        QString newTitle = QInputDialog::getText(this, "Rename bookmark", "Name:", QLineEdit::Normal, text(), &ok);
+        QString newTitle = QInputDialog::getText(this, get_text("bookmark_rename_title"),
+                                                 get_text("bookmark_name"),
+                                                 QLineEdit::Normal, text(), &ok);
         if (ok && !newTitle.isEmpty())
             emit renameRequested(m_index, newTitle);
     } else if (chosen == deleteAction) {
@@ -102,7 +105,7 @@ BookmarkBar::BookmarkBar(BookmarkManager *manager, QWidget *parent)
     m_layout->setContentsMargins(6, 2, 6, 2);
     m_layout->setSpacing(4);
 
-    m_emptyHint = new QLabel(tr("Drag pages here or use the \u2606 button to add bookmarks"), this);
+    m_emptyHint = new QLabel(get_text("bookmark_bar_hint"), this);
     // Was a hard-coded 35%-white, which is invisible on the classic chrome's
     // beige bookmarks strip. The hint follows the active chrome's dim text.
     m_emptyHint->setStyleSheet(QStringLiteral("color: %1; font-size: 11px;")

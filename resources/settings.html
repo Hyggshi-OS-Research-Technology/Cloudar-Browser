@@ -843,7 +843,7 @@
       </div>
 
       <div class="search-box" role="search">
-        <label class="sr-only" for="settingsSearch">Search settings</label>
+        <label class="sr-only" for="settingsSearch" data-i18n="settings_search_placeholder">Search settings</label>
         <span class="icon" aria-hidden="true">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" stroke-linejoin="round">
@@ -851,35 +851,33 @@
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
         </span>
-        <input type="text" id="settingsSearch" placeholder="Search settings" autocomplete="off">
+        <input type="text" id="settingsSearch" placeholder="Search settings" data-i18n-placeholder="settings_search_placeholder" autocomplete="off">
       </div>
 
       <nav class="sections">
         <div class="item active" data-section="general" tabindex="0" role="button" aria-current="page"><span
-            class="glyph">&#127968;</span>General</div>
+            class="glyph">&#127968;</span><span data-i18n="settings_page_general">General</span></div>
         <div class="item" data-section="appearance" tabindex="0" role="button"><span
-            class="glyph">&#127912;</span>Appearance</div>
+            class="glyph">&#127912;</span><span data-i18n="settings_page_appearance">Appearance</span></div>
         <div class="item" data-section="performance" tabindex="0" role="button"><span
-            class="glyph">&#9889;</span>Performance &amp; Memory</div>
-        <div class="item" data-section="privacy" tabindex="0" role="button"><span class="glyph">&#128274;</span>Privacy
-          &amp; data</div>
-        <div class="item" data-section="tor" tabindex="0" role="button"><span class="glyph">&#129533;</span>Tor &amp;
-          Anonymity</div>
+            class="glyph">&#9889;</span><span data-i18n="settings_page_performance">Performance &amp; Memory</span></div>
+        <div class="item" data-section="privacy" tabindex="0" role="button"><span class="glyph">&#128274;</span><span data-i18n="settings_page_privacy">Privacy &amp; data</span></div>
+        <div class="item" data-section="tor" tabindex="0" role="button"><span class="glyph">&#129533;</span><span data-i18n="settings_page_tor">Tor &amp; Anonymity</span></div>
         <div class="item" data-section="torrent" tabindex="0" role="button"><span
-            class="glyph">&#129522;</span>BitTorrent</div>
+            class="glyph">&#129522;</span><span data-i18n="settings_page_torrent">BitTorrent &amp; WebTorrent</span></div>
         <div class="item" data-section="downloads" tabindex="0" role="button"><span
-            class="glyph">&#8681;</span>Downloads</div>
-        <div class="item" data-section="about" tabindex="0" role="button"><span class="glyph">&#8505;</span>About</div>
+            class="glyph">&#8681;</span><span data-i18n="settings_page_downloads">Downloads</span></div>
+        <div class="item" data-section="about" tabindex="0" role="button"><span class="glyph">&#8505;</span><span data-i18n="settings_page_about">About</span></div>
       </nav>
     </aside>
 
     <main>
       <!-- ===================== General ===================== -->
       <section class="page" data-page="general">
-        <h1>General</h1>
+        <h1 data-i18n="settings_page_general">General</h1>
 
         <div class="card" data-keywords="home page start new tab">
-          <div class="card-title">On startup</div>
+          <div class="card-title" data-i18n="settings_card_on_startup">On startup</div>
           <div class="radio-group" id="homePageRadios">
             <label class="radio-row">
               <input type="radio" name="homeChoice" value="cloudar://newtab">
@@ -899,7 +897,7 @@
         </div>
 
         <div class="card" data-keywords="search engine duckduckgo google bing default">
-          <div class="card-title">Search engine</div>
+          <div class="card-title" data-i18n="settings_card_search_engine">Search engine</div>
           <div class="row">
             <div class="info">
               <div class="label">Used from the address bar</div>
@@ -925,7 +923,7 @@
         </div>
 
         <div class="card" data-keywords="startup restore session tabs crash recovery">
-          <div class="card-title">Session recovery</div>
+          <div class="card-title" data-i18n="settings_card_session_recovery">Session recovery</div>
           <label class="row">
             <div class="info">
               <div class="label">Restore previous tabs on startup</div>
@@ -943,10 +941,10 @@
 
       <!-- ===================== Appearance ===================== -->
       <section class="page" data-page="appearance">
-        <h1>Appearance</h1>
+        <h1 data-i18n="settings_page_appearance">Appearance</h1>
 
         <div class="card" data-keywords="interface ui theme chrome classic modern 2009 retro skin layout">
-          <div class="card-title">Interface style</div>
+          <div class="card-title" data-i18n="settings_card_interface_style">Interface style</div>
           <div class="row">
             <div class="info">
               <div class="label">Browser chrome</div>
@@ -1002,7 +1000,7 @@
         </div>
 
         <div class="card" data-keywords="dark light theme mode system appearance color scheme auto">
-          <div class="card-title">Color mode</div>
+          <div class="card-title" data-i18n="settings_card_color_mode">Color mode</div>
           <div class="row">
             <div class="info">
               <div class="label">Light or dark</div>
@@ -1033,8 +1031,49 @@
           </div>
         </div>
 
+        <div class="card" id="languageCard" data-keywords="language locale translation english vietnamese interface language">
+          <div class="card-title" data-i18n="settings_language">Language</div>
+          <div class="row">
+            <div class="info">
+              <div class="label" data-i18n="settings_language_label">Interface language</div>
+              <div class="desc">
+                <span data-i18n="settings_language_scope">Applies to the browser's own menus,
+                toolbars and internal pages, and takes effect immediately &mdash; no restart.
+                Pages you visit keep their own language.</span><br>
+                <strong>System</strong>
+                <span data-i18n="settings_language_system">follows your operating system's
+                language.</span>
+                <span id="languageSystemNote"></span>
+              </div>
+            </div>
+            <div class="control">
+              <select id="languageSelect" class="field-wide">
+                <option value="system">System</option>
+              </select>
+            </div>
+          </div>
+          <div class="row">
+            <div class="info">
+              <div class="label" data-i18n="settings_language_state">Currently showing</div>
+              <div class="desc" id="languageStateLabel">&mdash;</div>
+            </div>
+            <div class="control">
+              <span class="badge" id="languageStateBadge">&mdash;</span>
+            </div>
+          </div>
+          <div class="row">
+            <div class="info">
+              <div class="label" data-i18n="settings_language_coverage">Translation coverage</div>
+              <div class="desc" id="languageCoverageLabel">&mdash;</div>
+            </div>
+            <div class="control">
+              <span class="badge" id="languageCoverageBadge">&mdash;</span>
+            </div>
+          </div>
+        </div>
+
         <div class="card" data-keywords="accent color theme title bar color">
-          <div class="card-title">Accent color</div>
+          <div class="card-title" data-i18n="settings_card_accent_color">Accent color</div>
           <div class="swatches" id="accentSwatches"></div>
           <div class="row">
             <div class="info">
@@ -1050,10 +1089,10 @@
 
       <!-- ===================== Performance & Memory ===================== -->
       <section class="page" data-page="performance">
-        <h1>Performance &amp; Memory</h1>
+        <h1 data-i18n="settings_page_performance">Performance &amp; Memory</h1>
 
         <div class="card" data-keywords="memory ram performance saver discard sleep freeze tabs speed low ram">
-          <div class="card-title">Memory Saver</div>
+          <div class="card-title" data-i18n="settings_card_memory_saver">Memory Saver</div>
           <label class="row">
             <div class="info">
               <div class="label">Automatic Memory Saver</div>
@@ -1105,7 +1144,7 @@
         </div>
 
         <div class="card" data-keywords="cpu compatibility old hardware legacy pentium core 2 tier performance slow gpu acceleration graphics">
-          <div class="card-title">CPU &amp; hardware compatibility</div>
+          <div class="card-title" data-i18n="settings_card_cpu_and_hardware_compatibility">CPU &amp; hardware compatibility</div>
           <div class="row">
             <div class="info">
               <div class="label">Detected hardware</div>
@@ -1172,10 +1211,10 @@
 
       <!-- ===================== Privacy ===================== -->
       <section class="page" data-page="privacy">
-        <h1>Privacy &amp; data</h1>
+        <h1 data-i18n="settings_page_privacy">Privacy &amp; data</h1>
 
         <div class="card" data-keywords="cookies sessions persist">
-          <div class="card-title">Cookies</div>
+          <div class="card-title" data-i18n="settings_card_cookies">Cookies</div>
           <label class="row">
             <div class="info">
               <div class="label">Keep cookies between sessions</div>
@@ -1191,7 +1230,7 @@
         </div>
 
         <div class="card" data-keywords="clear browsing data history cache cookies delete">
-          <div class="card-title">Clear browsing data</div>
+          <div class="card-title" data-i18n="settings_card_clear_browsing_data">Clear browsing data</div>
           <label class="checkbox-row">
             <input type="checkbox" id="clearHistoryCheck" checked>
             <span>Browsing history</span>
@@ -1212,10 +1251,10 @@
 
       <!-- ===================== Tor & Anonymity ===================== -->
       <section class="page" data-page="tor">
-        <h1>Tor &amp; Anonymity</h1>
+        <h1 data-i18n="settings_page_tor">Tor &amp; Anonymity</h1>
 
         <div class="card" data-keywords="tor anonymity socks5 onion proxy routing private circuit">
-          <div class="card-title">Tor Routing</div>
+          <div class="card-title" data-i18n="settings_card_tor_routing">Tor Routing</div>
           <label class="row">
             <div class="info">
               <div class="label">Route traffic through Tor Network (SOCKS5)</div>
@@ -1253,7 +1292,7 @@
         </div>
 
         <div class="card" data-keywords="onion hidden services deep dark web">
-          <div class="card-title">.onion Hidden Services</div>
+          <div class="card-title" data-i18n="settings_card_onion_hidden_services">.onion Hidden Services</div>
           <label class="row">
             <div class="info">
               <div class="label">Resolve and open .onion domains</div>
@@ -1269,7 +1308,7 @@
         </div>
 
         <div class="card" data-keywords="webrtc fingerprinting canvas leak privacy shield">
-          <div class="card-title">Privacy &amp; Anti-Fingerprinting Shield</div>
+          <div class="card-title" data-i18n="settings_card_privacy_and_anti_fingerprinting_shield">Privacy &amp; Anti-Fingerprinting Shield</div>
           <label class="row">
             <div class="info">
               <div class="label">Block WebRTC IP address leaks</div>
@@ -1314,10 +1353,10 @@
 
       <!-- ===================== BitTorrent ===================== -->
       <section class="page" data-page="torrent">
-        <h1>BitTorrent &amp; WebTorrent</h1>
+        <h1 data-i18n="settings_page_torrent">BitTorrent &amp; WebTorrent</h1>
 
         <div class="card" data-keywords="torrent webtorrent magnet p2p download bittorrent">
-          <div class="card-title">Direct Torrent Client</div>
+          <div class="card-title" data-i18n="settings_card_direct_torrent_client">Direct Torrent Client</div>
           <label class="row">
             <div class="info">
               <div class="label">Enable direct in-browser Torrent &amp; Magnet downloads</div>
@@ -1334,7 +1373,7 @@
         </div>
 
         <div class="card" data-keywords="torrent download folder path location save">
-          <div class="card-title">Storage Location</div>
+          <div class="card-title" data-i18n="settings_card_storage_location">Storage Location</div>
           <div class="row">
             <div class="info">
               <div class="label">Torrent download folder</div>
@@ -1359,7 +1398,7 @@
         </div>
 
         <div class="card" data-keywords="torrent transfer speed limit ratio seed active">
-          <div class="card-title">Transfer Limits &amp; Seeding</div>
+          <div class="card-title" data-i18n="settings_card_transfer_limits_and_seeding">Transfer Limits &amp; Seeding</div>
           <div class="row">
             <div class="info">
               <div class="label">Maximum active downloads</div>
@@ -1423,7 +1462,7 @@
         </div>
 
         <div class="card" data-keywords="dht pex lpd encryption peer discovery trackerless">
-          <div class="card-title">Peer Discovery &amp; Encryption</div>
+          <div class="card-title" data-i18n="settings_card_peer_discovery_and_encryption">Peer Discovery &amp; Encryption</div>
           <label class="checkbox-row">
             <input type="checkbox" id="torrentDhtCheck" checked>
             <span>Enable DHT (Distributed Hash Table) for trackerless swarms</span>
@@ -1445,10 +1484,10 @@
 
       <!-- ===================== Downloads ===================== -->
       <section class="page" data-page="downloads">
-        <h1>Downloads</h1>
+        <h1 data-i18n="settings_page_downloads">Downloads</h1>
 
         <div class="card" data-keywords="downloads folder location save">
-          <div class="card-title">Location</div>
+          <div class="card-title" data-i18n="settings_card_location">Location</div>
           <div class="row">
             <div class="info">
               <div class="label">Downloads folder</div>
@@ -1475,7 +1514,7 @@
 
       <!-- ===================== About ===================== -->
       <section class="page" data-page="about">
-        <h1>About</h1>
+        <h1 data-i18n="settings_page_about">About</h1>
         <div class="card">
           <div class="about-hero">
             <div class="mark"></div>
@@ -1809,6 +1848,82 @@
         });
       }
 
+      // --- language --------------------------------------------------------
+      // Written against the *measured* state the native side reports: which code
+      // is resolved, which preference produced it, and how much of the reference
+      // dictionary the active language can actually answer for. A language is
+      // never shown as "fully translated" without that count backing it up.
+      var languageSelect = document.getElementById('languageSelect');
+      if (languageSelect && bridge) {
+        bridge.languageState(function (raw) {
+          var state = typeof raw === 'string' ? JSON.parse(raw) : raw;
+          if (!state) return;
+
+          // Rebuild the list from the bridge rather than hard-coding codes here:
+          // this page must not claim a language the browser cannot load.
+          languageSelect.innerHTML = '';
+          var systemOption = document.createElement('option');
+          systemOption.value = 'system';
+          systemOption.textContent = 'System' +
+            (state.systemLanguage ? ' (' + state.systemLanguage + ')' : '');
+          languageSelect.appendChild(systemOption);
+
+          (state.available || []).forEach(function (entry) {
+            var option = document.createElement('option');
+            option.value = entry.code;
+            option.textContent = entry.name;
+            if (entry.complete === false) {
+              option.textContent += ' \u2014 ' + entry.translatedCount + '/' +
+                                    state.referenceCount;
+            }
+            languageSelect.appendChild(option);
+          });
+          languageSelect.value = state.preference || 'system';
+
+          if (!state.source) {
+            document.getElementById('languageSystemNote').textContent =
+              ' The dictionary for this language could not be loaded, so English is ' +
+              'being shown instead.';
+          }
+
+          var nameOf = function (code) {
+            var match = (state.available || []).filter(function (e) { return e.code === code; });
+            return match.length ? match[0].name : code;
+          };
+
+          document.getElementById('languageStateLabel').textContent =
+            nameOf(state.code) + ' (' + state.code + ')' +
+            (state.followsSystem ? ' \u2014 following the system locale (' +
+                                   state.systemLocale + ')' : '');
+          document.getElementById('languageStateBadge').textContent = state.code.toUpperCase();
+
+          var total = state.referenceCount || 0;
+          var done = state.translatedCount || 0;
+          var coverage = total ? Math.round((done / total) * 100) : 0;
+          document.getElementById('languageCoverageLabel').textContent =
+            done + ' of ' + total + ' interface strings (' + coverage + '%)' +
+            (state.source ? ' \u2014 loaded from ' + state.source : '') +
+            (done < total ? '. Missing strings fall back to English, not to blank labels.' : '.');
+          document.getElementById('languageCoverageBadge').textContent = coverage + '%';
+
+          languageSelect.addEventListener('change', function (e) {
+            // setLanguage persists and every open window retranslates itself;
+            // this page reloads so its own text follows too.
+            bridge.setLanguage(e.target.value, function (ok) {
+              if (ok) {
+                showToast(CloudarI18n.t('settings_toast_language', 'Language updated'));
+                // Reload so this page's own static text (and the dictionary it
+                // fetches) is rebuilt in the new language.
+                setTimeout(function () { location.reload(); }, 250);
+              } else {
+                showToast(CloudarI18n.t('settings_toast_language_failed',
+                                        'That language is not available'));
+              }
+            });
+          });
+        });
+      }
+
       var uiStyleSelect = document.getElementById('uiStyleSelect');
       uiStyleSelect.value = data.uiStyle || 'classic';
       // Reskin this page so it matches the chrome that is actually running (see
@@ -2057,6 +2172,7 @@
       });
     }
   </script>
+  <script src="i18n.js" defer></script>
 </body>
 
 </html>

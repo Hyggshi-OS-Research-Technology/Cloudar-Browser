@@ -227,10 +227,10 @@
 </head>
 <body>
   <header>
-    <h1>Bookmarks</h1>
+    <h1 data-i18n="page_bookmarks">Bookmarks</h1>
     <div class="actions">
-      <button id="add-folder">Add Folder</button>
-      <button id="add-bookmark" class="primary">Add Bookmark</button>
+      <button id="add-folder" data-i18n="bookmarks_add_folder">Add Folder</button>
+      <button id="add-bookmark" class="primary" data-i18n="bookmarks_add">Add Bookmark</button>
     </div>
   </header>
   <div class="layout">
@@ -291,7 +291,9 @@
       const list = (data.bookmarks || []).filter(b => !currentFolder || b.folder === currentFolder);
       bookmarksEl.innerHTML = '';
       if (!list.length) {
-        bookmarksEl.innerHTML = '<div class="empty">No bookmarks in this folder.</div>';
+        bookmarksEl.innerHTML = '<div class="empty"></div>';
+        bookmarksEl.firstChild.textContent =
+          CloudarI18n.t('bookmark_no_bookmarks', 'No bookmarks yet!');
         return;
       }
       list.forEach((b) => {
@@ -349,5 +351,7 @@
 
     window.addEventListener('DOMContentLoaded', initChannel);
   </script>
+
+  <script src="i18n.js" defer></script>
 </body>
 </html>

@@ -1,4 +1,5 @@
 #include "DownloadManager.h"
+#include "Language.h"
 
 #include <QStandardPaths>
 #include <QFileInfo>
@@ -25,14 +26,16 @@ QString defaultDownloadDir()
 QString describe(const DownloadRecord &record)
 {
     if (record.cancelled)
-        return QStringLiteral("Cancelled: %1").arg(record.filename);
+        return get_text("download_popup_cancelled") + ": " + record.filename;
     if (record.completed)
-        return QStringLiteral("Done: %1").arg(record.filename);
+        return get_text("download_popup_completed") + ": " + record.filename;
     if (record.paused)
-        return QStringLiteral("Paused: %1 (%2%)").arg(record.filename).arg(record.progress);
+        return get_text("download_popup_paused") + ": " + record.filename
+                + QStringLiteral(" (%1%)").arg(record.progress);
     if (record.progress > 0)
-        return QStringLiteral("Downloading: %1 (%2%)").arg(record.filename).arg(record.progress);
-    return QStringLiteral("Downloading: %1").arg(record.filename);
+        return get_text("download_popup_downloading") + ": " + record.filename
+                + QStringLiteral(" (%1%)").arg(record.progress);
+    return get_text("download_popup_downloading") + ": " + record.filename;
 }
 }
 
@@ -47,14 +50,14 @@ void DownloadManager::ensureDialog()
         return;
 
     m_dialog = new QDialog(m_parentWidget);
-    m_dialog->setWindowTitle("Downloads");
+    m_dialog->setWindowTitle(get_text("page_downloads"));
     m_dialog->resize(420, 320);
 
     auto *layout = new QVBoxLayout(m_dialog);
     m_list = new QListWidget(m_dialog);
     layout->addWidget(m_list);
 
-    auto *hint = new QLabel("Double-click a finished download to open its folder.", m_dialog);
+    auto *hint = new QLabel(get_text("download_hint"), m_dialog);
     hint->setStyleSheet("color: #8b93a7; font-size: 11px;");
     layout->addWidget(hint);
 
@@ -134,7 +137,7 @@ void DownloadManager::handleDownloadRequested(QWebEngineDownloadRequest *downloa
     const bool askLocation = settings.value(kAskLocationKey, true).toBool();
     if (askLocation) {
         const QString chosen = QFileDialog::getSaveFileName(
-            m_parentWidget, "Save File As", finalPath);
+            m_parentWidget, get_text("download_save_title"), finalPath);
         if (chosen.isEmpty()) {
             // User cancelled the save dialog — cancel the download too
             // rather than silently saving it somewhere they didn't pick.

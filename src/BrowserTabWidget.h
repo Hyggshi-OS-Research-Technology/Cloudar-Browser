@@ -96,6 +96,11 @@ public:
     void hidePreview() { dismissPreview(); }
     static QIcon defaultFavicon(const QUrl &url);
 
+    // Re-applies the translated placeholder texts ("New Tab", sleeping hint)
+    // after a language change. Titles of *real* pages belong to the site and are
+    // left alone.
+    void retranslate();
+
     void showTabContextMenu(int index, const QPoint &globalPos);
     void reopenClosedTab();
     bool hasClosedTabs() const { return !m_closedTabUrls.isEmpty(); }

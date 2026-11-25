@@ -216,11 +216,11 @@
 </head>
 <body>
   <header>
-    <h1>Extensions</h1>
-    <div class="meta">Load unpacked extensions from <code>extensions/</code></div>
+    <h1 data-i18n="page_extensions">Extensions</h1>
+    <div class="meta"><span data-i18n="extensions_folder_intro">Load unpacked extensions from</span> <code>extensions/</code></div>
   </header>
   <div class="list" id="list"></div>
-  <div class="note">Restart tabs to ensure content scripts are applied everywhere.</div>
+  <div class="note" data-i18n="extensions_restart_note">Restart tabs to ensure content scripts are applied everywhere.</div>
 
   <script>
     // The active chrome, written to localStorage by the native side on every
@@ -286,5 +286,7 @@
 
     window.addEventListener('DOMContentLoaded', initChannel);
   </script>
+
+  <script src="i18n.js" defer></script>
 </body>
 </html>

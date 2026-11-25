@@ -1,4 +1,5 @@
 #include "MainWindow.h"
+#include "Language.h"
 #include "SettingsDialog.h"
 #include "ExtensionsDialog.h"
 #include "LightSchemeHandler.h"
@@ -258,12 +259,12 @@ MainWindow::MainWindow(bool isIncognito, QWidget *parent)
                 // that opens a dialog and prints nothing, this writes a PDF the
                 // user chooses — and the menu item says so.
                 const QString target = QFileDialog::getSaveFileName(
-                        view, tr("Print to PDF"), QDir::homePath() + "/page.pdf",
+                        view, get_text("print_title"), QDir::homePath() + "/page.pdf",
                         tr("PDF files (*.pdf)"));
                 if (target.isEmpty())
                     return;
                 page->printToPdf(target);
-                statusBar()->showMessage(tr("Printing to %1…").arg(target), 4000);
+                statusBar()->showMessage(get_text("print_started").arg(target), 4000);
             }
         });
         return menu;
@@ -333,7 +334,7 @@ MainWindow::MainWindow(bool isIncognito, QWidget *parent)
             m_addressGlowAnim->start();
         }
         if (statusBar() && Theme::current() == Theme::ThemeStyle::Classic)
-            statusBar()->showMessage(tr("Loading..."));
+            statusBar()->showMessage(get_text("status_loading"));
         updateNavigationState();
     });
     connect(m_tabs, &BrowserTabWidget::loadFinishedForCurrentTab, this, [this](bool ok) {
@@ -345,7 +346,7 @@ MainWindow::MainWindow(bool isIncognito, QWidget *parent)
             m_addressGlow->setEnabled(false);
         }
         if (statusBar() && Theme::current() == Theme::ThemeStyle::Classic)
-            statusBar()->showMessage(ok ? tr("Done") : tr("Failed to open page"), 3000);
+            statusBar()->showMessage(ok ? get_text("status_done") : get_text("status_failed"), 3000);
         updateProgress(100);
         updateNavigationState();
     });
@@ -363,12 +364,17 @@ MainWindow::MainWindow(bool isIncognito, QWidget *parent)
     buildToolbar();
     buildSidebar();
     buildBookmarksBar();
-    buildMenu();
+    buildMenuOnce();
     applySettings();
     applyChromeStyle();
     applyTheme();
     connect(&ThemeManager::instance(), &ThemeManager::accentChanged, this,
             [this](const QColor &) { applyTheme(); });
+    // Language is the one setting that changes strings, not layout: every open
+    // window retranslates itself the moment the change lands, so the settings
+    // page cannot leave one of two windows in the old language.
+    connect(LanguageManager::instance(), &LanguageManager::languageChanged, this,
+            [this](const QString &) { retranslateUi(); });
     // Light/dark is the one appearance setting that can apply without a restart:
     // it changes colours, not the window model, so every window repaints at once
     // instead of asking the user to relaunch. The classic chrome ignores it by
@@ -417,7 +423,7 @@ MainWindow::MainWindow(bool isIncognito, QWidget *parent)
         // would be redundant chrome Chrome 2009 never had.
         statusBar()->setSizeGripEnabled(true);
         statusBar()->setFixedHeight(20);
-        statusBar()->showMessage(tr("Ready"));
+        statusBar()->showMessage(get_text("status_ready"));
     }
 
     // AISidebar dock widget
@@ -431,8 +437,8 @@ MainWindow::MainWindow(bool isIncognito, QWidget *parent)
             [this](int sleptTabs, qint64 freedBytes) {
                 const int mb = static_cast<int>(freedBytes / (1024 * 1024));
                 const QString msg = sleptTabs > 0
-                    ? tr("Memory Saver: %1 tab(s) sleeping, ~%2 MB released").arg(sleptTabs).arg(mb)
-                    : tr("Memory Saver: no tabs are sleeping");
+                    ? get_text("memory_saver_status").arg(sleptTabs).arg(mb)
+                    : get_text("memory_saver_idle");
                 statusBar()->showMessage(msg, 4000);
             });
 
@@ -727,21 +733,21 @@ void MainWindow::buildToolbar()
 
     m_backAction = toolbar->addAction(classic ? Theme::icon("back") : QIcon(),
                                       classic ? QString() : QString("\u2190")); // back
-    m_backAction->setToolTip("Back");
+    m_backAction->setToolTip(tr("Back"));
     connect(m_backAction, &QAction::triggered, this, [this]() {
         if (auto *v = activeView()) v->back();
     });
 
     m_forwardAction = toolbar->addAction(classic ? Theme::icon("forward") : QIcon(),
                                           classic ? QString() : QString("\u2192")); // forward
-    m_forwardAction->setToolTip("Forward");
+    m_forwardAction->setToolTip(tr("Forward"));
     connect(m_forwardAction, &QAction::triggered, this, [this]() {
         if (auto *v = activeView()) v->forward();
     });
 
     m_reloadStopAction = toolbar->addAction(classic ? Theme::icon("reload") : QIcon(),
                                              classic ? QString() : QString("\u27F3")); // reload / stop while loading
-    m_reloadStopAction->setToolTip("Reload");
+    m_reloadStopAction->setToolTip(tr("Reload"));
     connect(m_reloadStopAction, &QAction::triggered, this, [this]() {
         if (auto *v = activeView()) {
             if (v->page()->isLoading()) v->stop(); else v->reload();
@@ -767,7 +773,7 @@ void MainWindow::buildToolbar()
     // The object name is what the classic stylesheet targets for its 23 px,
     // square-cornered, page-icon-inset omnibox.
     m_addressBar->setObjectName(classic ? "ClassicOmnibox" : "Omnibox");
-    m_addressBar->setPlaceholderText(classic ? QString() : QString("Search or enter address"));
+    m_addressBar->setPlaceholderText(classic ? QString() : get_text("omnibox_placeholder"));
     m_addressBar->setClearButtonEnabled(!classic);
     connect(m_addressBar, &QLineEdit::returnPressed, this, &MainWindow::navigateToAddressBarInput);
     toolbar->addWidget(m_addressBar);
@@ -798,19 +804,19 @@ void MainWindow::buildToolbar()
 
     m_bookmarkStarAction = toolbar->addAction(classic ? Theme::icon("star") : QIcon(),
                                               classic ? QString() : QString("\u2606")); // outline star; filled when bookmarked
-    m_bookmarkStarAction->setToolTip("Bookmark this page");
+    m_bookmarkStarAction->setToolTip(tr("Bookmark this page"));
     connect(m_bookmarkStarAction, &QAction::triggered, this, &MainWindow::toggleBookmarkForCurrentPage);
 
     auto *readerAction = toolbar->addAction(classic ? Theme::icon("reader") : QIcon(),
                                             classic ? QString() : QString("\u2637")); // reader/article glyph
-    readerAction->setToolTip("Reader mode");
+    readerAction->setToolTip(tr("Reader Mode"));
     connect(readerAction, &QAction::triggered, this, [this]() {
         auto *v = activeView();
         if (!v)
             return;
         v->page()->runJavaScript(ReaderMode::toggleScript(), [this](const QVariant &result) {
             if (result.toString() == "no-article")
-                statusBar()->showMessage("Reader mode isn't available for this page", 3000);
+                statusBar()->showMessage(get_text("reader_unavailable"), 3000);
         });
     });
 
@@ -845,7 +851,7 @@ void MainWindow::buildToolbar()
     if (!classic) {
         // AI Sidebar toggle button (Ctrl+Shift+A)
         m_aiSidebarAction = toolbar->addAction("AI"); // AI label for sidebar toggle
-        m_aiSidebarAction->setToolTip("AI Sidebar (Ctrl+Shift+A)");
+        m_aiSidebarAction->setToolTip(tr("AI Assistant") + " (Ctrl+Shift+A)");
         m_aiSidebarAction->setCheckable(true);
         m_aiSidebarAction->setShortcut(QKeySequence("Ctrl+Shift+A"));
         connect(m_aiSidebarAction, &QAction::triggered, this, [this](bool checked) {
@@ -855,7 +861,7 @@ void MainWindow::buildToolbar()
 
         // SplitView toggle button
         m_splitViewAction = toolbar->addAction("\u29C9"); // split view icon
-        m_splitViewAction->setToolTip("Toggle Split View");
+        m_splitViewAction->setToolTip(tr("Split View"));
         m_splitViewAction->setCheckable(true);
         connect(m_splitViewAction, &QAction::triggered, this, [this](bool checked) {
             toggleSplitView(checked);
@@ -921,11 +927,110 @@ void MainWindow::updateBookmarkStar(const QUrl &url)
 
 void MainWindow::buildMenu()
 {
+    clearMenuUi();
     if (Theme::current() == Theme::ThemeStyle::Classic) {
         buildClassicMenu();
         return;
     }
     buildModernMenu();
+}
+
+void MainWindow::buildMenuOnce()
+{
+    if (m_menuBuilt)
+        return;
+    m_menuBuilt = true;
+    buildMenu();
+}
+
+// Every menu this window builds owns QActions that are either members or
+// children of the menu/menu bar. Rebuilding the menus for a new language would
+// otherwise stack a second "File" on top of the first, and would leak a second
+// Ctrl+Shift+S shortcut — one of the two would then fire on every key press.
+// Deleting the actions first is what makes retranslation idempotent.
+void MainWindow::clearMenuUi()
+{
+    if (m_modernMenu) {
+        if (m_titleBar)
+            m_titleBar->setMenu(nullptr);
+        // Deleted now, not deleteLater()d: the rebuilt menu registers the same
+        // shortcuts (Ctrl+Shift+S, F12, ...), and for the gap between the two
+        // QShortcut sets Qt would see every one of them twice.
+        delete m_modernMenu;
+        m_modernMenu = nullptr;
+    }
+    if (m_menuBar) {
+        const QList<QAction *> actions = m_menuBar->actions();
+        for (QAction *action : actions) {
+            m_menuBar->removeAction(action);
+            delete action;
+        }
+    }
+    m_sidebarAction = nullptr;
+    m_zoomInAction = nullptr;
+    m_zoomOutAction = nullptr;
+    m_zoomResetAction = nullptr;
+    m_themeClassicAction = nullptr;
+    m_themeModernAction = nullptr;
+    m_splitViewMenuAction = nullptr;
+}
+
+// The native chrome has no way to change its language in place without
+// rebuilding every string it shows, so the honest implementation is exactly that:
+// rebuild the parts that can be rebuilt (menus, status bar, tab titles, window
+// title) and update the text and tooltips of the actions that are members of the
+// toolbar. The one thing that is *not* rebuilt is the window model — the
+// interface style — because that is a separate setting that already has its own
+// restart path.
+void MainWindow::retranslateUi()
+{
+    buildMenu();
+    applyMenuTranslations();
+    updateNavigationState();
+    refreshStatusBar();
+    if (m_tabs)
+        m_tabs->retranslate();
+    if (m_sidebar)
+        m_sidebar->retranslate();
+    if (m_aiSidebar)
+        m_aiSidebar->retranslateUi();
+    if (m_addressBar && Theme::current() != Theme::ThemeStyle::Classic)
+        m_addressBar->setPlaceholderText(get_text("omnibox_placeholder"));
+    // The window title is derived from the *page* title, which QtWebEngine gives
+    // us as the site chose to write it; only the " - Cloudar Browser" suffix is
+    // ours to translate, so rebuild it from the current tab.
+    if (m_tabs && m_tabs->currentView())
+        displayWindowTitle(m_tabs->currentView()->title());
+}
+
+// Status-bar messages are transient and were the only strings in this window
+// that nothing else re-set; after a language change they would sit in the old
+// language until the next navigation.
+void MainWindow::refreshStatusBar()
+{
+    // Only ever called right after a language change: the persistent messages
+    // ("Loading...", "Done") are transient and self-restoring, but the *idle*
+    // message is not, and a window that sits on an English "Ready" in a Vietnamese
+    // interface looks like the setting did not apply.
+    if (!statusBar())
+        return;
+    if (statusBar()->currentMessage().isEmpty())
+        statusBar()->showMessage(get_text("status_ready"));
+}
+
+void MainWindow::applyMenuTranslations()
+{
+    // The classic menu bar and the modern three-dot menu are built from tr()
+    // calls, which the DictionaryTranslator answers, so a rebuild is enough for
+    // them. These two are the exceptions: both are re-created on every
+    // buildToolbar() and their text lives outside the menus.
+    if (m_bookmarkStarAction)
+        m_bookmarkStarAction->setToolTip(tr("Bookmark this page"));
+    if (m_reloadStopAction) {
+        const bool loading = m_tabs && m_tabs->currentView()
+                             && m_tabs->currentView()->page()->isLoading();
+        m_reloadStopAction->setToolTip(loading ? tr("Stop") : tr("Reload"));
+    }
 }
 
 void MainWindow::announceStyleChange(Theme::ThemeStyle style)
@@ -949,37 +1054,41 @@ void MainWindow::buildModernMenu()
     // states) live as long as the window does, exactly as a menu-bar-owned menu
     // would.
     auto *menu = new QMenu(this);
+    m_modernMenu = menu;
     if (m_titleBar)
         m_titleBar->setMenu(menu);
 
-    auto *newTab = menu->addAction("New Tab");
+    auto *newTab = menu->addAction(tr("New Tab"));
     newTab->setShortcut(QKeySequence::AddTab);
     connect(newTab, &QAction::triggered, this, [this]() { m_tabs->addNewTab(); });
 
-    auto *newIncognito = menu->addAction("New Incognito Window");
+    auto *newIncognito = menu->addAction(tr("New Incognito Window"));
     newIncognito->setShortcut(QKeySequence("Ctrl+Shift+N"));
     connect(newIncognito, &QAction::triggered, this, [this]() {
         auto *incognitoWindow = new MainWindow(true);
         incognitoWindow->show();
     });
 
-    m_sidebarAction = menu->addAction("Show Sidebar");
+    m_sidebarAction = menu->addAction(tr("Show Sidebar"));
     m_sidebarAction->setCheckable(true);
     m_sidebarAction->setShortcut(QKeySequence("Ctrl+Shift+S"));
     m_sidebarAction->setChecked(m_sidebar && m_sidebar->isVisible());
     connect(m_sidebarAction, &QAction::toggled, this, &MainWindow::setSidebarVisible);
 
-    auto *downloads = menu->addAction("Downloads");
+    auto *downloads = menu->addAction(tr("Downloads"));
     connect(downloads, &QAction::triggered, this, [this]() { m_downloadManager->showDialog(); });
 
-    auto *history = menu->addAction("History");
+    auto *history = menu->addAction(tr("History"));
     connect(history, &QAction::triggered, this, &MainWindow::showHistoryDialog);
 
     // One shared handler for both chromes so the two menus cannot drift apart.
     auto *themeMenu = menu->addMenu(tr("Interface Style"));
     m_themeClassicAction = themeMenu->addAction(tr("Classic (Chrome 2009)"));
     m_themeModernAction = themeMenu->addAction(tr("Modern (dark)"));
-    auto *styleGroup = new QActionGroup(this);
+    // Parented to the menu, not the window: the menus are rebuilt on a
+    // language change, and a group per rebuild parented to the window would
+    // accumulate for the lifetime of the process.
+    auto *styleGroup = new QActionGroup(themeMenu);
     for (QAction *action : {m_themeClassicAction, m_themeModernAction}) {
         action->setCheckable(true);
         styleGroup->addAction(action);
@@ -1001,22 +1110,22 @@ void MainWindow::buildModernMenu()
         applyStyleChoice(Theme::ThemeStyle::Modern);
     });
 
-    auto *find = menu->addAction("Find in page");
+    auto *find = menu->addAction(tr("Find in Page"));
     find->setShortcut(QKeySequence::Find);
     connect(find, &QAction::triggered, this, &MainWindow::showFindBar);
 
-    auto *zoom = menu->addMenu("Zoom");
-    m_zoomInAction = zoom->addAction("Zoom In");
+    auto *zoom = menu->addMenu(tr("Zoom"));
+    m_zoomInAction = zoom->addAction(tr("Zoom In"));
     m_zoomInAction->setShortcut(QKeySequence::ZoomIn);
     connect(m_zoomInAction, &QAction::triggered, this, [this](){ if (auto *v = activeView()) setZoom(v->zoomFactor() + .1); });
-    m_zoomOutAction = zoom->addAction("Zoom Out");
+    m_zoomOutAction = zoom->addAction(tr("Zoom Out"));
     m_zoomOutAction->setShortcut(QKeySequence::ZoomOut);
     connect(m_zoomOutAction, &QAction::triggered, this, [this](){ if (auto *v = activeView()) setZoom(v->zoomFactor() - .1); });
-    m_zoomResetAction = zoom->addAction("Actual Size");
+    m_zoomResetAction = zoom->addAction(tr("Actual Size"));
     m_zoomResetAction->setShortcut(QKeySequence("Ctrl+0"));
     connect(m_zoomResetAction, &QAction::triggered, this, [this](){ setZoom(1.0); });
 
-    auto *toggleBookmarksBar = menu->addAction("Show Bookmarks Bar");
+    auto *toggleBookmarksBar = menu->addAction(tr("Show Bookmarks Bar"));
     toggleBookmarksBar->setCheckable(true);
     toggleBookmarksBar->setChecked(QSettings().value("browser/bookmarkBarVisible", true).toBool());
     toggleBookmarksBar->setShortcut(QKeySequence("Ctrl+Shift+B"));
@@ -1028,7 +1137,7 @@ void MainWindow::buildModernMenu()
         }
     });
 
-    auto *extensions = menu->addAction("Extensions");
+    auto *extensions = menu->addAction(tr("Extensions"));
     connect(extensions, &QAction::triggered, this, &MainWindow::showExtensionsDialog);
 
     // Split view was only reachable from the toolbar button, which does not
@@ -1042,7 +1151,7 @@ void MainWindow::buildModernMenu()
 
     menu->addSeparator();
 
-    auto *settings = menu->addAction("Settings");
+    auto *settings = menu->addAction(tr("Settings"));
     connect(settings, &QAction::triggered, this, &MainWindow::openSettingsPage);
 
     // The interface-style handler tells the user to "Use Tools ▸ Restart to
@@ -1062,7 +1171,7 @@ void MainWindow::buildModernMenu()
     devTools->setShortcut(QKeySequence(Qt::Key_F12));
     connect(devTools, &QAction::triggered, this, &MainWindow::openDevToolsForCurrentTab);
 
-    auto *quit = menu->addAction("Quit");
+    auto *quit = menu->addAction(tr("Quit"));
     quit->setShortcut(QKeySequence::Quit);
     connect(quit, &QAction::triggered, this, &QWidget::close);
 }
@@ -1180,7 +1289,7 @@ void MainWindow::updateNavigationState()
             m_reloadStopAction->setIcon(QIcon());
             m_reloadStopAction->setText(loading ? "\u2715" : "\u27F3");
         }
-        m_reloadStopAction->setToolTip(loading ? "Stop" : "Reload");
+        m_reloadStopAction->setToolTip(loading ? tr("Stop") : tr("Reload"));
     }
 }
 
@@ -1189,7 +1298,8 @@ void MainWindow::showFindBar()
     auto *view = activeView();
     if (!view) return;
     bool accepted = false;
-    const QString text = QInputDialog::getText(this, "Find in page", "Find:", QLineEdit::Normal, {}, &accepted);
+    const QString text = QInputDialog::getText(this, get_text("find_dialog_title"),
+                                               get_text("find_prompt"), QLineEdit::Normal, {}, &accepted);
     if (accepted && !text.isEmpty())
         view->findText(text);
 }
@@ -1198,7 +1308,7 @@ void MainWindow::setZoom(qreal zoom)
 {
     if (auto *view = activeView()) {
         view->setZoomFactor(qBound<qreal>(0.25, zoom, 5.0));
-        statusBar()->showMessage(QString("Zoom: %1%").arg(qRound(view->zoomFactor() * 100)), 1500);
+        statusBar()->showMessage(get_text("status_zoom").arg(qRound(view->zoomFactor() * 100)), 1500);
     }
 }
 
@@ -1206,18 +1316,21 @@ void MainWindow::setZoom(qreal zoom)
 QString MainWindow::permissionName(QWebEnginePermission::PermissionType type) const
 {
     using Type = QWebEnginePermission::PermissionType;
+    // The *capability id* is what PermissionStore keys on and what
+    // cloudar://permissions edits; these are the human-readable names for the
+    // dialog only, so they are translated while the stored ids stay stable.
     switch (type) {
-    case Type::MediaAudioCapture: return "microphone";
-    case Type::MediaVideoCapture: return "camera";
-    case Type::MediaAudioVideoCapture: return "camera and microphone";
-    case Type::Geolocation: return "location";
-    case Type::Notifications: return "notifications";
-    case Type::MouseLock: return "pointer lock";
-    case Type::DesktopVideoCapture: return "screen sharing";
-    case Type::DesktopAudioVideoCapture: return "screen and audio sharing";
-    case Type::ClipboardReadWrite: return "clipboard";
-    case Type::LocalFontsAccess: return "local fonts";
-    default: return "this capability";
+    case Type::MediaAudioCapture: return get_text("permission_name_microphone");
+    case Type::MediaVideoCapture: return get_text("permission_name_camera");
+    case Type::MediaAudioVideoCapture: return get_text("permission_name_camera_and_microphone");
+    case Type::Geolocation: return get_text("permission_name_location");
+    case Type::Notifications: return get_text("permission_name_notifications");
+    case Type::MouseLock: return get_text("permission_name_pointer_lock");
+    case Type::DesktopVideoCapture: return get_text("permission_name_screen_sharing");
+    case Type::DesktopAudioVideoCapture: return get_text("permission_name_screen_and_audio_sharing");
+    case Type::ClipboardReadWrite: return get_text("permission_name_clipboard");
+    case Type::LocalFontsAccess: return get_text("permission_name_local_fonts");
+    default: return get_text("permission_name_unknown");
     }
 }
 
@@ -1242,11 +1355,13 @@ void MainWindow::requestPermission(const QWebEnginePermission &permission)
     }
     {
         QMessageBox question(this);
-        question.setWindowTitle("Permission request");
-        question.setText(QString("%1 wants to use your %2.").arg(origin.host(), permissionName(permission.permissionType())));
-        question.setInformativeText("Choose Allow only for sites you trust.");
-        auto *deny = question.addButton("Deny", QMessageBox::RejectRole);
-        auto *allow = question.addButton("Allow", QMessageBox::AcceptRole);
+        question.setWindowTitle(get_text("permission_request_title"));
+        question.setText(get_text("permission_request_message")
+                             .replace("{origin}", origin.host())
+                             .replace("{permission}", permissionName(permission.permissionType())));
+        question.setInformativeText(get_text("permission_info"));
+        auto *deny = question.addButton(get_text("permission_deny"), QMessageBox::RejectRole);
+        auto *allow = question.addButton(get_text("permission_allow"), QMessageBox::AcceptRole);
         question.exec();
         const bool granted = question.clickedButton() == allow;
         Q_UNUSED(deny);
@@ -1262,15 +1377,16 @@ void MainWindow::requestPermission(const QWebEnginePermission &permission)
 QString MainWindow::featureName(QWebEnginePage::Feature feature) const
 {
     switch (feature) {
-    case QWebEnginePage::Notifications: return "notifications";
-    case QWebEnginePage::Geolocation: return "location";
-    case QWebEnginePage::MediaAudioCapture: return "microphone";
-    case QWebEnginePage::MediaVideoCapture: return "camera";
-    case QWebEnginePage::MediaAudioVideoCapture: return "camera and microphone";
-    case QWebEnginePage::MouseLock: return "pointer lock";
-    case QWebEnginePage::DesktopVideoCapture: return "screen sharing";
-    case QWebEnginePage::DesktopAudioVideoCapture: return "screen and audio sharing";
-    default: return "this capability";
+    case QWebEnginePage::Notifications: return get_text("permission_name_notifications");
+    case QWebEnginePage::Geolocation: return get_text("permission_name_location");
+    case QWebEnginePage::MediaAudioCapture: return get_text("permission_name_microphone");
+    case QWebEnginePage::MediaVideoCapture: return get_text("permission_name_camera");
+    case QWebEnginePage::MediaAudioVideoCapture: return get_text("permission_name_camera_and_microphone");
+    case QWebEnginePage::MouseLock: return get_text("permission_name_pointer_lock");
+    case QWebEnginePage::DesktopVideoCapture: return get_text("permission_name_screen_sharing");
+    case QWebEnginePage::DesktopAudioVideoCapture:
+        return get_text("permission_name_screen_and_audio_sharing");
+    default: return get_text("permission_name_unknown");
     }
 }
 
@@ -1291,11 +1407,13 @@ void MainWindow::handleFeaturePermission(const QUrl &origin, QWebEnginePage::Fea
     }
     {
         QMessageBox question(this);
-        question.setWindowTitle("Permission request");
-        question.setText(QString("%1 wants to use your %2.").arg(origin.host(), featureName(feature)));
-        question.setInformativeText("Choose Allow only for sites you trust.");
-        auto *deny = question.addButton("Deny", QMessageBox::RejectRole);
-        auto *allow = question.addButton("Allow", QMessageBox::AcceptRole);
+        question.setWindowTitle(get_text("permission_request_title"));
+        question.setText(get_text("permission_request_message")
+                             .replace("{origin}", origin.host())
+                             .replace("{permission}", featureName(feature)));
+        question.setInformativeText(get_text("permission_info"));
+        auto *deny = question.addButton(get_text("permission_deny"), QMessageBox::RejectRole);
+        auto *allow = question.addButton(get_text("permission_allow"), QMessageBox::AcceptRole);
         question.exec();
         const bool granted = question.clickedButton() == allow;
         Q_UNUSED(deny);
@@ -1356,13 +1474,34 @@ void MainWindow::updateAddressBar(const QUrl &url)
     m_addressBar->setCursorPosition(0);
 }
 
-void MainWindow::updateWindowTitle(const QString &title)
+// The two halves are deliberately separate. This slot is connected to
+// titleChangedForCurrentTab, which QtWebEngine emits repeatedly while a page
+// loads, and it fed every one of those straight into the history store — the
+// same URL could be recorded a dozen times for one visit. Retranslating the
+// window title would have recorded another, which is how the split became
+// necessary rather than tidy.
+void MainWindow::displayWindowTitle(const QString &title)
 {
-    const QString prefix = m_isIncognito ? "🕶 Incognito - " : "";
-    const QString full = title.isEmpty() ? (prefix + "Cloudar Browser") : (prefix + title + " - Cloudar Browser");
+    // Only the incognito word and the product name around the page title are
+    // ours to translate; the page title itself belongs to the site.
+    const QString appName = get_text("app_name_short");
+    // fromUtf8 rather than QStringLiteral: the sunglasses glyph is a 4-byte
+    // character and a narrow literal's encoding is the compiler's opinion, not
+    // ours.
+    const QString prefix = m_isIncognito ? QString::fromUtf8("\xF0\x9F\x95\xB6 ")
+                                                 + get_text("incognito_suffix")
+                                           + QStringLiteral(" - ")
+                                         : QString();
+    const QString full = title.isEmpty() ? (prefix + appName)
+                                         : (prefix + title + QStringLiteral(" - ") + appName);
     setWindowTitle(full);
     if (m_titleBar)
         m_titleBar->setTitle(full);
+}
+
+void MainWindow::updateWindowTitle(const QString &title)
+{
+    displayWindowTitle(title);
     if (!m_isIncognito && m_historyManager) {
         if (auto *v = m_tabs->currentView())
             m_historyManager->addVisit(title, v->url().toString());
@@ -1452,7 +1591,7 @@ void MainWindow::openInNewWindow(const QUrl &url)
 void MainWindow::showHistoryDialog()
 {
     QDialog dialog(this);
-    dialog.setWindowTitle("History");
+    dialog.setWindowTitle(tr("History"));
     dialog.resize(480, 400);
 
     auto *layout = new QVBoxLayout(&dialog);
@@ -1512,18 +1651,18 @@ void MainWindow::buildClassicMenu()
         m_menuBar = menuBar(); // the decorated window has a real menu bar
     auto *fileMenu = m_menuBar->addMenu(tr("&File"));
 
-    auto *newTab = fileMenu->addAction(tr("New &tab"));
+    auto *newTab = fileMenu->addAction(tr("New Tab"));
     newTab->setShortcut(QKeySequence::AddTab);
     connect(newTab, &QAction::triggered, this, [this]() { m_tabs->addNewTab(); });
 
-    auto *newWindow = fileMenu->addAction(tr("New &window"));
+    auto *newWindow = fileMenu->addAction(tr("New Window"));
     newWindow->setShortcut(QKeySequence("Ctrl+N"));
     connect(newWindow, &QAction::triggered, this, [this]() {
         auto *window = new MainWindow(false);
         window->show();
     });
 
-    auto *newIncognito = fileMenu->addAction(tr("New &incognito window"));
+    auto *newIncognito = fileMenu->addAction(tr("New Incognito Window"));
     newIncognito->setShortcut(QKeySequence("Ctrl+Shift+N"));
     connect(newIncognito, &QAction::triggered, this, [this]() {
         auto *window = new MainWindow(true);
@@ -1532,21 +1671,21 @@ void MainWindow::buildClassicMenu()
 
     fileMenu->addSeparator();
 
-    auto *openLocation = fileMenu->addAction(tr("Open &location"));
+    auto *openLocation = fileMenu->addAction(tr("Open Location"));
     openLocation->setShortcut(QKeySequence("Ctrl+L"));
     connect(openLocation, &QAction::triggered, this, [this]() {
         m_addressBar->setFocus();
         m_addressBar->selectAll();
     });
 
-    auto *closeTab = fileMenu->addAction(tr("&Close tab"));
+    auto *closeTab = fileMenu->addAction(tr("Close Tab"));
     closeTab->setShortcut(QKeySequence::Close);
     connect(closeTab, &QAction::triggered, this, [this]() {
         m_tabs->closeTabAt(m_tabs->currentIndex());
     });
 
     fileMenu->addSeparator();
-    auto *quit = fileMenu->addAction(tr("E&xit"));
+    auto *quit = fileMenu->addAction(tr("Exit"));
     quit->setShortcut(QKeySequence::Quit);
     connect(quit, &QAction::triggered, this, &QWidget::close);
 
@@ -1554,25 +1693,25 @@ void MainWindow::buildClassicMenu()
     // Shortcut only, no stored pointer: nothing outside this menu needs to
     // enable/disable it, and a member that is never read is just another
     // pointer that can dangle.
-    auto *find = editMenu->addAction(tr("&Find in page..."));
+    auto *find = editMenu->addAction(tr("Find in Page"));
     find->setShortcut(QKeySequence::Find);
     connect(find, &QAction::triggered, this, &MainWindow::showFindBar);
 
     auto *viewMenu = m_menuBar->addMenu(tr("&View"));
-    m_zoomInAction = viewMenu->addAction(tr("Zoom &in"));
+    m_zoomInAction = viewMenu->addAction(tr("Zoom In"));
     m_zoomInAction->setShortcut(QKeySequence::ZoomIn);
     connect(m_zoomInAction, &QAction::triggered, this,
             [this]() { if (auto *v = activeView()) setZoom(v->zoomFactor() + .1); });
-    m_zoomOutAction = viewMenu->addAction(tr("Zoom &out"));
+    m_zoomOutAction = viewMenu->addAction(tr("Zoom Out"));
     m_zoomOutAction->setShortcut(QKeySequence::ZoomOut);
     connect(m_zoomOutAction, &QAction::triggered, this,
             [this]() { if (auto *v = activeView()) setZoom(v->zoomFactor() - .1); });
-    m_zoomResetAction = viewMenu->addAction(tr("&Normal size"));
+    m_zoomResetAction = viewMenu->addAction(tr("Actual Size"));
     m_zoomResetAction->setShortcut(QKeySequence("Ctrl+0"));
     connect(m_zoomResetAction, &QAction::triggered, this, [this]() { setZoom(1.0); });
 
     viewMenu->addSeparator();
-    auto *alwaysShowBookmarks = viewMenu->addAction(tr("Always show &bookmarks bar"));
+    auto *alwaysShowBookmarks = viewMenu->addAction(get_text("menu_always_bookmarks"));
     alwaysShowBookmarks->setCheckable(true);
     alwaysShowBookmarks->setChecked(QSettings().value("browser/bookmarkBarVisible", true).toBool());
     connect(alwaysShowBookmarks, &QAction::toggled, this, [this](bool on) {
@@ -1583,7 +1722,7 @@ void MainWindow::buildClassicMenu()
     if (m_bookmarkToolbar)
         m_bookmarkToolbar->setVisible(alwaysShowBookmarks->isChecked());
 
-    m_sidebarAction = viewMenu->addAction(tr("Show &side panel"));
+    m_sidebarAction = viewMenu->addAction(get_text("menu_side_panel"));
     m_sidebarAction->setCheckable(true);
     m_sidebarAction->setShortcut(QKeySequence("Ctrl+Shift+S"));
     m_sidebarAction->setChecked(m_sidebar && m_sidebar->isVisible());
@@ -1592,7 +1731,7 @@ void MainWindow::buildClassicMenu()
     // Modern-chrome features stay reachable from a menu even when their
     // toolbar buttons are hidden for period accuracy.
     viewMenu->addSeparator();
-    m_splitViewMenuAction = viewMenu->addAction(tr("Sp&lit view"));
+    m_splitViewMenuAction = viewMenu->addAction(tr("Split View"));
     auto *splitAction = m_splitViewMenuAction;
     splitAction->setCheckable(true);
     splitAction->setShortcut(QKeySequence("Ctrl+Shift+D"));
@@ -1600,7 +1739,7 @@ void MainWindow::buildClassicMenu()
     // slot and the menu check state always mirrors the actual view.
     connect(splitAction, &QAction::toggled, this, &MainWindow::toggleSplitView);
 
-    auto *aiAction = viewMenu->addAction(tr("AI assistant panel"));
+    auto *aiAction = viewMenu->addAction(get_text("menu_ai_assistant_panel"));
     aiAction->setCheckable(true);
     aiAction->setShortcut(QKeySequence("Ctrl+Shift+A"));
     connect(aiAction, &QAction::triggered, this, [this](bool on) {
@@ -1612,30 +1751,30 @@ void MainWindow::buildClassicMenu()
     });
 
     auto *historyMenu = m_menuBar->addMenu(tr("&History"));
-    auto *history = historyMenu->addAction(tr("&History..."));
+    auto *history = historyMenu->addAction(tr("History"));
     history->setShortcut(QKeySequence("Ctrl+H"));
     connect(history, &QAction::triggered, this, &MainWindow::showHistoryDialog);
-    auto *bookmarks = historyMenu->addAction(tr("&Bookmark manager"));
+    auto *bookmarks = historyMenu->addAction(tr("Bookmarks"));
     bookmarks->setShortcut(QKeySequence("Ctrl+B"));
     connect(bookmarks, &QAction::triggered, this,
             [this]() { m_tabs->focusOrOpenTab("cloudar://bookmarks", QUrl("cloudar://bookmarks/")); });
-    auto *downloads = historyMenu->addAction(tr("&Downloads"));
+    auto *downloads = historyMenu->addAction(tr("Downloads"));
     downloads->setShortcut(QKeySequence("Ctrl+J"));
     connect(downloads, &QAction::triggered, this, [this]() { m_downloadManager->showDialog(); });
 
     auto *toolsMenu = m_menuBar->addMenu(tr("&Tools"));
-    auto *extensions = toolsMenu->addAction(tr("&Extensions"));
+    auto *extensions = toolsMenu->addAction(tr("Extensions"));
     connect(extensions, &QAction::triggered, this, &MainWindow::showExtensionsDialog);
-    auto *settings = toolsMenu->addAction(tr("&Options..."));
+    auto *settings = toolsMenu->addAction(tr("Settings"));
     connect(settings, &QAction::triggered, this, &MainWindow::openSettingsPage);
-    auto *flags = toolsMenu->addAction(tr("&Under the hood"));
+    auto *flags = toolsMenu->addAction(tr("Experiments"));
     connect(flags, &QAction::triggered, this,
             [this]() { m_tabs->focusOrOpenTab("cloudar://flags", QUrl("cloudar://flags/")); });
     toolsMenu->addSeparator();
-    auto *devTools = toolsMenu->addAction(tr("&Developer tools"));
+    auto *devTools = toolsMenu->addAction(tr("Developer Tools"));
     devTools->setShortcut(QKeySequence(Qt::Key_F12));
     connect(devTools, &QAction::triggered, this, &MainWindow::openDevToolsForCurrentTab);
-    auto *restart = toolsMenu->addAction(tr("&Restart"));
+    auto *restart = toolsMenu->addAction(tr("Restart"));
     connect(restart, &QAction::triggered, this, [this]() {
         // Settings that change the Chromium command line only take effect on a
         // new process, so a restart has to be one click away.
@@ -1644,10 +1783,13 @@ void MainWindow::buildClassicMenu()
     });
 
     toolsMenu->addSeparator();
-    auto *themeMenu = toolsMenu->addMenu(tr("&Appearance"));
+    auto *themeMenu = toolsMenu->addMenu(tr("Appearance"));
     m_themeClassicAction = themeMenu->addAction(tr("Classic (Chrome 2009)"));
     m_themeModernAction = themeMenu->addAction(tr("Modern (dark)"));
-    auto *styleGroup = new QActionGroup(this);
+    // Parented to the menu, not the window: the menus are rebuilt on a
+    // language change, and a group per rebuild parented to the window would
+    // accumulate for the lifetime of the process.
+    auto *styleGroup = new QActionGroup(themeMenu);
     for (QAction *action : {m_themeClassicAction, m_themeModernAction}) {
         action->setCheckable(true);
         styleGroup->addAction(action);
@@ -1670,7 +1812,7 @@ void MainWindow::buildClassicMenu()
     });
 
     auto *helpMenu = m_menuBar->addMenu(tr("&Help"));
-    auto *about = helpMenu->addAction(tr("&About Cloudar Browser"));
+    auto *about = helpMenu->addAction(tr("About Cloudar Browser"));
     connect(about, &QAction::triggered, this,
             [this]() { m_tabs->focusOrOpenTab("cloudar://about", QUrl("cloudar://about/")); });
 }

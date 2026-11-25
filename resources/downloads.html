@@ -221,7 +221,7 @@
 </head>
 <body>
   <header>
-    <h1>Downloads</h1>
+    <h1 data-i18n="page_downloads">Downloads</h1>
   </header>
   <div class="list" id="list"></div>
 
@@ -257,7 +257,8 @@
     const render = (items) => {
       listEl.innerHTML = '';
       if (!items || !items.length) {
-        listEl.innerHTML = '<div class="empty">No downloads yet.</div>';
+        listEl.innerHTML = '<div class="empty"></div>';
+        listEl.firstChild.textContent = CloudarI18n.t('download_popup_empty', 'No downloads yet');
         return;
       }
 
@@ -318,5 +319,7 @@
 
     window.addEventListener('DOMContentLoaded', initChannel);
   </script>
+
+  <script src="i18n.js" defer></script>
 </body>
 </html>

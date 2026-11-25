@@ -26,5 +26,16 @@
         <file>extensions.html</file>
         <file>permissions.html</file>
         <file>chrome-api-shim.js</file>
+        <file>i18n.js</file>
+        <file alias="lang/en.json">../lang/en.json</file>
+        <file alias="lang/vi.json">../lang/vi.json</file>
+        <file alias="lang/ko.json">../lang/ko.json</file>
+        <file alias="lang/fr.json">../lang/fr.json</file>
+        <file alias="lang/de.json">../lang/de.json</file>
+        <file alias="lang/es.json">../lang/es.json</file>
+        <file alias="lang/ru.json">../lang/ru.json</file>
+        <file alias="lang/pt.json">../lang/pt.json</file>
+        <file alias="lang/ja.json">../lang/ja.json</file>
+        <file alias="lang/zh.json">../lang/zh.json</file>
     </qresource>
 </RCC>

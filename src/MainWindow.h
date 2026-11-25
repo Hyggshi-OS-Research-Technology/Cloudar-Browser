@@ -39,6 +39,7 @@
 #include "ClassicTheme.h"
 
 class QSplitter;
+class QMenu;
 class QToolBar;
 class QToolButton;
 
@@ -66,6 +67,8 @@ private slots:
     void navigateToAddressBarInput();
     void updateAddressBar(const QUrl &url);
     void updateWindowTitle(const QString &title);
+    // Same title text without the history side effect (see the definition).
+    void displayWindowTitle(const QString &title);
     void updateProgress(int percent);
     void showHistoryDialog();
     void openSettingsPage(); // opens/focuses a tab on cloudar://settings/
@@ -128,6 +131,11 @@ private:
     // Both are null on the classic chrome, which uses the OS window frame and
     // QMainWindow's own menu bar; everything that touches them checks first.
     TitleBar *m_titleBar = nullptr;
+    // The modern chrome's whole menu lives in this one QMenu, attached to the
+    // title bar's three-dot button. Kept so it can be destroyed and rebuilt when
+    // the interface language changes.
+    QMenu *m_modernMenu = nullptr;
+    bool m_menuBuilt = false;
     QMenuBar *m_menuBar = nullptr; // owned manually (not via menuBar()) so it can be nested below m_titleBar
     Qt::Edges m_resizeEdges;
     QPoint m_resizeStartGlobal;
@@ -173,6 +181,14 @@ private:
     // the restart entry lives, which is exactly how the modern chrome ended up
     // pointing at a Tools menu it does not have.
     void announceStyleChange(Theme::ThemeStyle style);
+
+    // Language. QTranslator swaps the strings; these three make the *already
+    // built* widgets pick them up, which is the part Qt does not do for you.
+    void retranslateUi();          // menus, toolbar text, status bar, tab strip
+    void buildMenuOnce();          // the menus are built exactly once per window
+    void clearMenuUi();            // destroy the menus before rebuilding them
+    void applyMenuTranslations();  // the handful of strings outside the menus
+    void refreshStatusBar();
     void buildModernMenu();       // menu contents for the modern chrome
     void buildClassicMenu();      // Chrome 2009-style Page/Tools menus
     void buildToolbar();

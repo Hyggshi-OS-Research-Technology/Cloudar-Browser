@@ -41,6 +41,14 @@ private:
     // cloudar://newtab/media/wallpaper.jpg|.mp4 — the saved New Tab wallpaper,
     // read from AppDataLocation rather than from the renderer's storage.
     void serveWallpaperMedia(QWebEngineUrlRequestJob *job, const QString &path);
+    // cloudar://<any host>/i18n.json — the active language's dictionary with the
+    // English text already merged in for every key the translation lacks. Served
+    // under every internal host (rather than from one) so each page can fetch it
+    // same-origin: a cross-host fetch on a custom scheme has no CORS headers to
+    // satisfy the check with.
+    void serveLanguageDictionary(QWebEngineUrlRequestJob *job);
+    // cloudar://<any host>/i18n.js — the small runtime that applies the
+    // dictionary to [data-i18n] elements. Same origin rule as above.
 
     FaviconStore *m_favicons = nullptr;
 };

@@ -1,6 +1,7 @@
 #include "PageContextMenu.h"
 
 #include "ClassicTheme.h"
+#include "Language.h"
 
 #include <QApplication>
 #include <QClipboard>
@@ -50,10 +51,10 @@ void PageContextMenu::showAt(const QPoint &pos)
     // --- link ------------------------------------------------------------
     if (onLink) {
         const QUrl link = request->linkUrl();
-        QAction *openHere = menu.addAction(icon("page"), tr("Open link"));
-        QAction *openNewTab = menu.addAction(icon("plus"), tr("Open link in new tab"));
-        QAction *openNewWindow = menu.addAction(tr("Open link in new window"));
-        QAction *copyLink = menu.addAction(tr("Copy link address"));
+        QAction *openHere = menu.addAction(icon("page"), get_text("ctx_open_link"));
+        QAction *openNewTab = menu.addAction(icon("plus"), get_text("ctx_open_link_tab"));
+        QAction *openNewWindow = menu.addAction(get_text("ctx_open_link_window"));
+        QAction *copyLink = menu.addAction(get_text("ctx_copy_link"));
         menu.addSeparator();
 
         QAction *chosen = menu.exec(m_view->mapToGlobal(pos));
@@ -76,12 +77,11 @@ void PageContextMenu::showAt(const QPoint &pos)
     // --- image / video ---------------------------------------------------
     if (onImage || onVideo) {
         const QUrl media = request->mediaUrl();
-        QAction *openMedia = menu.addAction(tr("Open %1 in new tab")
-                                            .arg(onImage ? tr("image") : tr("video")));
-        QAction *copyMediaUrl = menu.addAction(tr("Copy %1 address")
-                                               .arg(onImage ? tr("image") : tr("video")));
-        QAction *saveMedia = menu.addAction(tr("Save %1 as…")
-                                            .arg(onImage ? tr("image") : tr("video")));
+        const QString mediaKind = onImage ? get_text("ctx_media_image")
+                                         : get_text("ctx_media_video");
+        QAction *openMedia = menu.addAction(get_text("ctx_open_media").arg(mediaKind));
+        QAction *copyMediaUrl = menu.addAction(get_text("ctx_copy_media").arg(mediaKind));
+        QAction *saveMedia = menu.addAction(get_text("ctx_save_media").arg(mediaKind));
         menu.addSeparator();
         QAction *chosen = menu.exec(m_view->mapToGlobal(pos));
         if (!chosen)
@@ -105,19 +105,19 @@ void PageContextMenu::showAt(const QPoint &pos)
 
     // --- editable field --------------------------------------------------
     if (onEditable) {
-        QAction *undo = menu.addAction(tr("Undo"));
+        QAction *undo = menu.addAction(get_text("ctx_undo"));
         undo->setEnabled(m_view->page()->action(QWebEnginePage::Undo)->isEnabled());
-        QAction *redo = menu.addAction(tr("Redo"));
+        QAction *redo = menu.addAction(get_text("ctx_redo"));
         redo->setEnabled(m_view->page()->action(QWebEnginePage::Redo)->isEnabled());
         menu.addSeparator();
-        QAction *cut = menu.addAction(icon("stop"), tr("Cut"));
+        QAction *cut = menu.addAction(icon("stop"), get_text("ctx_cut"));
         cut->setEnabled(m_view->page()->action(QWebEnginePage::Cut)->isEnabled());
-        QAction *copy = menu.addAction(tr("Copy"));
+        QAction *copy = menu.addAction(get_text("ctx_copy"));
         copy->setEnabled(m_view->page()->action(QWebEnginePage::Copy)->isEnabled());
-        QAction *paste = menu.addAction(tr("Paste"));
+        QAction *paste = menu.addAction(get_text("ctx_paste"));
         paste->setEnabled(m_view->page()->action(QWebEnginePage::Paste)->isEnabled());
         menu.addSeparator();
-        QAction *selectAll = menu.addAction(tr("Select all"));
+        QAction *selectAll = menu.addAction(get_text("ctx_select_all"));
         QAction *chosen = menu.exec(m_view->mapToGlobal(pos));
         if (!chosen)
             return;
@@ -132,8 +132,8 @@ void PageContextMenu::showAt(const QPoint &pos)
 
     // --- selected text ---------------------------------------------------
     if (onSelection) {
-        QAction *copy = menu.addAction(tr("Copy"));
-        QAction *search = menu.addAction(tr("Search the web for “%1”")
+        QAction *copy = menu.addAction(get_text("ctx_copy"));
+        QAction *search = menu.addAction(get_text("ctx_search_web")
                                          .arg(request->selectedText().left(24)));
         menu.addSeparator();
         QAction *chosen = menu.exec(m_view->mapToGlobal(pos));
@@ -155,14 +155,14 @@ void PageContextMenu::showAt(const QPoint &pos)
     QAction *reload = menu.addAction(icon("reload"), tr("Reload"));
     menu.addSeparator();
 
-    QAction *copyPageUrl = menu.addAction(tr("Copy page address"));
-    QAction *pageSource = menu.addAction(tr("View page source"));
+    QAction *copyPageUrl = menu.addAction(get_text("ctx_copy_page_url"));
+    QAction *pageSource = menu.addAction(get_text("menu_view_source"));
     // view-source: only makes sense for a real document. A cloudar:// page is a
     // Qt resource; "View page source" there would open a blank tab.
     pageSource->setEnabled(!internal && pageUrl.isValid());
     // "Print" in a browser means a print dialog with a preview; QtWebEngine only
     // offers printToPdf. The label says what the item actually does.
-    QAction *printPage = menu.addAction(tr("Print to PDF…"));
+    QAction *printPage = menu.addAction(get_text("print_title") + QStringLiteral("…"));
 
     QAction *bookmarkAction = m_bookmarkActionProvider ? m_bookmarkActionProvider() : nullptr;
     if (bookmarkAction && bookmarkAction->isEnabled()) {
@@ -171,9 +171,9 @@ void PageContextMenu::showAt(const QPoint &pos)
     }
 
     menu.addSeparator();
-    QAction *inspect = menu.addAction(tr("Inspect element"));
+    QAction *inspect = menu.addAction(get_text("ctx_inspect"));
     inspect->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_I));
-    QAction *devTools = menu.addAction(tr("Developer tools"));
+    QAction *devTools = menu.addAction(get_text("menu_devtools"));
     devTools->setShortcut(QKeySequence(Qt::Key_F12));
 
     QAction *chosen = menu.exec(m_view->mapToGlobal(pos));

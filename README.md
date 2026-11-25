@@ -206,11 +206,13 @@ Cloudar-Browser/
 │   ├── BrowserSidebar.*         # vertical tabs + hover cards
 │   ├── TabPreviewPopup.*        # hover thumbnail card
 │   ├── SettingsBridge.*         # cloudar://settings backend
+│   ├── Language.*               # dictionaries, QTranslator, languageChanged
 │   ├── AdBlock.*, AISidebar.*, SplitView.*, ReaderMode.*, ThemeManager.*, ...
 ├── resources/                   # internal pages, icons, QSS assets
 ├── docs/
 │   ├── CLASSIC_UI.md            # the Chrome 2009 interface, in detail
 │   ├── CPU_COMPATIBILITY.md     # hardware tiers and what they change
+│   ├── LANGUAGE.md              # interface languages: how a string is translated
 │   ├── PLATFORM_MATRIX.md       # what runs where; legacy/mobile branch plan
 │   └── KNOWN_ISSUES.md          # honest list of gaps and limitations
 └── legacy/                      # archived Python / PyQt6 prototype
@@ -227,6 +229,7 @@ Cloudar-Browser/
 | Qt 6.5 LTS / 6.8 LTS / 6.10 | 6.8 LTS and 6.10 are built in CI; 6.5 is supported in the source (`QT_VERSION` guards) but not exercised by CI |
 | Memory Saver, CPU tiers | implemented; **no unit tests yet** — see `docs/KNOWN_ISSUES.md` §9 |
 | Extensions | partial `chrome.*` shim — see `docs/KNOWN_ISSUES.md` §4 |
+| Interface languages | 10 languages, native chrome + internal pages; settings body copy still English — see `docs/LANGUAGE.md` |
 | Windows 7/8.1, Android, Debian 11 | **not** supported by this branch, on purpose |
 
 ---

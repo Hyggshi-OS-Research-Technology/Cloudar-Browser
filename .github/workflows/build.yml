@@ -113,6 +113,15 @@ jobs:
           # a typo costs seconds instead of twenty minutes.
           node tools/check-newtab.js
 
+      - name: Check translations
+        run: |
+          # The interface language is only worth shipping if the dictionaries are
+          # complete and every string the chrome shows can actually reach one.
+          # Catches: a language offered by LanguageManager with no dictionary, a
+          # key missing from one language only, a tr()/get_text() string with no
+          # English entry, and a page that never loads the i18n runtime.
+          node tools/check-i18n.js
+
       - name: Configure CMake
         run: cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release
 
