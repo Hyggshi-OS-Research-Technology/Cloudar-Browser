@@ -198,6 +198,137 @@ for (const file of jsFiles) {
   }
 }
 
+// --- 6: reading a property off something that is not in scope ---------------
+// The specific defect this prevents, reported from a real run:
+//
+//     reader.onload = function () {          // no parameter
+//       ...
+//       img.src = e.target.result;           // ReferenceError: e is not defined
+//     };
+//
+// It threw inside an async FileReader callback, so nothing was logged to the
+// page except an uncaught error, img.src was never assigned, the image's own
+// load event never fired, and a local wallpaper did nothing at all while the
+// panel showed no message. Silent, and invisible to every other check here.
+//
+// Only `<ident>.target` is checked: that is the event-object property this bug
+// class always reaches for, and it is unambiguous — a name used as `.target`
+// must be a parameter of an enclosing function or declared in the file.
+const KNOWN_GLOBALS = new Set([
+  'window', 'document', 'console', 'navigator', 'location', 'localStorage',
+  'indexedDB', 'URL', 'Math', 'JSON', 'Object', 'Array', 'String', 'Number',
+  'Date', 'Error', 'Promise', 'Image', 'FileReader', 'Blob', 'self', 'this',
+  'globalThis', 'HTMLElement', 'Event', 'performance',
+]);
+
+for (const file of jsFiles) {
+  const src = stripComments(read(file));
+  const declaredInFile = new Set(
+    [...src.matchAll(/\b(?:var|let|const|function)\s+([A-Za-z_$][\w$]*)/g)].map((m) => m[1])
+  );
+
+  // Walk forward, keeping a stack of function scopes so `.target` can be resolved
+  // against the parameter lists that actually enclose it.
+  const scopes = [];
+  let depth = 0;
+  let i = 0;
+  let pendingParams = null;
+  while (i < src.length) {
+    const ch = src[i];
+
+    if (ch === '"' || ch === "'" || ch === '`') {
+      const quote = ch;
+      i++;
+      while (i < src.length) {
+        if (src[i] === '\\') { i += 2; continue; }
+        if (src[i] === quote) { i++; break; }
+        i++;
+      }
+      continue;
+    }
+
+    if (src.startsWith('function', i) && !/[\w$]/.test(src[i - 1] || '')) {
+      const open = src.indexOf('(', i);
+      const close = open < 0 ? -1 : (() => {
+        let d = 0;
+        for (let k = open; k < src.length; k++) {
+          if (src[k] === '(') d++;
+          else if (src[k] === ')') { d--; if (d === 0) return k; }
+        }
+        return -1;
+      })();
+      if (close < 0) { i++; continue; }
+      pendingParams = src.slice(open + 1, close)
+        .split(',')
+        .map((t) => t.trim().split('=')[0].trim())
+        .filter(Boolean);
+      i = close + 1;
+      continue;
+    }
+
+    // Arrow functions: `(a, b) => {` and `a => {`
+    if (ch === '=' && src[i + 1] === '>' && !pendingParams) {
+      let params = [];
+      let k = i - 1;
+      while (k >= 0 && /\s/.test(src[k])) k--;
+      if (src[k] === ')') {
+        let d = 0;
+        const closeK = k;
+        for (; k >= 0; k--) {
+          if (src[k] === ')') d++;
+          else if (src[k] === '(') { d--; if (d === 0) break; }
+        }
+        params = src.slice(k + 1, closeK).split(',')
+          .map((t) => t.trim().split('=')[0].trim()).filter(Boolean);
+      } else {
+        let m = '';
+        for (; k >= 0 && /[\w$]/.test(src[k]); k--) m = src[k] + m;
+        if (m) params = [m];
+      }
+      pendingParams = params;
+      i += 2;
+      continue;
+    }
+
+    if (ch === '{') {
+      depth++;
+      scopes.push({ depth, params: pendingParams || [] });
+      pendingParams = null;
+      i++;
+      continue;
+    }
+    if (ch === '}') {
+      while (scopes.length && scopes[scopes.length - 1].depth === depth) scopes.pop();
+      depth--;
+      i++;
+      continue;
+    }
+
+    if (/[A-Za-z_$]/.test(ch)) {
+      let m = '';
+      let k = i;
+      for (; k < src.length && /[\w$]/.test(src[k]); k++) m += src[k];
+      // `<ident>.target`
+      if (src[k] === '.' && src.startsWith('.target', k) &&
+          !/[\w$]/.test(src[k + 7] || '')) {
+        const inScope = scopes.some((sc) => sc.params.includes(m));
+        if (!inScope && !declaredInFile.has(m) && !KNOWN_GLOBALS.has(m)) {
+          errors.push(
+            `${path.relative(ROOT, file)}: reads .target off "${m}", which is not a ` +
+            `parameter of any enclosing function and is not declared — this is a ` +
+            `ReferenceError inside a callback, so the code after it silently never runs`
+          );
+        }
+      }
+      i = k;
+      continue;
+    }
+
+    if (!/\s/.test(ch)) pendingParams = null;
+    i++;
+  }
+}
+
 // --- 6: syntax --------------------------------------------------------------
 for (const file of jsFiles) {
   const src = read(file);

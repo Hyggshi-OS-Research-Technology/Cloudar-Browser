@@ -220,7 +220,13 @@ var CloudarNewTab = (function () {
 
     // Mirrors a wallpaper choice into QSettings + AppDataLocation. `cb(ok)` is
     // optional; the caller uses it to put a real message in the panel.
-    saveMedia: function (kind, blobOrNull, value, cb) {
+    // `mime` matters for an uploaded image: the browser keeps exactly one file
+    // per kind, and its extension and Content-Type have to describe the bytes it
+    // actually received. See prepareImage() in scripts/background.js.
+    saveMedia: function (kind, blobOrNull, value, mime, cb) {
+      // Called as saveMedia(kind, blob, value, cb) by older call sites: only a
+      // string in the mime position can be a type.
+      if (typeof mime === 'function') { cb = mime; mime = ''; }
       var done = typeof cb === 'function' ? cb : function () {};
       if (!bridge || !bridge.saveWallpaperMedia) {
         done(false, 'no bridge');
@@ -230,7 +236,7 @@ var CloudarNewTab = (function () {
 
       function send(base64) {
         try {
-          api.saveWallpaperMedia(kind, base64 || '', value || '', function (url) {
+          api.saveWallpaperMedia(kind, base64 || '', value || '', mime || '', function (url) {
             done(!!url || kind === 'color' || kind === 'web', url || '');
           });
         } catch (e) {

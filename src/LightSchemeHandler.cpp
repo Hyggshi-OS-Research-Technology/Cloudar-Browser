@@ -6,6 +6,7 @@
 #include <QBuffer>
 #include <QFile>
 #include <QFileInfo>
+#include <QHash>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QUrlQuery>
@@ -103,12 +104,35 @@ void LightSchemeHandler::serveFavicon(QWebEngineUrlRequestJob *job)
 
 void LightSchemeHandler::serveWallpaperMedia(QWebEngineUrlRequestJob *job, const QString &path)
 {
-    // Only the two names NewTabBridge ever writes are served. Anything else under
-    // /media/ is a 404, so a page cannot use this host to read arbitrary files by
-    // guessing names — the same reason the assets handler rejects "..".
+    // Only the names NewTabBridge ever writes are served, and only the still or
+    // video formats it can write: wallpaper.<ext>. Anything else under /media/ is
+    // a 404, so a page cannot use this host to read arbitrary files by guessing
+    // names — the same reason the assets handler rejects "..".
+    //
+    // The extension is not decoration. The page uploads whatever format the user
+    // picked (PNG keeps transparency, so it is deliberately not re-encoded), and
+    // the stored file is named after it. Answering image/jpeg for PNG bytes was
+    // only survivable because Chromium sniffs image content.
+    static const QHash<QString, QByteArray> kTypes = {
+        {QStringLiteral("jpg"),  QByteArrayLiteral("image/jpeg")},
+        {QStringLiteral("jpeg"), QByteArrayLiteral("image/jpeg")},
+        {QStringLiteral("png"),  QByteArrayLiteral("image/png")},
+        {QStringLiteral("webp"), QByteArrayLiteral("image/webp")},
+        {QStringLiteral("gif"),  QByteArrayLiteral("image/gif")},
+        {QStringLiteral("svg"),  QByteArrayLiteral("image/svg+xml")},
+        {QStringLiteral("mp4"),  QByteArrayLiteral("video/mp4")},
+        {QStringLiteral("webm"), QByteArrayLiteral("video/webm")},
+        {QStringLiteral("ogv"),  QByteArrayLiteral("video/ogg")},
+    };
+
     const QString fileName = path.mid(path.lastIndexOf(QLatin1Char('/')) + 1);
-    if (fileName != QLatin1String("wallpaper.jpg")
-        && fileName != QLatin1String("wallpaper.mp4")) {
+    const int dot = fileName.lastIndexOf(QLatin1Char('.'));
+    if (dot <= 0 || !fileName.startsWith(QLatin1String("wallpaper."))) {
+        job->fail(QWebEngineUrlRequestJob::UrlNotFound);
+        return;
+    }
+    const QString suffix = fileName.mid(dot + 1).toLower();
+    if (!kTypes.contains(suffix)) {
         job->fail(QWebEngineUrlRequestJob::UrlNotFound);
         return;
     }
@@ -124,10 +148,7 @@ void LightSchemeHandler::serveWallpaperMedia(QWebEngineUrlRequestJob *job, const
         return;
     }
 
-    const QByteArray mimeType = fileName.endsWith(QLatin1String(".mp4"))
-            ? QByteArrayLiteral("video/mp4")
-            : QByteArrayLiteral("image/jpeg");
-    serveResource(job, stored, mimeType);
+    serveResource(job, stored, kTypes.value(suffix));
 }
 
 void LightSchemeHandler::requestStarted(QWebEngineUrlRequestJob *job)

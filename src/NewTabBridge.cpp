@@ -25,6 +25,7 @@ const char *kDefaultSearch = "https://duckduckgo.com/?q=%s";
 const char *kWallpaperKindKey = "browser/newTabWallpaper/kind";
 const char *kWallpaperValueKey = "browser/newTabWallpaper/value";
 const char *kWallpaperFileKey = "browser/newTabWallpaper/file";
+const char *kWallpaperMimeKey = "browser/newTabWallpaper/mime";
 
 QString wallpaperDir()
 {
@@ -36,6 +37,31 @@ QString wallpaperDir()
     const QString dir = base + QStringLiteral("/wallpaper");
     QDir().mkpath(dir);
     return dir;
+}
+
+// One file per kind means the extension is the only thing telling the scheme
+// handler (and the WebEngine parser) what those bytes are. Map the MIME the page
+// reported to a suffix; anything unknown is treated as a still image, because a
+// wallpaper upload from the file picker is an image unless the page said video.
+QString extensionForMime(const QString &kind, const QString &mime)
+{
+    const QString normalised = mime.trimmed().toLower();
+    if (kind == QLatin1String("video")) {
+        if (normalised == QLatin1String("video/webm"))
+            return QStringLiteral("webm");
+        if (normalised == QLatin1String("video/ogg"))
+            return QStringLiteral("ogv");
+        return QStringLiteral("mp4");
+    }
+    if (normalised == QLatin1String("image/png"))
+        return QStringLiteral("png");
+    if (normalised == QLatin1String("image/webp"))
+        return QStringLiteral("webp");
+    if (normalised == QLatin1String("image/gif"))
+        return QStringLiteral("gif");
+    if (normalised == QLatin1String("image/svg+xml"))
+        return QStringLiteral("svg");
+    return QStringLiteral("jpg");
 }
 
 // The page shows the engine's name above the search box; deriving it from the
@@ -144,7 +170,7 @@ QString NewTabBridge::faviconUrl(const QString &pageUrl)
 }
 
 QString NewTabBridge::saveWallpaperMedia(const QString &kind, const QString &base64,
-                                         const QString &value)
+                                         const QString &value, const QString &mime)
 {
     QSettings settings;
     const QString normalised = kind.trimmed().toLower();
@@ -155,6 +181,7 @@ QString NewTabBridge::saveWallpaperMedia(const QString &kind, const QString &bas
         settings.setValue(QLatin1String(kWallpaperKindKey), normalised);
         settings.setValue(QLatin1String(kWallpaperValueKey), value);
         settings.remove(QLatin1String(kWallpaperFileKey));
+        settings.remove(QLatin1String(kWallpaperMimeKey));
         return QString();
     }
 
@@ -165,13 +192,12 @@ QString NewTabBridge::saveWallpaperMedia(const QString &kind, const QString &bas
     if (bytes.isEmpty())
         return QString();
 
-    // One slot per kind ("wallpaper.jpg" / "wallpaper.mp4"), so choosing ten
+    // One slot per kind ("wallpaper.png" / "wallpaper.mp4"), so choosing ten
     // wallpapers in a row cannot grow a directory of orphans. The extension is
     // part of the name so the scheme handler can answer with the right MIME type
-    // without sniffing.
-    const QString fileName = QStringLiteral("wallpaper.")
-            + (normalised == QLatin1String("video") ? QStringLiteral("mp4")
-                                                    : QStringLiteral("jpg"));
+    // without sniffing — and it follows the bytes the page actually uploaded, so
+    // a PNG is not stored as wallpaper.jpg.
+    const QString fileName = QStringLiteral("wallpaper.") + extensionForMime(normalised, mime);
     const QString path = wallpaperDir() + QLatin1Char('/') + fileName;
 
     // Replace, do not append: QFile::WriteOnly would otherwise leave the tail of
@@ -193,6 +219,7 @@ QString NewTabBridge::saveWallpaperMedia(const QString &kind, const QString &bas
 
     settings.setValue(QLatin1String(kWallpaperKindKey), normalised);
     settings.setValue(QLatin1String(kWallpaperFileKey), path);
+    settings.setValue(QLatin1String(kWallpaperMimeKey), mime.trimmed().toLower());
     settings.remove(QLatin1String(kWallpaperValueKey));
     return wallpaperMediaUrl();
 }
@@ -245,6 +272,7 @@ void NewTabBridge::clearWallpaperMedia()
     if (!path.isEmpty())
         QFile::remove(path);
     settings.remove(QLatin1String(kWallpaperFileKey));
+    settings.remove(QLatin1String(kWallpaperMimeKey));
 }
 
 void NewTabBridge::openUrl(const QString &url)

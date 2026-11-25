@@ -71,12 +71,19 @@ public slots:
     // saved here survives, and it also survives clearing browsing data, which is
     // what a person expects of a preference they chose deliberately.
     //
-    // `base64` is the raw file bytes, already re-encoded by the page (max 2560 px
-    // JPEG for images). `kind` is "image" | "video" | "web" | "color" |
-    // "default"; `value` carries the URL/colour for the last three.
+    // `base64` is the raw file bytes, already re-encoded by the page. `kind` is
+    // "image" | "video" | "web" | "color" | "default"; `value` carries the
+    // URL/colour for the last three.
+    //
+    // `mime` ("image/png", "image/webp", "image/jpeg", ...) describes those
+    // bytes. It decides the stored file's extension, and therefore the
+    // Content-Type the scheme handler answers with, so the extension is never a
+    // guess. An empty or unrecognised value falls back to JPEG for images and
+    // MP4 for videos, which is what the page used to send unconditionally.
+    //
     // Returns the cloudar://newtab/media/<file> URL to display, or "" on failure.
     QString saveWallpaperMedia(const QString &kind, const QString &base64,
-                               const QString &value);
+                               const QString &value, const QString &mime);
 
     // The cloudar:// URL for the stored wallpaper, or "" when none is stored.
     // The page asks for this at startup (initialState().wallpaper comes from the
