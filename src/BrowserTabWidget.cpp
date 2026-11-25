@@ -451,7 +451,10 @@ void BrowserTabWidget::applyCloseGlyph(int index)
     // first must be deleted before it is replaced, or QTabBar keeps a child
     // button that is no longer the tab's and paints a second cross over ours.
     if (button && !tool) {
-        tabBar()->setTabButton(index, QTabBar::RightSide, nullptr);
+        // setTabButton() only accepts a QWidget*, and Qt's own close button is
+        // a QTabBar::CloseButton (a QAbstractButton) — so the clear is a plain
+        // QWidget* cast of nullptr, which is where the compiler needed help.
+        tabBar()->setTabButton(index, QTabBar::RightSide, static_cast<QWidget *>(nullptr));
         delete button;
     }
     if (!tool) {
