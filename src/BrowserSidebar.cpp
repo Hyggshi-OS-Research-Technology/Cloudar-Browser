@@ -1,6 +1,7 @@
 #include "BrowserSidebar.h"
 #include "BrowserTabWidget.h"
 #include "ClassicTheme.h"
+#include "ThemeManager.h"
 #include "Language.h"
 
 #include <QApplication>
@@ -105,7 +106,11 @@ public:
 
         auto *divider = new QFrame(this);
         divider->setFrameShape(QFrame::HLine);
-        divider->setStyleSheet(QStringLiteral("background: rgba(255, 255, 255, 0.08); max-height: 1px; min-height: 1px; border: none;"));
+        divider->setStyleSheet(
+        // A white 8% hairline is invisible on a light surface: it assumes the
+        // dark card. The border colour works in both.
+        QStringLiteral("background: %1; max-height: 1px; min-height: 1px; border: none;")
+            .arg(colors.border.name()));
         layout->addWidget(divider);
 
         auto *footerLayout = new QHBoxLayout;
@@ -252,7 +257,19 @@ public:
 
         m_closeButton = new QToolButton(this);
         m_closeButton->setFixedSize(20, 20);
-        m_closeButton->setText(QStringLiteral("✕"));
+        // Painted, palette-following cross rather than the "✕" character: the
+        // character inherits the button's colour, which the QSS sets, but its
+        // weight and size differ per platform font and it reads as a text
+        // glyph, not a button. This matches the tab strip's close button.
+        m_closeButton->setIcon(Theme::icon(QStringLiteral("close"), 12));
+        m_closeButton->setIconSize(QSize(12, 12));
+        // The sidebar exists in both chromes, so the glyph has to survive a
+        // light/dark flip without a rebuild of this row.
+        connect(&ThemeManager::instance(), &ThemeManager::colorModeChanged, m_closeButton,
+                [this](bool) {
+                    if (m_closeButton)
+                        m_closeButton->setIcon(Theme::icon(QStringLiteral("close"), 12));
+                });
         m_closeButton->setToolTip(get_text("menu_close_tab"));
         m_closeButton->setCursor(Qt::PointingHandCursor);
         m_closeButton->setObjectName(QStringLiteral("SidebarTabCloseButton"));

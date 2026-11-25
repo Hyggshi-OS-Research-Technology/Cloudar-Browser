@@ -332,5 +332,20 @@
   "files_error_title": "このフォルダーを一覧できません",
   "files_error_body": "フォルダーを読み取れませんでした。",
   "files_no_bridge_title": "利用できません",
-  "files_no_bridge_body": "このページは Cloudar Browser 内で開く必要があります。"
+  "files_no_bridge_body": "このページは Cloudar Browser 内で開く必要があります。",
+  "notification_dismiss": "通知を閉じる",
+  "permission_info_notifications": "Cloudar はこのサイトの通知をこのウィンドウ内のカードとして表示します。OS による通知ではないため、ウィンドウを閉じている間は何も表示されません。",
+  "notification_shown_status": "{site} から通知が届きました",
+  "shortcut_dialog_title": "ウェブ ショートカットを作成",
+  "shortcut_dialog_intro": "タブやアドレスバーのない専用ウィンドウでこのページを開きます。",
+  "shortcut_dialog_note": "このショートカットはインストールではありません。ページには引き続きネットワークが必要で、オフライン用の保存は行われません。",
+  "shortcut_name_label": "名前",
+  "shortcut_url_label": "ページ",
+  "shortcut_create": "ショートカットを作成",
+  "shortcut_menu_empty": "ウェブ ショートカットはまだありません",
+  "shortcut_remove": "ショートカットを削除",
+  "shortcut_removed": "ショートカットを削除しました",
+  "shortcut_created": "ショートカット「{name}」を作成しました",
+  "shortcut_needs_web_page": "ショートカットはウェブページに対してのみ作成できます",
+  "Web shortcuts": "ウェブ ショートカット"
 }

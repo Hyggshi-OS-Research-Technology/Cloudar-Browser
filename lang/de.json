@@ -332,5 +332,20 @@
   "files_error_title": "Dieser Ordner konnte nicht aufgelistet werden",
   "files_error_body": "Der Ordner konnte nicht gelesen werden.",
   "files_no_bridge_title": "Nicht verfügbar",
-  "files_no_bridge_body": "Diese Seite muss in Cloudar Browser geöffnet werden."
+  "files_no_bridge_body": "Diese Seite muss in Cloudar Browser geöffnet werden.",
+  "notification_dismiss": "Benachrichtigung verwerfen",
+  "permission_info_notifications": "Cloudar zeigt die Benachrichtigungen dieser Website als Karte in diesem Fenster. Sie werden nicht vom Betriebssystem zugestellt: Bei geschlossenem Fenster erscheint nichts.",
+  "notification_shown_status": "{site} hat eine Benachrichtigung gesendet",
+  "shortcut_dialog_title": "Web-Verknüpfung erstellen",
+  "shortcut_dialog_intro": "Öffnet diese Seite in einem eigenen Fenster, ohne Tabs oder Adressleiste.",
+  "shortcut_dialog_note": "Die Verknüpfung ist keine Installation: Die Seite braucht weiterhin das Netz, und für die Offline-Nutzung wird nichts gespeichert.",
+  "shortcut_name_label": "Name",
+  "shortcut_url_label": "Seite",
+  "shortcut_create": "Verknüpfung erstellen",
+  "shortcut_menu_empty": "Noch keine Web-Verknüpfungen",
+  "shortcut_remove": "Verknüpfung entfernen",
+  "shortcut_removed": "Verknüpfung entfernt",
+  "shortcut_created": "Verknüpfung „{name}“ erstellt",
+  "shortcut_needs_web_page": "Verknüpfungen lassen sich nur für Webseiten erstellen",
+  "Web shortcuts": "Web-Verknüpfungen"
 }

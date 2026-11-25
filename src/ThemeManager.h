@@ -63,6 +63,27 @@ public:
     // copy drifting out of sync with this one.
     QString modernStyleSheet(const QColor &accent) const;
 
+    // One definition of the light/dark palette, shared by the stylesheet and by
+    // every widget that paints itself. The painted widgets used to hard-code
+    // the dark values, which is why the tab close button was #c7cede — i.e.
+    // white-on-white — in light mode.
+    struct Palette {
+        QColor window;
+        QColor chrome;
+        QColor border;
+        QColor tab;
+        QColor tabHover;
+        QColor hover;
+        QColor input;
+        QColor text;
+        QColor dim;
+        QColor onAccent;
+    };
+    // The palette in force right now (the preference with System resolved).
+    Palette palette() const;
+    // The same palette for an explicit dark/light answer.
+    static Palette paletteFor(bool dark);
+
 signals:
     void accentChanged(const QColor &color);
     // Emitted when what is on screen changes: the user picked a mode, or the OS

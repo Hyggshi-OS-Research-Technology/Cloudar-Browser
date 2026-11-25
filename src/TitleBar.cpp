@@ -176,6 +176,13 @@ TitleBar::TitleBar(QWidget *parent) : QWidget(parent)
 
     applyTheme(ThemeManager::instance().accentColor());
     connect(&ThemeManager::instance(), &ThemeManager::accentChanged, this, &TitleBar::applyTheme);
+    // The window controls are painted, so a light/dark flip has to *repaint*
+    // them: applyTheme() derives their colour from readableTextOn(accent), and
+    // in light mode that is dark glyphs on a light accent — the opposite of the
+    // dark-mode answer. Without this the title bar kept the old glyphs until the
+    // user happened to change the accent colour.
+    connect(&ThemeManager::instance(), &ThemeManager::colorModeChanged, this,
+            [this](bool) { applyTheme(ThemeManager::instance().accentColor()); });
 }
 
 void TitleBar::setTitle(const QString &title)

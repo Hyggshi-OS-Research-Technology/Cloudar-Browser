@@ -113,6 +113,15 @@ jobs:
           # a typo costs seconds instead of twenty minutes.
           node tools/check-newtab.js
 
+      - name: Check stylesheet tokens
+        run: |
+          # Both chromes build their QSS by substitution, and nothing verified
+          # that the substitution completed: a role added to the sheet but not to
+          # the .arg() chain renders as a literal "%13" that Qt drops silently.
+          # Also refuses image assets in the modern sheet, because a shipped SVG
+          # has its colour baked in and cannot follow light/dark.
+          node tools/check-css.js
+
       - name: Check translations
         run: |
           # The interface language is only worth shipping if the dictionaries are

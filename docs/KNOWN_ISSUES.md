@@ -106,6 +106,11 @@ automated benchmark in this repository yet.
   cosmetic.
 - Reader mode is a heuristic DOM rewrite, not Readability.js.
 
+Web notifications and web shortcuts were on this list as "not implemented".
+Both now exist, incompletely and on purpose: see §12 (the cards are drawn by
+Cloudar, not by the operating system) and §13 (a shortcut is a saved URL, not an
+installed app).
+
 ## 8. Performance claims still need measurements
 
 The theoretical costs are known: a live wallpaper is a decoding video element,
@@ -130,11 +135,14 @@ Xvfb — one `--classic`, one `--modern` — which is enough to catch a startup
 crash, a missing resource or a broken stylesheet, and nothing else. The Windows
 jobs build and package but run no test at all.
 
-There is now a test target, but it covers **one** class: `LocalFileService`, in
-`tests/tst_localfileservice.cpp`, built with `-DCLOUDAR_BUILD_TESTS=ON`. It
-exists because that class is a security boundary — it decides which directories
-a `cloudar://` page can make the browser enumerate — so "it looked right" was not
-good enough. See `docs/FILE_PROTOCOL_SECURITY.md`.
+There are now two test targets, built with `-DCLOUDAR_BUILD_TESTS=ON`:
+
+* `tests/tst_localfileservice.cpp` — `LocalFileService`, because it decides which
+  directories a `cloudar://` page can make the browser enumerate and that is a
+  security boundary (see `docs/FILE_PROTOCOL_SECURITY.md`);
+* `tests/tst_webshortcutstore.cpp` — `WebShortcutStore`, because the menu it
+  feeds has invariants (one site one shortcut, ids surviving a rename) that break
+  silently.
 
 Everything else is still untested. `PerformanceProfile`, `MemorySaver` and
 `Theme::metrics()` remain the highest-value additions, because all three are pure
@@ -146,6 +154,7 @@ logic and trivially testable:
 | `MemorySaver::thresholdForLevel` | light/medium/high/ultra map to 2 h/1 h/15 min/2 min and an unknown level falls back to medium. | not written |
 | `Theme` | `metrics()` returns a coherent set per style (classic not frameless, status bar visible, zero sidebar); every `@TOKEN@` in the classic sheet is substituted; `styleFromKey()` round-trips with `keyFor()`. | not written |
 | `LocalFileService` | path confinement, `..`/symlink/sibling-prefix escapes, `~/` expansion, path-vs-search resolution. | **written** |
+| `WebShortcutStore` | one site one shortcut, id survives a rename, trailing slash/fragment normalisation, file:// and cloudar:// refused, corrupt storage reads as empty. | **written** |
 
 A smoke test cannot see any of that, which is why these bugs are the kind that
 survive releases.
@@ -206,3 +215,65 @@ feature: the horizontal tab strip (the only surface in the classic chrome) keeps
 Reordering tabs *inside* the sidebar has none of these limitations: it moves the
 real tab, which keeps its history, its page state and its cookies, because both
 surfaces are one call to `QTabBar::moveTab()`.
+
+## 12. Notifications are real, but they are not OS notifications
+
+The roadmap line for this item said "declare unsupported", on the assumption that
+QtWebEngine had no notification API. That assumption was wrong:
+`QWebEngineProfile::setNotificationPresenter()` has existed since Qt 5.13
+(`QWebEngineNotification` since 2019), so web notifications are **implemented**
+(`src/NotificationPresenter.*`, `src/NotificationToast.*`) rather than disclaimed.
+
+What works:
+
+* A site the user allowed (the normal permission prompt, stored by
+  `PermissionStore`) gets a card in the corner of the window that owns the page.
+* Clicking the card runs the page's `click()` handler and raises the tab; the
+  dismiss button and the six-second timeout run `close()`, so the page is never
+  left waiting for an answer that will not come.
+* At most three at a time; the oldest is evicted.
+* A denied site is dropped silently, and so is one that never asked for
+  permission — the page cannot distinguish "denied" from "nobody was watching".
+
+What does **not** work, and is not claimed:
+
+* **No operating-system delivery.** There is no libnotify / Windows Toast XML /
+  macOS path in this build, so nothing appears when the Cloudar window is closed,
+  and nothing is queued for later. There is no notification centre.
+* **No action buttons, no `requireInteraction`, no `silent`/`renotify`, no
+  `badge`.** The card shows title, message, site icon and origin, which is all
+  `QWebEngineNotification` exposes.
+* **The `tag` is not used to replace a toast.** The engine's own `matches()`
+  logic already collapses a notification the page means as an update of another.
+* **Full-screen and split-view pages:** a toast is positioned in the window, so
+  in full screen it appears over the page rather than in an OS overlay. In split
+  view it is anchored to the window, not to the pane that sent it.
+
+## 13. Web shortcuts are not PWA installation
+
+`Tools ▸ Web shortcuts` (classic) and the ☰ menu's **Web shortcuts** submenu save
+a name and a URL and open that page in a chrome-less window
+(`MainWindow::createAppWindow`, `src/WebShortcutStore.*`). It is honest to call
+this "the thing Chrome calls *Create shortcut*", and not honest to call it an
+installed app:
+
+* **Nothing is installed.** No `manifest.json` is fetched, no service worker is
+  registered, no assets are cached. The page still needs the network on every
+  launch, so a shortcut to an app that would normally work offline does not.
+* **No icon is taken from the site.** The window and any future launcher entry
+  use the browser's own icon, because the manifest's icons are exactly the part
+  that would require the install step above.
+* **No Start-menu or desktop entry is written.** There is no installer, and
+  writing `.desktop`/`.lnk` files from a browser without a per-platform
+  registration path is how a browser ends up shipping a half-working "install"
+  button. `cloudar-browser --app <url>` and `--app-id <id>` exist so a launcher
+  someone writes by hand works.
+* **The window is one page.** Links that ask for a new window open in a normal
+  browser window, not inside the app window: there is no tab strip there, so a
+  popup that targeted it would be unreachable.
+* **Only http/https.** `file://` is refused on purpose (a chrome-less window on
+  a local file would be a second route to the filesystem that bypasses the
+  confinement in `FILE_PROTOCOL_SECURITY.md`), and so is `cloudar://`.
+
+Shortcuts are stored in `QSettings` under `browser/webShortcuts`, deliberately not
+in the renderer's storage partition, which is cleared with browsing data.

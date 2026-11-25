@@ -332,5 +332,20 @@
   "files_error_title": "Não foi possível listar esta pasta",
   "files_error_body": "Não foi possível ler a pasta.",
   "files_no_bridge_title": "Não disponível",
-  "files_no_bridge_body": "Esta página precisa ser aberta no Cloudar Browser."
+  "files_no_bridge_body": "Esta página precisa ser aberta no Cloudar Browser.",
+  "notification_dismiss": "Dispensar notificação",
+  "permission_info_notifications": "O Cloudar mostrará as notificações deste site como um cartão nesta janela. Elas não são entregues pelo sistema operacional: nada aparece com a janela fechada.",
+  "notification_shown_status": "{site} enviou uma notificação",
+  "shortcut_dialog_title": "Criar atalho da web",
+  "shortcut_dialog_intro": "Abre esta página em sua própria janela, sem abas nem barra de endereço.",
+  "shortcut_dialog_note": "O atalho não é uma instalação: a página continua precisando da rede e nada é salvo para uso offline.",
+  "shortcut_name_label": "Nome",
+  "shortcut_url_label": "Página",
+  "shortcut_create": "Criar atalho",
+  "shortcut_menu_empty": "Ainda não há atalhos da web",
+  "shortcut_remove": "Remover atalho",
+  "shortcut_removed": "Atalho removido",
+  "shortcut_created": "Atalho \"{name}\" criado",
+  "shortcut_needs_web_page": "Atalhos só podem ser criados para páginas da web",
+  "Web shortcuts": "Atalhos da web"
 }

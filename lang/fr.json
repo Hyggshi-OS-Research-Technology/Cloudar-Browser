@@ -332,5 +332,20 @@
   "files_error_title": "Impossible de lister ce dossier",
   "files_error_body": "Le dossier n'a pas pu être lu.",
   "files_no_bridge_title": "Non disponible",
-  "files_no_bridge_body": "Cette page doit être ouverte dans Cloudar Browser."
+  "files_no_bridge_body": "Cette page doit être ouverte dans Cloudar Browser.",
+  "notification_dismiss": "Ignorer la notification",
+  "permission_info_notifications": "Cloudar affichera les notifications de ce site sous forme de carte dans cette fenêtre. Elles ne sont pas remises par le système d'exploitation : rien n'apparaît lorsque la fenêtre est fermée.",
+  "notification_shown_status": "{site} a envoyé une notification",
+  "shortcut_dialog_title": "Créer un raccourci web",
+  "shortcut_dialog_intro": "Ouvre cette page dans sa propre fenêtre, sans onglets ni barre d'adresse.",
+  "shortcut_dialog_note": "Le raccourci n'est pas une installation : la page a toujours besoin du réseau et rien n'est enregistré pour une utilisation hors ligne.",
+  "shortcut_name_label": "Nom",
+  "shortcut_url_label": "Page",
+  "shortcut_create": "Créer le raccourci",
+  "shortcut_menu_empty": "Aucun raccourci web pour l'instant",
+  "shortcut_remove": "Supprimer le raccourci",
+  "shortcut_removed": "Raccourci supprimé",
+  "shortcut_created": "Raccourci « {name} » créé",
+  "shortcut_needs_web_page": "Les raccourcis ne peuvent être créés que pour des pages web",
+  "Web shortcuts": "Raccourcis web"
 }

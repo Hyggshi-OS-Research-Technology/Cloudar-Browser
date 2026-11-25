@@ -332,5 +332,20 @@
   "files_error_title": "이 폴더를 나열할 수 없습니다",
   "files_error_body": "폴더를 읽을 수 없습니다.",
   "files_no_bridge_title": "사용할 수 없음",
-  "files_no_bridge_body": "이 페이지는 Cloudar Browser 안에서 열어야 합니다."
+  "files_no_bridge_body": "이 페이지는 Cloudar Browser 안에서 열어야 합니다.",
+  "notification_dismiss": "알림 닫기",
+  "permission_info_notifications": "Cloudar는 이 사이트의 알림을 이 창의 카드로 표시합니다. 운영 체제가 전달하지 않으므로 창이 닫혀 있으면 아무것도 표시되지 않습니다.",
+  "notification_shown_status": "{site}에서 알림을 보냈습니다",
+  "shortcut_dialog_title": "웹 바로가기 만들기",
+  "shortcut_dialog_intro": "탭이나 주소 표시줄 없이 이 페이지를 자체 창에서 엽니다.",
+  "shortcut_dialog_note": "이 바로가기는 설치가 아닙니다. 페이지는 여전히 네트워크가 필요하며 오프라인용으로 저장되는 것은 없습니다.",
+  "shortcut_name_label": "이름",
+  "shortcut_url_label": "페이지",
+  "shortcut_create": "바로가기 만들기",
+  "shortcut_menu_empty": "아직 웹 바로가기가 없습니다",
+  "shortcut_remove": "바로가기 삭제",
+  "shortcut_removed": "바로가기를 삭제했습니다",
+  "shortcut_created": "\"{name}\" 바로가기를 만들었습니다",
+  "shortcut_needs_web_page": "웹 페이지에 대해서만 바로가기를 만들 수 있습니다",
+  "Web shortcuts": "웹 바로가기"
 }

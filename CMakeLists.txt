@@ -46,6 +46,10 @@ set(SOURCES
     src/HistoryManager.cpp
     src/InternalBridge.cpp
     src/NewTabBridge.cpp
+    src/NotificationPresenter.cpp
+    src/NotificationToast.cpp
+    src/WebShortcutStore.cpp
+    src/WebShortcutDialog.cpp
     src/PermissionStore.cpp
     src/PageContextMenu.cpp
     src/IdleEasterEgg.cpp
@@ -90,6 +94,10 @@ set(HEADERS
     src/HistoryManager.h
     src/InternalBridge.h
     src/NewTabBridge.h
+    src/NotificationPresenter.h
+    src/NotificationToast.h
+    src/WebShortcutStore.h
+    src/WebShortcutDialog.h
     src/PermissionStore.h
     src/PageContextMenu.h
     src/IdleEasterEgg.h
@@ -176,6 +184,18 @@ if(CLOUDAR_BUILD_TESTS)
     # the test runs with QTEST_GUILESS_MAIN.
     target_link_libraries(tst_localfileservice PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME tst_localfileservice COMMAND tst_localfileservice)
+
+    # Web shortcut storage (roadmap item 7): one site one shortcut, id survives a
+    # rename, file:// and cloudar:// refused. QSettings-backed, so the test
+    # points QSettings at a temporary directory (see its init()).
+    add_executable(tst_webshortcutstore
+        tests/tst_webshortcutstore.cpp
+        src/WebShortcutStore.cpp
+        src/WebShortcutStore.h
+    )
+    target_include_directories(tst_webshortcutstore PRIVATE src)
+    target_link_libraries(tst_webshortcutstore PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME tst_webshortcutstore COMMAND tst_webshortcutstore)
 endif()
 
 install(TARGETS cloudar-browser RUNTIME DESTINATION bin)

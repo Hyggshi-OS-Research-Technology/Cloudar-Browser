@@ -38,6 +38,10 @@ public:
     QWebEngineView *addNewTab(const QUrl &url = QUrl("cloudar://newtab"),
                                bool makeCurrent = true);
     QWebEngineView *currentView() const;
+    // Painted, palette-following close glyph for a tab. See the definition for
+    // why the style's own button is not used on the modern chrome.
+    void applyCloseGlyph(int index);
+    void applyTabCloseGlyphs();
     QStringList openUrls() const;
     void restoreTabs(const QStringList &urls, int currentIndex);
     void setHorizontalTabBarVisible(bool visible);

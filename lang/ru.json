@@ -332,5 +332,20 @@
   "files_error_title": "Не удалось показать папку",
   "files_error_body": "Не удалось прочитать папку.",
   "files_no_bridge_title": "Недоступно",
-  "files_no_bridge_body": "Эту страницу нужно открыть в Cloudar Browser."
+  "files_no_bridge_body": "Эту страницу нужно открыть в Cloudar Browser.",
+  "notification_dismiss": "Закрыть уведомление",
+  "permission_info_notifications": "Cloudar будет показывать уведомления этого сайта карточкой в этом окне. Их доставляет не операционная система: при закрытом окне ничего не появится.",
+  "notification_shown_status": "{site} отправил уведомление",
+  "shortcut_dialog_title": "Создать веб-ярлык",
+  "shortcut_dialog_intro": "Открывает эту страницу в отдельном окне, без вкладок и адресной строки.",
+  "shortcut_dialog_note": "Ярлык — это не установка: странице по-прежнему нужна сеть, и ничего не сохраняется для работы офлайн.",
+  "shortcut_name_label": "Название",
+  "shortcut_url_label": "Страница",
+  "shortcut_create": "Создать ярлык",
+  "shortcut_menu_empty": "Веб-ярлыков пока нет",
+  "shortcut_remove": "Удалить ярлык",
+  "shortcut_removed": "Ярлык удалён",
+  "shortcut_created": "Ярлык «{name}» создан",
+  "shortcut_needs_web_page": "Ярлыки можно создавать только для веб-страниц",
+  "Web shortcuts": "Веб-ярлыки"
 }
