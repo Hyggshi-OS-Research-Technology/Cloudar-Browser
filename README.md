@@ -113,10 +113,21 @@ Details, and what was deliberately *not* reproduced: [`docs/CLASSIC_UI.md`](docs
 - Incognito is **not** anonymity — read [`docs/KNOWN_ISSUES.md`](docs/KNOWN_ISSUES.md) §5 before
   relying on it.
 
+### 📁 Local files
+
+- **File → Open File…** (`Ctrl+O`) opens a local file in a tab; **Open Folder…** (`Ctrl+Shift+O`)
+  opens a browsable listing of a directory.
+- Typing a path works by **checking the filesystem**, not by guessing from the text: `/home/me`,
+  `~/Downloads` and `C:\Users\me\Projects` open as folders even though they contain no dot.
+- `cloudar://files/` lists any folder you opened, with name, size and date, folders first, click to
+  descend. It is **confined**: a page can only list folders you opened, never read file contents, and
+  cannot choose a folder for itself — see
+  [`docs/FILE_PROTOCOL_SECURITY.md`](docs/FILE_PROTOCOL_SECURITY.md).
+
 ### 🌐 Internal pages (`cloudar://`)
 
 `newtab` · `settings` · `bookmarks` · `history` · `downloads` · `extensions` · `permissions` ·
-`flags` · `about`
+`files` · `flags` · `about`
 
 ---
 
@@ -232,6 +243,7 @@ Cloudar-Browser/
 | Windows 10/11 | build job in CI; installer and code signing not yet done |
 | Qt 6.5 LTS / 6.8 LTS / 6.10 | 6.8 LTS and 6.10 are built in CI; 6.5 is supported in the source (`QT_VERSION` guards) but not exercised by CI |
 | Memory Saver, CPU tiers | implemented; **no unit tests yet** — see `docs/KNOWN_ISSUES.md` §9 |
+| Local file listing | confined to user-opened folders, with unit tests — see `docs/FILE_PROTOCOL_SECURITY.md` |
 | Extensions | partial `chrome.*` shim — see `docs/KNOWN_ISSUES.md` §4 |
 | Interface languages | 10 languages, native chrome + internal pages; settings body copy still English — see `docs/LANGUAGE.md` |
 | Tab tear-off | opens the page in a new window with its own profile; in-page state and history do not move — see `docs/KNOWN_ISSUES.md` §11 |

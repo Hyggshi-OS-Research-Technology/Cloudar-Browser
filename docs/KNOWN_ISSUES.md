@@ -130,16 +130,22 @@ Xvfb — one `--classic`, one `--modern` — which is enough to catch a startup
 crash, a missing resource or a broken stylesheet, and nothing else. The Windows
 jobs build and package but run no test at all.
 
-There are **no unit tests** for `PerformanceProfile`, `MemorySaver`, or
-`Theme::metrics()`, and no test target in `CMakeLists.txt`. Adding one is the
-highest-value next step in this repository, because the three areas that
-matter most are all pure logic that is trivially testable:
+There is now a test target, but it covers **one** class: `LocalFileService`, in
+`tests/tst_localfileservice.cpp`, built with `-DCLOUDAR_BUILD_TESTS=ON`. It
+exists because that class is a security boundary — it decides which directories
+a `cloudar://` page can make the browser enumerate — so "it looked right" was not
+good enough. See `docs/FILE_PROTOCOL_SECURITY.md`.
 
-| Target | What to assert |
-|:---|:---|
-| `PerformanceProfile` | `detectTierFromHardware()` maps a synthetic `CpuInfo` to each tier; `chromiumFlags()` never contains `--no-sandbox`; a forced tier beats the saved one; `applyEnvironment()` called twice does not duplicate switches. |
-| `MemorySaver::thresholdForLevel` | light/medium/high/ultra map to 2 h/1 h/15 min/2 min and an unknown level falls back to medium. |
-| `Theme` | `metrics()` returns a coherent set per style (classic not frameless, status bar visible, zero sidebar); every `@TOKEN@` in the classic sheet is substituted; `styleFromKey()` round-trips with `keyFor()`. |
+Everything else is still untested. `PerformanceProfile`, `MemorySaver` and
+`Theme::metrics()` remain the highest-value additions, because all three are pure
+logic and trivially testable:
+
+| Target | What to assert | Status |
+|:---|:---|:---|
+| `PerformanceProfile` | `detectTierFromHardware()` maps a synthetic `CpuInfo` to each tier; `chromiumFlags()` never contains `--no-sandbox`; a forced tier beats the saved one; `applyEnvironment()` called twice does not duplicate switches. | not written |
+| `MemorySaver::thresholdForLevel` | light/medium/high/ultra map to 2 h/1 h/15 min/2 min and an unknown level falls back to medium. | not written |
+| `Theme` | `metrics()` returns a coherent set per style (classic not frameless, status bar visible, zero sidebar); every `@TOKEN@` in the classic sheet is substituted; `styleFromKey()` round-trips with `keyFor()`. | not written |
+| `LocalFileService` | path confinement, `..`/symlink/sibling-prefix escapes, `~/` expansion, path-vs-search resolution. | **written** |
 
 A smoke test cannot see any of that, which is why these bugs are the kind that
 survive releases.

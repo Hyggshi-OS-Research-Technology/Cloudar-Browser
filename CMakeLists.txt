@@ -51,6 +51,7 @@ set(SOURCES
     src/IdleEasterEgg.cpp
     src/Language.cpp
     src/LightSchemeHandler.cpp
+    src/LocalFileService.cpp
     src/MainWindow.cpp
     src/MemorySaver.cpp
     src/PerformanceProfile.cpp
@@ -94,6 +95,7 @@ set(HEADERS
     src/IdleEasterEgg.h
     src/Language.h
     src/LightSchemeHandler.h
+    src/LocalFileService.h
     src/MainWindow.h
     src/MemorySaver.h
     src/PerformanceProfile.h
@@ -141,6 +143,40 @@ target_link_libraries(cloudar-browser PRIVATE
     Qt6::WebChannel
     ZLIB::ZLIB
 )
+
+# ---------------------------------------------------------------------------
+# Unit tests.
+#
+# Only the parts that are pure logic are testable without a display or a
+# Chromium process, and LocalFileService is the first of them that also happens
+# to be a security boundary: it decides which directories a cloudar:// page can
+# make the browser enumerate. See tests/tst_localfileservice.cpp and
+# docs/KNOWN_ISSUES.md §9.
+#
+# Off by default so that the shipped build does not need Qt6::Test, and the CI
+# jobs that only build/package stay as they are. Enable with
+#   cmake -DCLOUDAR_BUILD_TESTS=ON
+# ---------------------------------------------------------------------------
+option(CLOUDAR_BUILD_TESTS "Build the unit tests" OFF)
+
+if(CLOUDAR_BUILD_TESTS)
+    find_package(Qt6 REQUIRED COMPONENTS Test)
+    enable_testing()
+
+    # The test links the *source* of LocalFileService rather than the whole
+    # browser: MainWindow pulls in QtWebEngine, which needs a display and a
+    # GPU process, and none of that is under test here.
+    add_executable(tst_localfileservice
+        tests/tst_localfileservice.cpp
+        src/LocalFileService.cpp
+        src/LocalFileService.h
+    )
+    target_include_directories(tst_localfileservice PRIVATE src)
+    # Core only: the service uses QtCore (QDir/QFileInfo/QUrl) and no widgets, and
+    # the test runs with QTEST_GUILESS_MAIN.
+    target_link_libraries(tst_localfileservice PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME tst_localfileservice COMMAND tst_localfileservice)
+endif()
 
 install(TARGETS cloudar-browser RUNTIME DESTINATION bin)
 install(FILES resources/cloudar-browser.desktop DESTINATION share/applications)

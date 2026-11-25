@@ -25,6 +25,7 @@
         <file>downloads.html</file>
         <file>extensions.html</file>
         <file>permissions.html</file>
+        <file>files.html</file>
         <file>chrome-api-shim.js</file>
         <file>i18n.js</file>
         <file alias="lang/en.json">../lang/en.json</file>

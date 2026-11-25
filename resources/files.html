@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Files</title>
+  <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --panel: #151923;
+      --panel-2: #1b2230;
+      --text: #e6edf3;
+      --muted: #9aa4b2;
+      --accent: #22c55e;
+      --border: rgba(255,255,255,0.08);
+    }
+
+    /* Same three palettes as every other cloudar:// page: modern dark, modern
+       light, and the classic 2009 chrome. The bootstrap in <head> applies the
+       class/attribute before first paint, so there is no flash. */
+    html[data-color-mode="light"]:not(.classic) {
+      --bg: #f7f8fa;
+      --panel: #ffffff;
+      --panel-2: #f1f2f5;
+      --text: #1a1d24;
+      --muted: #5b6273;
+      --border: #d6dae2;
+    }
+
+    @media (prefers-color-scheme: light) {
+      html[data-color-mode="auto"]:not(.classic) {
+        --bg: #f7f8fa;
+        --panel: #ffffff;
+        --panel-2: #f1f2f5;
+        --text: #1a1d24;
+        --muted: #5b6273;
+        --border: #d6dae2;
+      }
+    }
+
+    html.classic {
+      --bg: #e8e8e8;
+      --panel: #ffffff;
+      --panel-2: #f4f4f4;
+      --text: #1a1a1a;
+      --muted: #6b6b6b;
+      --border: #a0a0a0;
+      --accent: #3a9b3a;
+    }
+
+    html.classic body {
+      font-family: Tahoma, "Segoe UI", Verdana, sans-serif;
+      font-size: 12px;
+      background: var(--bg);
+    }
+
+    html.classic header {
+      padding: 6px 10px;
+      background: linear-gradient(#f6f6f6, #dcdcdc);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: none;
+    }
+
+    html.classic h1 { font-size: 14px; font-weight: 700; letter-spacing: 0; }
+
+    html.classic .toolbar button,
+    html.classic .crumbs {
+      border-radius: 0;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 12px;
+      font-family: inherit;
+    }
+
+    html.classic .toolbar button:hover { background: #e4eefb; border-color: #9fc3ef; }
+
+    html.classic table { border-radius: 0; box-shadow: none; }
+    html.classic thead th {
+      background: var(--panel-2);
+      color: #1a1a1a;
+      text-transform: none;
+      letter-spacing: 0;
+      border-radius: 0;
+    }
+    html.classic tbody tr:hover { background: #e4eefb; }
+    html.classic tbody tr.selected { background: #c3daf5; }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+      color: var(--text);
+      background: radial-gradient(1200px 500px at 20% -20%, rgba(34,197,94,0.16), transparent), var(--bg);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .title-row { display: flex; align-items: baseline; gap: 12px; }
+    h1 { margin: 0; font-size: 22px; }
+    .count { color: var(--muted); font-size: 12px; }
+
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+    button {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    button:hover:not(:disabled) { background: var(--panel-2); }
+    button:disabled { opacity: 0.45; cursor: default; }
+
+    .crumbs {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-family: 'Cascadia Mono', Consolas, monospace;
+      font-size: 12px;
+      color: var(--muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 100%;
+    }
+
+    .content { flex: 1; overflow: auto; padding: 12px 24px 24px; }
+
+    table { width: 100%; border-collapse: collapse; }
+
+    thead th {
+      text-align: left;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      font-weight: 700;
+      padding: 8px 10px;
+      position: sticky;
+      top: 0;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+    }
+
+    thead th.num { text-align: right; }
+
+    tbody tr { cursor: default; border-bottom: 1px solid var(--border); }
+    tbody tr.navigable { cursor: pointer; }
+    tbody tr.navigable:hover { background: var(--panel); }
+
+    tbody td { padding: 8px 10px; font-size: 13px; }
+    tbody td.num { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+    .name { display: flex; align-items: center; gap: 8px; }
+    .glyph { width: 18px; text-align: center; opacity: 0.9; }
+    .hidden .name { color: var(--muted); }
+
+    /* The empty state and the error states are the same box: they are the same
+       situation from the page's point of view — nothing to show, and a reason. */
+    .empty {
+      color: var(--muted);
+      text-align: center;
+      padding: 40px 20px;
+      line-height: 1.6;
+    }
+
+    .empty strong { display: block; color: var(--text); margin-bottom: 6px; font-size: 15px; }
+
+    .notice {
+      margin: 12px 24px 0;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .notice:empty { display: none; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="title-row">
+      <h1 data-i18n="page_files">Files</h1>
+      <span class="count" id="count"></span>
+    </div>
+    <div class="toolbar">
+      <button id="up" data-i18n="files_up">Up</button>
+      <button id="refresh" data-i18n="files_refresh">Refresh</button>
+      <button id="open-folder" data-i18n="files_open_folder">Open Folder...</button>
+      <span class="crumbs" id="path"></span>
+    </div>
+  </header>
+  <div class="notice" id="notice"></div>
+  <div class="content">
+    <table id="table" hidden>
+      <thead>
+        <tr>
+          <th data-i18n="files_name">Name</th>
+          <th class="num" data-i18n="files_size">Size</th>
+          <th class="num" data-i18n="files_modified">Modified</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="empty" id="empty"></div>
+  </div>
+
+  <script>
+    // The active chrome and colour mode, written to localStorage by the native
+    // side on every internal page load (BrowserTabWidget::wireView).
+    (function applyChromeStyle() {
+      try {
+        if (localStorage.getItem('cloudar.chromeStyle') === 'classic')
+          document.documentElement.classList.add('classic');
+        var cachedMode = localStorage.getItem('cloudar.colorMode');
+        if (cachedMode)
+          document.documentElement.setAttribute('data-color-mode', cachedMode);
+      } catch (e) { /* storage disabled: stay with the modern look */ }
+    })();
+
+    let bridge = null;
+    let currentPath = '';
+    let currentParent = '';
+    let lastEntries = [];
+    let sortKey = 'name';
+    let sortDir = 1;
+
+    const rowsEl = document.getElementById('rows');
+    const tableEl = document.getElementById('table');
+    const emptyEl = document.getElementById('empty');
+    const pathEl = document.getElementById('path');
+    const countEl = document.getElementById('count');
+    const noticeEl = document.getElementById('notice');
+    const upBtn = document.getElementById('up');
+
+    // i18n.js replaces this whole object once the dictionary arrives. Until
+    // then — and if the fetch ever fails — `t` returns the English fallback, so
+    // the page is never blank. Note that tools/check-i18n.js scans this file for
+    // literal CloudarI18n.t calls with a quoted dictionary name, which is how a
+    // dictionary entry that no page can reach gets caught before it ships.
+    window.CloudarI18n = window.CloudarI18n || {
+      t: (key, fallback) => (typeof fallback === 'string' ? fallback : key),
+      language: null,
+    };
+
+    // Error codes, not sentences, cross the bridge (LocalFileService returns
+    // them so the native side never has to know the interface language).
+    const errorText = (code) => {
+      switch (code) {
+        case 'no-root':
+          return [CloudarI18n.t('files_no_root_title', 'No folder opened'),
+                  CloudarI18n.t('files_no_root_body', 'Use Open Folder to pick a folder to browse.')];
+        case 'outside-root':
+          return [CloudarI18n.t('files_outside_title', 'Not allowed'),
+                  CloudarI18n.t('files_outside_body', 'This page can only list folders you opened.')];
+        case 'not-a-directory':
+          return [CloudarI18n.t('files_not_dir_title', 'Not a folder'),
+                  CloudarI18n.t('files_not_dir_body', 'That path is not a directory any more.')];
+        case 'unreadable':
+          return [CloudarI18n.t('files_unreadable_title', 'Cannot read this folder'),
+                  CloudarI18n.t('files_unreadable_body', 'The system refused access to it.')];
+        default:
+          return [CloudarI18n.t('files_error_title', 'Could not list this folder'),
+                  CloudarI18n.t('files_error_body', 'The folder could not be read.')];
+      }
+    };
+    const formatSize = (bytes, isDir) => {
+      if (isDir) return CloudarI18n.t('files_folder', 'Folder');
+      if (!bytes && bytes !== 0) return '';
+      if (bytes < 1024) return bytes + ' B';
+      const units = ['KB', 'MB', 'GB', 'TB'];
+      let value = bytes / 1024;
+      let unit = 0;
+      while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit++; }
+      return (value >= 10 ? value.toFixed(0) : value.toFixed(1)) + ' ' + units[unit];
+    };
+
+    const formatDate = (iso) => {
+      if (!iso) return '';
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return '';
+      try {
+        return d.toLocaleString(CloudarI18n && CloudarI18n.language || undefined,
+                                { dateStyle: 'medium', timeStyle: 'short' });
+      } catch (e) { return d.toISOString().slice(0, 16).replace('T', ' '); }
+    };
+
+    const sorted = (entries) => {
+      const copy = entries.slice();
+      copy.sort((a, b) => {
+        // Folders first, always: the ordering control is for within a group, and
+        // mixing them makes the one row you want harder to find.
+        if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+        let result = 0;
+        if (sortKey === 'size') result = (a.size || 0) - (b.size || 0);
+        else if (sortKey === 'modified') result = String(a.modified).localeCompare(String(b.modified));
+        else result = String(a.name).localeCompare(String(b.name), undefined, { numeric: true });
+        return result * sortDir;
+      });
+      return copy;
+    };
+
+    const showEmpty = (title, body) => {
+      tableEl.hidden = true;
+      countEl.textContent = '';
+      emptyEl.innerHTML = '';
+      if (title) {
+        const strong = document.createElement('strong');
+        strong.textContent = title;
+        emptyEl.appendChild(strong);
+      }
+      const span = document.createElement('span');
+      span.textContent = body || '';
+      emptyEl.appendChild(span);
+    };
+
+    const render = (data) => {
+      noticeEl.textContent = '';
+      if (!data || !data.ok) {
+        const [title, body] = errorText(data && data.error);
+        showEmpty(title, body);
+        pathEl.textContent = '';
+        upBtn.disabled = true;
+        return;
+      }
+
+      currentPath = data.path || '';
+      currentParent = data.parent || '';
+      lastEntries = data.entries || [];
+      pathEl.textContent = currentPath;
+      pathEl.title = currentPath;
+      upBtn.disabled = !currentParent;
+
+      if (data.truncated) {
+        noticeEl.textContent = CloudarI18n.t('files_truncated', 'Showing the first %1 entries only.')
+          .replace('%1', String(data.entryLimit || lastEntries.length));
+      }
+
+      if (!lastEntries.length) {
+        showEmpty(CloudarI18n.t('files_empty_title', 'This folder is empty'),
+                  CloudarI18n.t('files_empty_body', 'There is nothing in here.'));
+        return;
+      }
+
+      tableEl.hidden = false;
+      emptyEl.innerHTML = '';
+      const items = sorted(lastEntries);
+      countEl.textContent = CloudarI18n.t('files_count', '%1 items').replace('%1', String(items.length));
+
+      rowsEl.innerHTML = '';
+      const frag = document.createDocumentFragment();
+
+      items.forEach((entry) => {
+        const tr = document.createElement('tr');
+        tr.className = (entry.navigable ? 'navigable ' : '') + (entry.hidden ? 'hidden' : '');
+        tr.dataset.path = entry.path;
+        tr.dataset.url = entry.url || '';
+        tr.dataset.isDir = entry.isDir ? '1' : '0';
+
+        const nameCell = document.createElement('td');
+        const nameWrap = document.createElement('div');
+        nameWrap.className = 'name';
+        const glyph = document.createElement('span');
+        glyph.className = 'glyph';
+        glyph.textContent = entry.isDir ? '\u{1F4C1}' : '\u{1F4C4}';
+        const label = document.createElement('span');
+        label.textContent = entry.name;
+        nameWrap.appendChild(glyph);
+        nameWrap.appendChild(label);
+        nameCell.appendChild(nameWrap);
+
+        const sizeCell = document.createElement('td');
+        sizeCell.className = 'num';
+        sizeCell.textContent = formatSize(entry.size, entry.isDir);
+
+        const dateCell = document.createElement('td');
+        dateCell.className = 'num';
+        dateCell.textContent = formatDate(entry.modified);
+
+        tr.appendChild(nameCell);
+        tr.appendChild(sizeCell);
+        tr.appendChild(dateCell);
+        frag.appendChild(tr);
+      });
+
+      rowsEl.appendChild(frag);
+    };
+
+    const load = (path) => {
+      if (!bridge) return;
+      const done = (data) => render(data);
+      if (path) bridge.listDirectory(path, done);
+      else bridge.listDirectory('', done);
+    };
+
+    // A folder row opens the listing for that folder. A file row navigates the
+    // tab to its file:// URL, which is exactly what typing the path would do —
+    // the page never receives file *contents*, only a URL.
+    rowsEl.addEventListener('click', (event) => {
+      const row = event.target.closest('tr[data-path]');
+      if (!row) return;
+      if (row.dataset.isDir === '1') {
+        load(row.dataset.path);
+        return;
+      }
+      // The native side already produced the percent-encoded URL; building one
+      // here would get '#' and '?' in a filename wrong.
+      if (row.dataset.url) window.location.href = row.dataset.url;
+    });
+
+    upBtn.addEventListener('click', () => { if (currentParent) load(currentParent); });
+    document.getElementById('refresh').addEventListener('click', () => load(currentPath));
+    document.getElementById('open-folder').addEventListener('click', () => {
+      // The native picker: a page cannot choose a folder itself, and should not
+      // be able to — that is what keeps the confinement meaningful.
+      if (bridge && bridge.requestFolderPicker) bridge.requestFolderPicker();
+    });
+
+    document.querySelectorAll('thead th').forEach((th, index) => {
+      th.style.cursor = 'pointer';
+      const key = index === 1 ? 'size' : index === 2 ? 'modified' : 'name';
+      th.addEventListener('click', () => {
+        if (sortKey === key) sortDir = -sortDir;
+        else { sortKey = key; sortDir = 1; }
+        if (lastEntries.length) render({ ok: true, path: currentPath, parent: currentParent, entries: lastEntries });
+      });
+    });
+
+    const initChannel = () => {
+      if (typeof qt === 'undefined') {
+        showEmpty(CloudarI18n.t('files_no_bridge_title', 'Not available'),
+                  CloudarI18n.t('files_no_bridge_body', 'This page has to be opened inside Cloudar Browser.'));
+        return;
+      }
+      new QWebChannel(qt.webChannelTransport, (channel) => {
+        bridge = channel.objects.internalBridge;
+        if (!bridge) {
+          showEmpty(CloudarI18n.t('files_no_bridge_title', 'Not available'),
+                    CloudarI18n.t('files_no_bridge_body', 'This page has to be opened inside Cloudar Browser.'));
+          return;
+        }
+        if (bridge.filesRootsChanged) {
+          bridge.filesRootsChanged.connect(() => {
+            // A folder was opened from the menu while this page was up: follow
+            // it rather than making the user press Refresh.
+            if (bridge.directoryRoots) bridge.directoryRoots((roots) => {
+              if (roots && roots.length) load(roots[0]);
+            });
+          });
+        }
+        // The page is opened as cloudar://files/?path=<folder>; the query is the
+        // only way a filesystem path survives the round trip intact.
+        const param = new URLSearchParams(window.location.search).get('path');
+        if (param) load(param);
+        else if (bridge.directoryRoots) {
+          bridge.directoryRoots((roots) => {
+            if (roots && roots.length) load(roots[0]);
+            else load('');
+          });
+        } else load('');
+      });
+    };
+
+    // Re-render once the dictionary arrives, so row text (sizes of folders,
+    // counts, empty states) is translated too — not just the markup attributes.
+    window.cloudarLanguageApplied = () => {
+      if (!bridge) return;
+      if (lastEntries.length) render({ ok: true, path: currentPath, parent: currentParent, entries: lastEntries });
+      else load(currentPath);
+    };
+
+    window.addEventListener('DOMContentLoaded', initChannel);
+  </script>
+
+  <script src="i18n.js" defer></script>
+</body>
+</html>

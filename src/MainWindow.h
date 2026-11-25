@@ -40,6 +40,7 @@
 
 class QSplitter;
 class QMenu;
+class LocalFileService;
 class QToolBar;
 class QToolButton;
 
@@ -81,6 +82,16 @@ private slots:
     void updateProgress(int percent);
     void showHistoryDialog();
     void openSettingsPage(); // opens/focuses a tab on cloudar://settings/
+    // Local files (roadmap item 5). "Open File..." loads the picker's file://
+    // URL in a new tab; "Open Folder..." opens the folder's cloudar://files
+    // listing, which is also what makes that folder listable at all — see
+    // LocalFileService's confinement rule.
+    void openLocalFile();
+    void openLocalFolder();
+    // cloudar://files asked for the folder picker (see requestFolderPicker):
+    // the chosen folder replaces the current listing instead of opening a
+    // second tab.
+    void pickFolderForFilesPage();
     // Page context menu helpers (see PageContextMenu).
     void openPageSource(const QUrl &url);
     void openInNewWindow(const QUrl &url);
@@ -136,6 +147,10 @@ private:
     // read by NewTabBridge / LightSchemeHandler.
     FaviconStore *m_faviconStore = nullptr;
     NewTabBridge *m_newTabBridge = nullptr;
+    // Survives from the address bar to the page: the service is what remembers
+    // which folders the user opened, so cloudar://files keeps working after the
+    // tab that opened the folder is gone.
+    LocalFileService *m_localFiles = nullptr;
     SettingsBridge *m_settingsBridge = nullptr;
     // Both are null on the classic chrome, which uses the OS window frame and
     // QMainWindow's own menu bar; everything that touches them checks first.
