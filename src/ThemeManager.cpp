@@ -35,9 +35,12 @@ ThemeManager::ThemeManager(QObject *parent) : QObject(parent)
     m_lastDark = prefersDark();
 
     // The OS can flip light/dark while the app runs (a schedule, or the user
-    // changing it in system settings). Qt 6.5 exposes that as a signal; older
-    // builds have no way to observe it, which
-    // systemColorSchemeQueryable() reports so the UI can stop pretending.
+    // changing it in system settings). Qt 6.5 is the first release with
+    // QStyleHints::colorScheme()/colorSchemeChanged() and Qt::ColorScheme at
+    // all, and the distro-Qt CI jobs build against older releases — so the whole
+    // block is version-gated, not just the call. Without this the app does not
+    // compile there at all.
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
     if (QGuiApplication::instance() != nullptr) {
         const QStyleHints *hints = QGuiApplication::styleHints();
         if (hints) {
@@ -50,6 +53,7 @@ ThemeManager::ThemeManager(QObject *parent) : QObject(parent)
             });
         }
     }
+#endif
 }
 
 bool ThemeManager::systemColorSchemeQueryable()
