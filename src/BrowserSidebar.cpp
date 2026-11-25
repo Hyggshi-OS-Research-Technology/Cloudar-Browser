@@ -3,14 +3,22 @@
 #include "ClassicTheme.h"
 #include "Language.h"
 
+#include <QApplication>
+#include <QCursor>
+#include <QDrag>
+#include <QDragEnterEvent>
+#include <QDragMoveEvent>
+#include <QDropEvent>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QLabel>
 #include <QListWidget>
 #include <QMenu>
+#include <QMimeData>
 #include <QToolButton>
 #include <QWebEngineView>
 #include <QStyle>
+#include <QTabBar>
 #include <QMouseEvent>
 #include <QResizeEvent>
 #include <QEnterEvent>
@@ -26,6 +34,35 @@ namespace {
 // chrome.
 constexpr int kCollapsedWidth = 54;
 constexpr int kExpandedMaxWidth = 420;
+
+// The drag payload. A private MIME type, not text/uri-list: nothing else in the
+// application (and no website) should be able to accept a dragged tab, and a
+// dragged URL from a page should not look like one of ours.
+const char *const kTabMimeType = "application/x-cloudar-sidebar-tab";
+
+// Where a dragged row would land, expressed as a gap between rows: 0 is "above
+// the first row", count() is "below the last one". Gaps rather than item
+// indices because dropping *between* two rows is the only thing a reorder
+// means, and it removes the off-by-one that QTabBar::moveTab() semantics
+// otherwise invite.
+int gapForPosition(QListWidget *list, int y)
+{
+    for (int i = 0; i < list->count(); ++i) {
+        const QRect r = list->visualItemRect(list->item(i));
+        if (y < r.center().y())
+            return i;
+    }
+    return list->count();
+}
+
+// Turns a gap in the *current* order into the destination index moveTab() wants.
+// Once the dragged tab is lifted out, everything after its old position shifts
+// down by one, so a gap below it lands one slot earlier.
+int destinationForGap(int gap, int from)
+{
+    return gap > from ? gap - 1 : gap;
+}
+
 
 // Solid Floating Chrome-style Tab Hover Card with Real Thumbnail Preview
 class SidebarHoverCard : public QFrame
@@ -180,11 +217,15 @@ public:
     SidebarTabItemWidget(int tabIndex, const QIcon &icon, const QString &title,
                          const QUrl &url, bool isCurrent, bool expanded,
                          BrowserTabWidget *tabs, SidebarHoverCard *hoverCard,
-                         QWidget *parent = nullptr)
+                         BrowserSidebar *sidebar, QWidget *parent = nullptr)
         : QWidget(parent), m_index(tabIndex), m_title(title), m_url(url),
-          m_tabs(tabs), m_hoverCard(hoverCard), m_expanded(expanded), m_isCurrent(isCurrent)
+          m_tabs(tabs), m_hoverCard(hoverCard), m_sidebar(sidebar),
+          m_expanded(expanded), m_isCurrent(isCurrent)
     {
         setAttribute(Qt::WA_Hover, true);
+        // Hover feedback: the row can be dragged to reorder it or to tear the
+        // tab off into its own window.
+        setCursor(Qt::OpenHandCursor);
         setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
 
         auto *layout = new QHBoxLayout(this);
@@ -287,7 +328,19 @@ protected:
     void mousePressEvent(QMouseEvent *event) override
     {
         if (event->button() == Qt::LeftButton && m_tabs) {
+            // Before the activation below, not after: setCurrentIndex() emits
+            // currentTabChanged, which rebuilds every row, and this widget would
+            // then be one of the rows scheduled for deletion — with the pointer
+            // already pressed on it, so the drag that should follow would never
+            // start. The flag makes that rebuild wait for the release.
+            if (m_sidebar)
+                m_sidebar->setRowPressActive(true);
             m_tabs->setCurrentIndex(m_index);
+            // Remembered so mouseMoveEvent can tell a click apart from a drag:
+            // activating a tab on press (Chrome does the same) must not turn a
+            // slightly shaky click into a reorder.
+            m_dragOrigin = event->position().toPoint();
+            m_dragCandidate = true;
         } else if (event->button() == Qt::MiddleButton && m_tabs) {
             if (m_hoverCard)
                 m_hoverCard->hide();
@@ -296,12 +349,54 @@ protected:
         QWidget::mousePressEvent(event);
     }
 
+    void mouseMoveEvent(QMouseEvent *event) override
+    {
+        if (!m_dragCandidate || !m_tabs || !(event->buttons() & Qt::LeftButton)) {
+            QWidget::mouseMoveEvent(event);
+            return;
+        }
+        if ((event->position().toPoint() - m_dragOrigin).manhattanLength()
+                < QApplication::startDragDistance()) {
+            QWidget::mouseMoveEvent(event);
+            return;
+        }
+
+        // One gesture per press. beginTabDrag() runs its own event loop and only
+        // returns once the pointer is released, so clearing the flag first is
+        // what keeps a single press from starting a second drag.
+        m_dragCandidate = false;
+        if (m_hoverCard)
+            m_hoverCard->hide();
+        if (m_sidebar)
+            m_sidebar->beginTabDrag(m_index, this);
+
+        QWidget::mouseMoveEvent(event);
+    }
+
+    void mouseReleaseEvent(QMouseEvent *event) override
+    {
+        m_dragCandidate = false;
+        if (m_sidebar)
+            m_sidebar->setRowPressActive(false);
+        // The press deliberately postponed the row rebuilds it caused; this is
+        // where they run, once nothing is holding on to the rows.
+        if (m_sidebar)
+            m_sidebar->flushDeferredRefresh();
+        QWidget::mouseReleaseEvent(event);
+    }
+
 private:
     int m_index;
+    QPoint m_dragOrigin;
+    bool m_dragCandidate = false;
     QString m_title;
     QUrl m_url;
     BrowserTabWidget *m_tabs;
     SidebarHoverCard *m_hoverCard;
+    // The list this row belongs to, so the drag can be handed to the widget that
+    // owns the tab order. Not derived from parentWidget(): the row's parent is
+    // the QListWidget's viewport, not the sidebar.
+    BrowserSidebar *m_sidebar;
     bool m_expanded;
     bool m_isCurrent;
     bool m_hovered = false;
@@ -344,8 +439,21 @@ BrowserSidebar::BrowserSidebar(BrowserTabWidget *tabs, QWidget *parent)
     topRow->addStretch();
     layout->addLayout(topRow);
 
+    // The drop targets a dragged row; see beginTabDrag(). Without this the
+    // platform never offers this frame a drag at all.
+    setAcceptDrops(true);
+    m_dropIndicator = new QWidget(this);
+    m_dropIndicator->setObjectName("SidebarDropIndicator");
+    m_dropIndicator->setAttribute(Qt::WA_TransparentForMouseEvents, true);
+    m_dropIndicator->hide();
+
     m_tabList = new QListWidget(this);
     m_tabList->setObjectName("SidebarTabs");
+    // Rows start the drag themselves, in SidebarTabItemWidget::mouseMoveEvent().
+    // Leaving the view's own drag support off is what keeps it from also trying
+    // to insert rows into its model on a drop.
+    m_tabList->setDragEnabled(false);
+    m_tabList->setAcceptDrops(false);
     m_tabList->setSelectionMode(QAbstractItemView::SingleSelection);
     m_tabList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_tabList->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
@@ -380,6 +488,9 @@ BrowserSidebar::BrowserSidebar(BrowserTabWidget *tabs, QWidget *parent)
     connect(m_tabs, &BrowserTabWidget::tabsChanged, this, [this] { refresh(); });
     connect(m_tabs, &BrowserTabWidget::tabIconChanged, this, [this](int, const QIcon &) { refresh(); });
     connect(m_tabs, &BrowserTabWidget::currentTabChanged, this, [this](int index) {
+        // Highlight first, then rebuild: the rows carry the "current" styling
+        // themselves (bold title), so switching tabs has to rebuild them.
+        // refresh() is drag-safe — it defers while a row is being dragged.
         m_tabList->blockSignals(true);
         m_tabList->setCurrentRow(index);
         m_tabList->blockSignals(false);
@@ -392,6 +503,23 @@ BrowserSidebar::BrowserSidebar(BrowserTabWidget *tabs, QWidget *parent)
 
 void BrowserSidebar::refresh()
 {
+    // Every tab event rebuilds the whole list from scratch, and doing that in
+    // the middle of a drag would hand QListWidget a freshly built row widget
+    // while the drag is still animating the old one — the drop target loses its
+    // source. The rebuild is not skipped, only postponed until the gesture ends.
+    // A press flag that outlived its press (a release delivered somewhere else,
+    // a window that lost focus mid-gesture) would otherwise freeze the list
+    // forever: nothing would ever rebuild it again. No button held means no
+    // press to protect, whatever the flag says.
+    if (m_rowPressActive && QApplication::mouseButtons() == Qt::NoButton)
+        m_rowPressActive = false;
+
+    if (m_dragActive || m_rowPressActive) {
+        m_refreshDeferred = true;
+        return;
+    }
+    m_refreshDeferred = false;
+
     const int current = m_tabs->currentIndex();
     m_tabList->blockSignals(true);
     m_tabList->clear();
@@ -410,11 +538,177 @@ void BrowserSidebar::refresh()
         auto *item = new QListWidgetItem(m_tabList);
         item->setSizeHint(QSize(m_expanded ? 220 : 42, 38));
 
-        auto *rowWidget = new SidebarTabItemWidget(i, icon, title, url, (i == current), m_expanded, m_tabs, dynamic_cast<SidebarHoverCard *>(m_hoverCard), m_tabList);
+        auto *rowWidget = new SidebarTabItemWidget(i, icon, title, url, (i == current), m_expanded, m_tabs, dynamic_cast<SidebarHoverCard *>(m_hoverCard), this, m_tabList);
         m_tabList->setItemWidget(item, rowWidget);
     }
     m_tabList->setCurrentRow(current);
     m_tabList->blockSignals(false);
+}
+
+// ---------------------------------------------------------------------------
+// Row drag and drop
+//
+// The gesture is a real QDrag so the platform draws the drag image and the
+// pointer feedback users expect; the drop target is this frame, not the
+// QListWidget. The list is deliberately left with drag/drop disabled: a
+// QListWidget that accepts drops wants to insert model rows, and the rows here
+// are a mirror of QTabWidget's tab order, not a model of their own. Accepting
+// the drop here means the tab order is moved once, in the place it lives.
+// ---------------------------------------------------------------------------
+
+void BrowserSidebar::moveTab(int from, int to)
+{
+    // The order lives in QTabWidget, not in this list. QTabBar::moveTab() also
+    // moves the page widget inside QTabWidget's stack, so there is nothing to
+    // shuffle by hand — and no chance of the two orders drifting apart.
+    if (!m_tabs || from == to)
+        return;
+    if (from < 0 || to < 0 || from >= m_tabs->count() || to >= m_tabs->count())
+        return;
+    m_tabs->tabBar()->moveTab(from, to);
+    // The rows are a rendering of that order, and QTabWidget emits no signal for
+    // a move, so nothing else would redraw them. refresh() defers itself while
+    // the drag that caused this is still running (see its guard).
+    refresh();
+}
+
+void BrowserSidebar::flushDeferredRefresh()
+{
+    if (!m_refreshDeferred || m_dragActive || m_rowPressActive)
+        return;
+    refresh(); // refresh() clears the flag itself
+}
+
+void BrowserSidebar::updateDropIndicator(const QPoint &sidebarPos)
+{
+    if (!m_dropIndicator)
+        return;
+
+    const QPoint inList = m_tabList->mapFrom(this, sidebarPos);
+    const int gap = gapForPosition(m_tabList, inList.y());
+    m_dropGap = gap;
+
+    // The line is drawn in this frame's coordinates; the row rectangles are the
+    // list's, so the one has to be mapped into the other.
+    int yInList = 0;
+    if (m_tabList->count() > 0) {
+        if (gap < m_tabList->count())
+            yInList = m_tabList->visualItemRect(m_tabList->item(gap)).top();
+        else
+            yInList = m_tabList->visualItemRect(m_tabList->item(m_tabList->count() - 1)).bottom();
+    }
+    const int y = m_tabList->mapTo(this, QPoint(0, yInList)).y();
+    const int x = m_tabList->mapTo(this, QPoint(0, 0)).x();
+    m_dropIndicator->setGeometry(x + 4, qMax(0, y - 1), qMax(0, m_tabList->width() - 8), 2);
+    m_dropIndicator->show();
+    m_dropIndicator->raise();
+}
+
+void BrowserSidebar::clearDropIndicator()
+{
+    m_dropGap = -1;
+    if (m_dropIndicator)
+        m_dropIndicator->hide();
+}
+
+void BrowserSidebar::dragEnterEvent(QDragEnterEvent *event)
+{
+    if (m_dragActive && event->mimeData() && event->mimeData()->hasFormat(QString::fromLatin1(kTabMimeType))) {
+        updateDropIndicator(event->position().toPoint());
+        event->acceptProposedAction();
+        return;
+    }
+    QFrame::dragEnterEvent(event);
+}
+
+void BrowserSidebar::dragMoveEvent(QDragMoveEvent *event)
+{
+    if (m_dragActive && event->mimeData() && event->mimeData()->hasFormat(QString::fromLatin1(kTabMimeType))) {
+        updateDropIndicator(event->position().toPoint());
+        event->acceptProposedAction();
+        return;
+    }
+    QFrame::dragMoveEvent(event);
+}
+
+void BrowserSidebar::dragLeaveEvent(QDragLeaveEvent *event)
+{
+    clearDropIndicator();
+    QFrame::dragLeaveEvent(event);
+}
+
+void BrowserSidebar::dropEvent(QDropEvent *event)
+{
+    if (!m_dragActive || !event->mimeData()
+        || !event->mimeData()->hasFormat(QString::fromLatin1(kTabMimeType))) {
+        QFrame::dropEvent(event);
+        return;
+    }
+
+    const int from = event->mimeData()->data(QString::fromLatin1(kTabMimeType)).toInt();
+    // Recompute rather than trusting the last dragMoveEvent: a drop can arrive
+    // after the indicator was cleared by an intervening dragLeaveEvent.
+    const QPoint inList = m_tabList->mapFrom(this, event->position().toPoint());
+    const int gap = gapForPosition(m_tabList, inList.y());
+    const int to = destinationForGap(gap, from);
+    clearDropIndicator();
+    event->acceptProposedAction();
+    m_droppedInList = true;
+
+    if (from >= 0 && from < m_tabs->count() && to != from)
+        moveTab(from, to);
+}
+
+void BrowserSidebar::beginTabDrag(int index, QWidget *rowWidget)
+{
+    if (m_dragActive || !m_tabs || !rowWidget)
+        return;
+    if (index < 0 || index >= m_tabs->count())
+        return;
+
+    // Not m_refreshDeferred: the press that started this gesture almost
+    // certainly asked for a rebuild (activating the tab does), and that is still
+    // owed when the drag finishes.
+    m_dragActive = true;
+    m_rowPressActive = false;
+    m_droppedInList = false;
+
+    // The drag image is the row as it looks right now: grab() renders the live
+    // widget, so what follows the cursor matches what is in the list.
+    const QPixmap pixmap = rowWidget->grab();
+    auto *mime = new QMimeData;
+    mime->setData(QString::fromLatin1(kTabMimeType), QByteArray::number(index));
+
+    auto *drag = new QDrag(rowWidget);
+    drag->setMimeData(mime); // QDrag takes ownership
+    drag->setPixmap(pixmap);
+    drag->setHotSpot(QPoint(pixmap.width() / 2, pixmap.height() / 2));
+    drag->exec(Qt::MoveAction);
+
+    // Past this point the gesture is over: a drop inside the list already moved
+    // the tab in dropEvent(), so the only remaining case is a release somewhere
+    // this frame never saw.
+    clearDropIndicator();
+    m_dragActive = false;
+
+    if (!m_droppedInList) {
+        // Released over the page area, the toolbar or another application. Only
+        // a release outside this window's frame is a tear-off; anything inside
+        // it is a cancelled drag, which is what dropping a tab on its own page
+        // has always meant in a browser.
+        const QRect frame = window()->frameGeometry();
+        if (!frame.contains(QCursor::pos())) {
+            // Queued on purpose: the handler creates a window and, when this was
+            // the last tab, closes this one — which would delete the sidebar
+            // whose beginTabDrag() call is still on the stack.
+            QMetaObject::invokeMethod(this, [this, index]() { emit tabTearOffRequested(index); },
+                                      Qt::QueuedConnection);
+        }
+    }
+
+    // Any rebuild that arrived during the gesture — including the one from the
+    // reorder this drop performed — happens now, with nothing holding the rows.
+    flushDeferredRefresh();
 }
 
 QSize BrowserSidebar::sizeHint() const

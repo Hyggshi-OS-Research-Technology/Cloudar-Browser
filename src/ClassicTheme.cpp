@@ -607,6 +607,7 @@ QString appStyleSheet(const QColor &accent)
         /* ---- Side panel (hidden by default in the classic chrome) ---- */
         #BrowserSidebar { background: @FRAME@; border-right: 1px solid @BORDER@; }
         #SidebarTitle { color: @TEXT@; font-size: 12px; font-weight: bold; }
+        #SidebarDropIndicator { background: #316ac5; }
         #SidebarTabs { background: #ffffff; border: 1px solid @BORDER@; outline: none; }
         #SidebarTabs::item { min-height: 22px; }
         #SidebarTabs::item:selected { background: #316ac5; color: #ffffff; }

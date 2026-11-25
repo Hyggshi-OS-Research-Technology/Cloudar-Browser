@@ -101,6 +101,24 @@ public:
     // left alone.
     void retranslate();
 
+    // --- Tearing a tab off into another window ------------------------------
+    // Everything a new window needs to reopen this tab elsewhere: the URL it is
+    // showing and the title/icon the strip was showing. Returns false for a tab
+    // with nothing to reopen.
+    //
+    // Only *state* crosses the window boundary, never the live QWebEngineView:
+    // moving a WebEngine view into another top-level window re-parents its
+    // rendering delegate, and the first frame after that move is a well-known
+    // source of blank views. The new window loads the URL instead, which costs
+    // the tab's in-page state (form input, scroll offset, media position) and
+    // its per-tab back/forward list. docs/KNOWN_ISSUES.md §11 says so.
+    struct TabSnapshot {
+        QUrl url;
+        QString title;
+        QIcon icon;
+    };
+    bool snapshotTab(int index, TabSnapshot *snapshot) const;
+
     void showTabContextMenu(int index, const QPoint &globalPos);
     void reopenClosedTab();
     bool hasClosedTabs() const { return !m_closedTabUrls.isEmpty(); }

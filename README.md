@@ -87,6 +87,10 @@ Details, and what was deliberately *not* reproduced: [`docs/CLASSIC_UI.md`](docs
   titles and close buttons, smooth width animation.
 - **Horizontal tab strip** (both chromes; the only surface in classic mode) with active highlighting,
   audio indicators, drag-to-reorder and a `+` button that follows the last tab.
+- **Drag a sidebar row to reorder it, or drag it out of the window to open that tab in a new one.**
+  Reordering moves the real tab (`QTabBar::moveTab`), so the sidebar and the strip never disagree.
+  Tearing off reopens the page in a new window, which costs the tab's in-page state, its history and
+  its cookies - see [`docs/KNOWN_ISSUES.md`](docs/KNOWN_ISSUES.md) §11 for the exact trade-off.
 - **Ctrl+Click / middle-click** opens a new tab; `Ctrl+Shift+T` reopens the last closed one.
 - **Session restore** including sleeping tabs.
 
@@ -230,6 +234,7 @@ Cloudar-Browser/
 | Memory Saver, CPU tiers | implemented; **no unit tests yet** — see `docs/KNOWN_ISSUES.md` §9 |
 | Extensions | partial `chrome.*` shim — see `docs/KNOWN_ISSUES.md` §4 |
 | Interface languages | 10 languages, native chrome + internal pages; settings body copy still English — see `docs/LANGUAGE.md` |
+| Tab tear-off | opens the page in a new window with its own profile; in-page state and history do not move — see `docs/KNOWN_ISSUES.md` §11 |
 | Windows 7/8.1, Android, Debian 11 | **not** supported by this branch, on purpose |
 
 ---

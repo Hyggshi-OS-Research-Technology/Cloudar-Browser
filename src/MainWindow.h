@@ -47,7 +47,12 @@ class MainWindow : public QMainWindow
 {
     Q_OBJECT
 public:
-    explicit MainWindow(bool isIncognito = false, QWidget *parent = nullptr);
+    // `mirrorWindow` marks a window that was opened for one torn-off tab (see
+    // tearOffTab). Such a window neither restores the saved session — it is not
+    // a fresh start — nor writes it back, because the session is one list of
+    // URLs and two windows writing it would take turns clobbering each other.
+    explicit MainWindow(bool isIncognito = false, QWidget *parent = nullptr,
+                        bool mirrorWindow = false);
 
     void openUrl(const QUrl &url);
     void setSidebarVisible(bool visible);
@@ -62,6 +67,10 @@ public slots:
     // Opens (or focuses) the DevTools window for the current tab. Public because
     // both the F12 shortcut and the context menu reach it.
     void openDevToolsForCurrentTab();
+    // Where the sidebar's tear-off gesture lands: the tab is removed from this
+    // window and rebuilt in a new one. MainWindow owns the window-creation
+    // policy, which is why the sidebar only reports the gesture.
+    void tearOffTab(int index);
 
 private slots:
     void navigateToAddressBarInput();
@@ -142,6 +151,8 @@ private:
     QRect m_resizeStartGeometry;
     bool m_resizing = false;
     bool m_isIncognito = false;
+    // See the constructor: a window that exists to hold one torn-off tab.
+    bool m_mirrorWindow = false;
     bool m_firstShowDone = false;
     QVariantAnimation *m_sidebarAnimation = nullptr;
 

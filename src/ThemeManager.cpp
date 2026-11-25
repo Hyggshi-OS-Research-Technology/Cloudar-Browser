@@ -236,6 +236,7 @@ QString ThemeManager::modernStyleSheet(const QColor &color) const
         #BrowserSidebar QToolButton { color: %10; border-radius: 8px; padding: 6px; }
         #BrowserSidebar QToolButton:hover { background: %9; color: %6; }
         #BrowserSidebar QToolButton { min-width: 30px; }
+        #SidebarDropIndicator { background: %1; border-radius: 1px; }
         #SidebarTabs { background: transparent; border: none; outline: none; }
         #SidebarTabs::item { min-height: 38px; border-radius: 8px; margin: 2px 4px; padding: 0px; border: none; }
         #SidebarTabs::item:hover { background: %12; }
