@@ -208,8 +208,8 @@
 </head>
 <body>
   <header>
-    <h1>Permissions</h1>
-    <button id="clear">Clear All</button>
+    <h1 data-i18n="page_permissions">Permissions</h1>
+    <button id="clear" data-i18n="permissions_clear_all">Clear All</button>
   </header>
   <div class="table" id="table"></div>
 
@@ -243,18 +243,28 @@
       'camera and microphone', 'pointer lock', 'screen sharing',
       'screen and audio sharing', 'clipboard', 'local fonts'
     ];
-    const permLabels = {
-      'camera': 'Camera',
-      'microphone': 'Microphone',
-      'location': 'Location',
-      'notifications': 'Notifications',
-      'camera and microphone': 'Cam + Mic',
-      'pointer lock': 'Pointer',
-      'screen sharing': 'Screen',
-      'screen and audio sharing': 'Screen + Audio',
-      'clipboard': 'Clipboard',
-      'local fonts': 'Fonts'
+    // Labels resolve lazily, so a language change that arrives after this script
+    // runs still shows up in the next render. The stored capability ids (the
+    // object keys) are what PermissionStore and the native dialog use and never
+    // change with the language.
+    const permLabelKeys = {
+      'camera': 'permission_name_camera',
+      'microphone': 'permission_name_microphone',
+      'location': 'permission_name_location',
+      'notifications': 'permission_name_notifications',
+      'camera and microphone': 'permission_name_camera_and_microphone',
+      'pointer lock': 'permission_name_pointer_lock',
+      'screen sharing': 'permission_name_screen_sharing',
+      'screen and audio sharing': 'permission_name_screen_and_audio_sharing',
+      'clipboard': 'permission_name_clipboard',
+      'local fonts': 'permission_name_local_fonts'
     };
+    const permLabels = new Proxy({}, {
+      get: function (target, key) {
+        if (typeof key !== 'string' || !permLabelKeys[key]) return undefined;
+        return CloudarI18n.t(permLabelKeys[key], key);
+      }
+    });
 
     const buildSelect = (origin, key, value) => {
       const select = document.createElement('select');
@@ -272,15 +282,27 @@
     const render = (data) => {
       const origins = Object.keys(data || {});
       if (!origins.length) {
-        tableEl.innerHTML = '<div class="empty">No permissions stored yet.</div>';
+        tableEl.innerHTML = '<div class="empty"></div>';
+        tableEl.firstChild.textContent =
+          CloudarI18n.t('permissions_empty', 'No permissions stored yet.');
         return;
       }
 
       const table = document.createElement('table');
       const thead = document.createElement('thead');
-      thead.innerHTML = '<tr><th>Site</th>' + permKeys
-        .map((key) => `<th>${permLabels[key] || key}</th>`)
-        .join('') + '</tr>';
+      const headRow = document.createElement('tr');
+      // Built with textContent, not innerHTML: the column names come from the
+      // translation dictionary, and a translated string must never be parsed as
+      // markup.
+      const siteTh = document.createElement('th');
+      siteTh.textContent = CloudarI18n.t('permissions_site', 'Site');
+      headRow.appendChild(siteTh);
+      permKeys.forEach((key) => {
+        const th = document.createElement('th');
+        th.textContent = permLabels[key] || key;
+        headRow.appendChild(th);
+      });
+      thead.appendChild(headRow);
       table.appendChild(thead);
       const tbody = document.createElement('tbody');
 
@@ -306,7 +328,7 @@
     };
 
     document.getElementById('clear').onclick = () => {
-      if (confirm('Clear all saved permissions?')) {
+      if (confirm(CloudarI18n.t('permissions_clear_confirm', 'Clear all saved permissions?'))) {
         bridge.clearPermissions();
       }
     };
@@ -317,11 +339,17 @@
         bridge = channel.objects.internalBridge;
         if (!bridge) return;
         if (bridge.permissionsChanged) bridge.permissionsChanged.connect(load);
+
+      // The first render can happen before the dictionary has loaded; this hook
+      // (called by i18n.js) redraws the table in the resolved language.
+      window.cloudarLanguageApplied = function () { load(); };
         load();
       });
     };
 
     window.addEventListener('DOMContentLoaded', initChannel);
   </script>
+
+  <script src="i18n.js" defer></script>
 </body>
 </html>

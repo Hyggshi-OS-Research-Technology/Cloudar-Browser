@@ -56,26 +56,26 @@
     <h1 class="brand"><img src="qrc:/icon.png" alt="">Cloudar Browser</h1>
 
     <form class="search" id="searchForm" autocomplete="off">
-      <input type="text" id="searchInput" name="q" placeholder="Search the web" autofocus>
+      <input type="text" id="searchInput" name="q" placeholder="Search the web" data-i18n-placeholder="ntt_search_placeholder" autofocus>
       <span class="search-engine" id="searchEngine"></span>
     </form>
 
     <div class="tiles">
       <div class="tile" data-action="history" data-target="cloudar://history/">
         <div class="icon">&#128337;</div>
-        <div class="label">History</div>
+        <div class="label" data-i18n="ntt_history">History</div>
       </div>
       <div class="tile" data-action="downloads" data-target="cloudar://downloads/">
         <div class="icon">&#8681;</div>
-        <div class="label">Downloads</div>
+        <div class="label" data-i18n="ntt_downloads">Downloads</div>
       </div>
       <div class="tile" data-action="extensions" data-target="cloudar://extensions/">
         <div class="icon">&#129513;</div>
-        <div class="label">Extensions</div>
+        <div class="label" data-i18n="ntt_extensions">Extensions</div>
       </div>
       <div class="tile" data-action="settings" data-target="cloudar://settings/">
         <div class="icon">&#9881;</div>
-        <div class="label">Settings</div>
+        <div class="label" data-i18n="ntt_settings">Settings</div>
       </div>
     </div>
 
@@ -92,28 +92,28 @@
 
   <div class="mini-overlay" id="addOverlay">
     <div class="mini-dialog">
-      <h3>Add shortcut</h3>
-      <input type="text" id="addName" placeholder="Name" autocomplete="off">
+      <h3 data-i18n="ntt_add_shortcut">Add shortcut</h3>
+      <input type="text" id="addName" placeholder="Name" data-i18n-placeholder="ntt_name" autocomplete="off">
       <input type="text" id="addUrl" placeholder="https://example.com" autocomplete="off">
       <div class="row">
-        <button class="secondary" id="addCancel" type="button">Cancel</button>
-        <button class="action" id="addConfirm" type="button">Add</button>
+        <button class="secondary" id="addCancel" type="button" data-i18n="ntt_cancel">Cancel</button>
+        <button class="action" id="addConfirm" type="button" data-i18n="ntt_add">Add</button>
       </div>
     </div>
   </div>
 
   <aside class="panel" id="panel">
     <button class="close-btn" id="closePanel" type="button">&#10005;</button>
-    <h2>Customize this page</h2>
+    <h2 data-i18n="ntt_customize">Customize this page</h2>
 
     <section>
-      <label for="colorPicker">Background color</label>
+      <label for="colorPicker" data-i18n="ntt_background_color">Background color</label>
       <div class="swatches" id="swatches"></div>
       <input type="color" id="colorPicker" value="#10131a">
     </section>
 
     <section>
-      <label for="imageFile">Background image or video (from this device)</label>
+      <label for="imageFile" data-i18n="ntt_background_media">Background image or video (from this device)</label>
       <input type="file" id="imageFile" accept="image/*,video/mp4,video/webm,video/ogg,video/*">
       <div class="hint">Images (PNG, JPG, WebP) or videos (MP4, WebM for a live wallpaper).
         Saved by the browser in its own data folder, so it survives a restart and
@@ -128,13 +128,14 @@
       <!-- Reopens the frame editor. It opens by itself after a wallpaper is
            picked; this is for coming back to it later. Disabled until there is
            something to pan, because a button that does nothing is a defect. -->
-      <button class="action secondary" id="adjustFrame" type="button" disabled>
+      <button class="action secondary" id="adjustFrame" type="button" disabled
+              data-i18n="ntt_adjust_frame">
         Adjust the frame
       </button>
     </section>
 
     <section>
-      <label for="webImageUrl">Background media from the web</label>
+      <label for="webImageUrl" data-i18n="ntt_web_media">Background media from the web</label>
       <!-- "image or video URL" read as "any video link", so a YouTube share link
            went in and came back as "could not be loaded". This field loads a
            file, not a page, and the label and hint now say so before the click. -->
@@ -142,11 +143,11 @@
       <div class="hint">A direct link to the file itself, ending in .jpg, .png, .webp,
         .mp4 or .webm. A page address — including YouTube — will not work here:
         this field loads a file, and YouTube playback needs an embedded player.</div>
-      <button class="action" id="applyWebImage" type="button">Use this media</button>
+      <button class="action" id="applyWebImage" type="button" data-i18n="ntt_use_media">Use this media</button>
     </section>
 
     <section>
-      <button class="action secondary" id="resetBg" type="button">Reset to default</button>
+      <button class="action secondary" id="resetBg" type="button" data-i18n="ntt_reset">Reset to default</button>
     </section>
 
     <div class="bg-status" id="bgStatus" role="status" aria-live="polite"></div>
@@ -181,6 +182,7 @@
   <script src="qrc:/qtwebchannel/qwebchannel.js"></script>
   <script src="assets/scripts/app.js"></script>
   <script src="assets/scripts/speed-dial.js"></script>
+  <script src="i18n.js" defer></script>
   <script src="assets/scripts/search.js"></script>
   <script src="assets/scripts/background.js"></script>
   <script src="assets/scripts/customize.js"></script>

@@ -16,6 +16,8 @@ public:
     explicit BrowserSidebar(BrowserTabWidget *tabs, QWidget *parent = nullptr);
     bool isExpanded() const { return m_expanded; }
     void setExpanded(bool expanded);
+    // Re-reads the translated strings after a language change.
+    void retranslate();
 
     QSize sizeHint() const override;
     QSize minimumSizeHint() const override;

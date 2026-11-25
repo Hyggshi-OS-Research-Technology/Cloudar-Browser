@@ -203,19 +203,19 @@
     <div class="version" id="version">Version 0.2.0</div>
 
     <dl>
-      <dt>Qt</dt>
+      <dt data-i18n="about_engine_qt">Qt</dt>
       <dd id="qt">-</dd>
-      <dt>Chromium</dt>
+      <dt data-i18n="about_engine_chromium">Chromium</dt>
       <dd id="chromium">-</dd>
-      <dt>Platform</dt>
+      <dt data-i18n="about_platform">Platform</dt>
       <dd id="platform">-</dd>
-      <dt>Rendering</dt>
+      <dt data-i18n="about_rendering">Rendering</dt>
       <dd id="rendering">-</dd>
-      <dt>CPU tier</dt>
+      <dt data-i18n="about_cpu_tier">CPU tier</dt>
       <dd id="tier">-</dd>
     </dl>
 
-    <div class="footer">
+    <div class="footer" data-i18n="about_tagline">
       A Qt 6 / QtWebEngine browser with a Chrome 2009 interface option.
       MIT licensed.
     </div>
@@ -259,7 +259,11 @@
           var data = {};
           try { data = JSON.parse(json); } catch (e) { return; }
 
-          setText('version', data.version ? 'Version ' + data.version : '');
+          // The version *format* is translated; the number itself comes from the
+          // running build (SettingsBridge::getAll), never from this file.
+          setText('version', data.version
+            ? CloudarI18n.t('about_version', 'Version {version}').replace('{version}', data.version)
+            : '');
           setText('qt', data.qtVersion);
           setText('chromium', data.chromiumVersion);
           setText('platform', data.platform);
@@ -288,6 +292,8 @@
 
     window.addEventListener('DOMContentLoaded', init);
   </script>
+
+  <script src="i18n.js" defer></script>
 </body>
 
 </html>

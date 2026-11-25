@@ -1,6 +1,7 @@
 #include "BrowserSidebar.h"
 #include "BrowserTabWidget.h"
 #include "ClassicTheme.h"
+#include "Language.h"
 
 #include <QHBoxLayout>
 #include <QVBoxLayout>
@@ -95,7 +96,7 @@ public:
     void setTabInfo(const QString &title, const QUrl &url, const QPixmap &thumbnail,
                     const QString &state)
     {
-        m_titleLabel->setText(title.isEmpty() ? QStringLiteral("New Tab") : title);
+        m_titleLabel->setText(title.isEmpty() ? get_text("new_tab_title") : title);
 
         QString domain;
         if (url.scheme() == "cloudar" || url.scheme() == "browser" || url.scheme() == "light") {
@@ -130,7 +131,7 @@ public:
             QFont f = font();
             f.setPointSize(10);
             p.setFont(f);
-            p.drawText(QRectF(0, 0, 260, 146), Qt::AlignCenter, QStringLiteral("No preview available"));
+            p.drawText(QRectF(0, 0, 260, 146), Qt::AlignCenter, get_text("sidebar_no_preview"));
             p.end();
             m_thumbnailLabel->setPixmap(placeholder);
         }
@@ -138,10 +139,13 @@ public:
         // Truthful state label. The previous implementation printed a value
         // derived from qHash(url) and called it "Memory usage", which was not
         // a measurement of anything.
-        const bool sleeping = state.startsWith(QStringLiteral("Sleeping"), Qt::CaseInsensitive);
+        const bool sleeping = state == QLatin1String("sleeping");
         m_stateIcon->setText(sleeping ? QString::fromUtf8("\xF0\x9F\x92\xA4")
                                       : QString::fromUtf8("\xE2\x97\x8F"));
-        m_stateLabel->setText(state.isEmpty() ? QStringLiteral("Background") : state);
+        m_stateLabel->setText(sleeping ? get_text("tab_sleeping_state")
+                                       : state == QLatin1String("active")
+                                             ? get_text("tab_active_state")
+                                             : get_text("tab_background_state"));
 
         adjustSize();
     }
@@ -208,7 +212,7 @@ public:
         m_closeButton = new QToolButton(this);
         m_closeButton->setFixedSize(20, 20);
         m_closeButton->setText(QStringLiteral("✕"));
-        m_closeButton->setToolTip(QStringLiteral("Close tab"));
+        m_closeButton->setToolTip(get_text("menu_close_tab"));
         m_closeButton->setCursor(Qt::PointingHandCursor);
         m_closeButton->setObjectName(QStringLiteral("SidebarTabCloseButton"));
         m_closeButton->setVisible(false);
@@ -251,10 +255,13 @@ protected:
                 const QPixmap thumbnail = m_tabs->tabThumbnail(m_index);
                 const bool slept = m_tabs->isTabSlept(m_index);
                 const bool active = (m_tabs->currentIndex() == m_index);
+                // A state *code* crosses the boundary, not a translated
+                // sentence: the card draws the label, and the sleeping check
+                // below must not depend on which language that sentence is in.
                 m_hoverCard->setTabInfo(m_title, m_url, thumbnail,
-                                        slept ? QStringLiteral("Sleeping (memory released)")
-                                              : active ? QStringLiteral("Active renderer")
-                                                       : QStringLiteral("Background renderer"));
+                                        slept ? QStringLiteral("sleeping")
+                                              : active ? QStringLiteral("active")
+                                                       : QStringLiteral("background"));
                 const QPoint globalPos = mapToGlobal(QPoint(width() + 10, -6));
                 m_hoverCard->move(globalPos);
                 m_hoverCard->show();
@@ -325,12 +332,12 @@ BrowserSidebar::BrowserSidebar(BrowserTabWidget *tabs, QWidget *parent)
     m_toggleButton = new QToolButton(this);
     m_toggleButton->setObjectName("SidebarToggleButton");
     m_toggleButton->setText("☰");
-    m_toggleButton->setToolTip("Expand tabs sidebar");
+    m_toggleButton->setToolTip(get_text("nav_sidebar_expand"));
     m_toggleButton->setAutoRaise(true);
     m_toggleButton->setFixedSize(36, 32);
     topRow->addWidget(m_toggleButton);
 
-    m_title = new QLabel("Tabs", this);
+    m_title = new QLabel(get_text("sidebar_tabs"), this);
     m_title->setObjectName("SidebarTitle");
     m_title->setVisible(false);
     topRow->addWidget(m_title);
@@ -347,7 +354,7 @@ BrowserSidebar::BrowserSidebar(BrowserTabWidget *tabs, QWidget *parent)
     m_newTabButton = new QToolButton(this);
     m_newTabButton->setObjectName("SidebarNewTabButton");
     m_newTabButton->setText("+");
-    m_newTabButton->setToolTip("New tab");
+    m_newTabButton->setToolTip(get_text("file_new_tab"));
     m_newTabButton->setFixedHeight(36);
     m_newTabButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     m_newTabButton->setCursor(Qt::PointingHandCursor);
@@ -395,7 +402,7 @@ void BrowserSidebar::refresh()
         const QString tabLabel = m_tabs->tabText(i);
         const QString title = view && !view->title().isEmpty() ? view->title()
                                                               : (tabLabel.isEmpty()
-                                                                     ? QStringLiteral("New Tab")
+                                                                     ? get_text("new_tab_title")
                                                                      : tabLabel);
         const QUrl url = view ? view->url() : QUrl(m_tabs->urlForTabIndex(i));
         const QIcon icon = m_tabs->tabIcon(i);
@@ -430,16 +437,32 @@ void BrowserSidebar::setExpanded(bool expanded)
     style()->polish(this);
 
     m_toggleButton->setText(expanded ? "‹" : "☰");
-    m_toggleButton->setToolTip(expanded ? "Collapse tabs sidebar" : "Expand tabs sidebar");
+    m_toggleButton->setToolTip(expanded ? get_text("nav_sidebar_collapse")
+                                        : get_text("nav_sidebar_expand"));
     m_title->setVisible(expanded);
-    m_newTabButton->setText(expanded ? "+  New tab" : "+");
-    m_newTabButton->setToolTip("New tab");
+    m_newTabButton->setText(expanded ? QStringLiteral("+  ") + get_text("file_new_tab")
+                                     : QStringLiteral("+"));
+    m_newTabButton->setToolTip(get_text("file_new_tab"));
 
     updateGeometry();
     refresh();
 
     if (changed)
         emit expandedChanged(expanded);
+}
+
+void BrowserSidebar::retranslate()
+{
+    m_title->setText(get_text("sidebar_tabs"));
+    m_toggleButton->setToolTip(m_expanded ? get_text("nav_sidebar_collapse")
+                                          : get_text("nav_sidebar_expand"));
+    m_newTabButton->setText(m_expanded ? QStringLiteral("+  ") + get_text("file_new_tab")
+                                       : QStringLiteral("+"));
+    m_newTabButton->setToolTip(get_text("file_new_tab"));
+    // The per-row close buttons carry a tooltip too, and the rows are rebuilt
+    // here rather than walking each item widget: refresh() is the same path the
+    // tab list already uses for every other change.
+    refresh();
 }
 
 void BrowserSidebar::resizeEvent(QResizeEvent *event)
@@ -450,10 +473,11 @@ void BrowserSidebar::resizeEvent(QResizeEvent *event)
 
     m_title->setVisible(showDetails);
     m_toggleButton->setText(m_expanded ? "‹" : "☰");
-    m_toggleButton->setToolTip(m_expanded ? "Collapse tabs sidebar" : "Expand tabs sidebar");
+    m_toggleButton->setToolTip(m_expanded ? get_text("nav_sidebar_collapse")
+                                          : get_text("nav_sidebar_expand"));
 
     if (showDetails) {
-        m_newTabButton->setText("+  New tab");
+        m_newTabButton->setText(QStringLiteral("+  ") + get_text("file_new_tab"));
     } else {
         m_newTabButton->setText("+");
     }

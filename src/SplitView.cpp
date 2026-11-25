@@ -1,4 +1,5 @@
 #include "SplitView.h"
+#include "Language.h"
 #include "BrowserResources.h"
 #include "ClassicTheme.h"
 #include <QVBoxLayout>
@@ -40,7 +41,7 @@ SplitPane::SplitPane(QWebEngineProfile *profile, const QUrl &url, QWidget *paren
 
     m_urlBar = new QLineEdit(bar);
     m_urlBar->setObjectName("SplitPaneUrlBar");
-    m_urlBar->setPlaceholderText("Type URL or search");
+    m_urlBar->setPlaceholderText(get_text("splitview_url_placeholder"));
 
     barLayout->addWidget(m_backBtn);
     barLayout->addWidget(m_forwardBtn);

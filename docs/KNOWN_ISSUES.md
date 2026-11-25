@@ -143,3 +143,26 @@ matter most are all pure logic that is trivially testable:
 
 A smoke test cannot see any of that, which is why these bugs are the kind that
 survive releases.
+
+## 10. Interface language coverage
+
+The interface language setting is implemented end to end (see
+`docs/LANGUAGE.md`) and applies immediately. What it does **not** cover today:
+
+* **Settings page body copy.** Section names, page headings, card titles and the
+  Language card are translated; the long explanatory paragraphs under each
+  control — the most text-heavy part of the product — are still English only.
+  This is the largest remaining piece of translation work and it is deliberately
+  not claimed as done.
+* **Chromium-owned UI**: the DevTools window, the built-in PDF viewer and form
+  validation bubbles. Those strings live in QtWebEngine's resource tree; this
+  repository ships no `.pak` replacements for them.
+* **`--help` / `--version` output**, which `src/main.cpp` prints before
+  `QApplication` exists so that it works headless.
+* **`title` attributes on a few icon-only buttons** whose tooltip is set from a
+  literal in a file this PR did not touch; `tools/check-i18n.js` only enforces the
+  strings it can see, and those are plain `setToolTip("…")` calls, not `tr()`.
+
+`lang/{ja,zh}.json` were 13 keys short of `en.json` before this work; all
+dictionaries now carry identical key sets, which `node tools/check-i18n.js`
+enforces on every push.

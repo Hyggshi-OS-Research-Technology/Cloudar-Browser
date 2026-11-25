@@ -5,6 +5,7 @@
 #include "MemorySaver.h"
 #include "PerformanceProfile.h"
 #include "ClassicTheme.h"
+#include "Language.h"
 
 #include <QWebEngineProfile>
 // qWebEngineChromiumVersion() is declared in qtwebenginecoreglobal.h. There is
@@ -18,9 +19,11 @@
 #include <QStandardPaths>
 #include <QWidget>
 #include <QDir>
-#include <QCoreApplication>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QJsonDocument>
+#include <QLocale>
+#include <QCoreApplication>
 #include <QSysInfo>
 #include <QProcess>
 
@@ -470,6 +473,61 @@ void SettingsBridge::setColorMode(const QString &mode)
     ThemeManager::instance().setColorMode(parsed);
     // colorModeChanged repaints every window; this signal is only for the page.
     emit settingsChanged();
+}
+
+QString SettingsBridge::languageState() const
+{
+    LanguageManager *language = LanguageManager::instance();
+    QJsonObject obj;
+    // "preference" is what the user chose ("system" included); "code" is what is
+    // actually on screen. Both are needed: a page that only knew the resolved
+    // code could never show the System entry as selected again.
+    obj["preference"] = language->preference();
+    obj["code"] = language->getCurrentLanguage();
+    obj["followsSystem"] = language->followsSystemLocale();
+    obj["systemLocale"] = QLocale::system().name();
+    obj["systemLanguage"] = QLocale::system().nativeLanguageName();
+    obj["name"] = language->getAvailableLanguages().value(language->getCurrentLanguage());
+    obj["source"] = language->sourceDescription();
+    obj["translatedCount"] = language->translatedStringCount();
+    obj["referenceCount"] = language->referenceStringCount();
+
+    QJsonArray available;
+    const QMap<QString, QString> supported = language->getAvailableLanguages();
+    for (auto it = supported.constBegin(); it != supported.constEnd(); ++it) {
+        QJsonObject entry;
+        entry["code"] = it.key();
+        entry["name"] = it.value();
+        // Whether this dictionary is complete is a fact the page can show
+        // honestly instead of displaying a language as fully translated when it
+        // is not. It is computed from the same counts as above.
+        entry["complete"] = language->stringCountFor(it.key()) == language->referenceStringCount();
+        entry["translatedCount"] = language->stringCountFor(it.key());
+        available.append(entry);
+    }
+    obj["available"] = available;
+
+    return QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+}
+
+bool SettingsBridge::setLanguage(const QString &code)
+{
+    // setLanguage() persists and emits languageChanged, which every open
+    // MainWindow listens to in order to retranslate itself. Nothing else to do
+    // here — in particular no direct QSettings write, so the saved value and the
+    // running value can never disagree.
+    return LanguageManager::instance()->setLanguage(code);
+}
+
+void SettingsBridge::setFollowSystemLanguage(bool enabled)
+{
+    if (enabled) {
+        LanguageManager::instance()->setLanguage(QStringLiteral("system"));
+        emit settingsChanged();
+    }
+    // Switching it off has no meaning on its own: the page then sends an
+    // explicit code through setLanguage(), and ignoring this call is honest —
+    // there is no "neither system nor a language" state to store.
 }
 
 QString SettingsBridge::cpuTierSetting() const

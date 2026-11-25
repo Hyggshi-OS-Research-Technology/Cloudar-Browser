@@ -10,6 +10,7 @@
 #include "LightSchemeHandler.h"
 #include "PerformanceProfile.h"
 #include "ClassicTheme.h"
+#include "Language.h"
 
 int main(int argc, char *argv[])
 {
@@ -73,6 +74,13 @@ int main(int argc, char *argv[])
     QApplication::setApplicationName("Cloudar Browser");
     QApplication::setOrganizationName("Cloudar");
     QApplication::setApplicationVersion(QStringLiteral(CLOUDAR_VERSION));
+
+    // The interface language has to be installed before the first window is
+    // built, or the menus would be English until the user changed the setting
+    // once. The dictionaries are resolved from QSettings + QLocale inside
+    // LanguageManager, and the translator is installed here because a translator
+    // needs a QCoreApplication to exist.
+    LanguageManager::instance()->installOnApplication();
 
     // Second pass over the performance profile: the first one ran before
     // QApplication existed, so it could only apply defaults and environment

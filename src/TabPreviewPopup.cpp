@@ -1,4 +1,5 @@
 #include "TabPreviewPopup.h"
+#include "Language.h"
 #include "ClassicTheme.h"
 
 #include <QLabel>
@@ -168,16 +169,22 @@ void TabPreviewPopup::setContent(const QPixmap &thumbnail, const QString &title,
         QFont f = font();
         f.setPointSize(10);
         p.setFont(f);
-        p.drawText(QRectF(0, 0, 260, 146), Qt::AlignCenter, QStringLiteral("No preview available"));
+        p.drawText(QRectF(0, 0, 260, 146), Qt::AlignCenter, get_text("sidebar_no_preview"));
         p.end();
         m_thumbnailLabel->setPixmap(placeholder);
     }
 
-    // No invented numbers: report only the state we can actually observe.
-    const bool sleeping = state.startsWith(QStringLiteral("Sleeping"), Qt::CaseInsensitive);
+    // No invented numbers: report only the state we can actually observe. The
+    // caller passes a state *code* ("sleeping"/"active"/"background"), not a
+    // sentence, so this label follows the interface language and the sleeping
+    // check cannot break when that language changes.
+    const bool sleeping = state == QLatin1String("sleeping");
     m_stateIcon->setText(sleeping ? QString::fromUtf8("\xF0\x9F\x92\xA4")   // 💤
                                    : QString::fromUtf8("\xE2\x97\x8F"));  // ●
-    m_stateLabel->setText(state.isEmpty() ? QStringLiteral("Background") : state);
+    m_stateLabel->setText(sleeping ? get_text("tab_sleeping_state")
+                                    : state == QLatin1String("active")
+                                          ? get_text("tab_active_state")
+                                          : get_text("tab_background_state"));
 
     adjustSize();
 }

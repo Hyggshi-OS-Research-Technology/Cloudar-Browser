@@ -220,10 +220,10 @@
 </head>
 <body>
   <header>
-    <h1>History</h1>
+    <h1 data-i18n="page_history">History</h1>
     <div class="search">
-      <input id="query" type="text" placeholder="Search history" />
-      <button id="clear">Clear History</button>
+      <input id="query" type="text" placeholder="Search history" data-i18n-placeholder="history_search_placeholder" />
+      <button id="clear" data-i18n="history_clear_short">Clear History</button>
     </div>
   </header>
   <div class="list" id="list"></div>
@@ -253,7 +253,8 @@
     const render = (items) => {
       listEl.innerHTML = '';
       if (!items || !items.length) {
-        listEl.innerHTML = '<div class="empty">No history found.</div>';
+        listEl.innerHTML = '<div class="empty"></div>';
+        listEl.firstChild.textContent = CloudarI18n.t('history_empty', 'No history found.');
         return;
       }
       items.forEach((item) => {
@@ -288,7 +289,7 @@
     };
 
     document.getElementById('clear').onclick = () => {
-      if (confirm('Clear all browsing history?')) {
+      if (confirm(CloudarI18n.t('history_clear_confirm', 'Clear all browsing history?'))) {
         bridge.clearHistory();
       }
     };
@@ -307,5 +308,7 @@
 
     window.addEventListener('DOMContentLoaded', initChannel);
   </script>
+
+  <script src="i18n.js" defer></script>
 </body>
 </html>

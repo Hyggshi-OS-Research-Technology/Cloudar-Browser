@@ -111,6 +111,18 @@ public slots:
     bool colorSchemeQueryable() const;
     void setUiStyle(const QString &style);
 
+    // --- Language ---------------------------------------------------------
+    // Returns a JSON object: preference ("system" or a code), resolved code,
+    // the resolved language's own name, every supported language as
+    // [{code,name}], where the dictionary was loaded from, and how many of the
+    // reference strings it can answer for. That last pair is the difference
+    // between "translated" as a claim and as a measurement.
+    QString languageState() const;
+    // Persists the choice and applies it to every open window immediately.
+    // Returns false (and changes nothing) for a code that is not supported.
+    bool setLanguage(const QString &code);
+    void setFollowSystemLanguage(bool enabled);
+
     // Chrome 2009's two toolbar toggles: the Home button and the bookmarks bar.
     void setShowHomeButton(bool enabled);
     void setShowBookmarkBar(bool enabled);
